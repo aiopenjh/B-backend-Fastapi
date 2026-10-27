@@ -1,0 +1,25 @@
+[project]
+name = "b-backend-fastapi"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "kss8014", email = "kss8014@daum.net" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "asyncpg>=0.32.0",
+    "dotenv>=0.9.9",
+    "fastapi>=0.162.0",
+    "greenlet>=3.5.6",
+    "pydantic>=2.14.1",
+    "sqlalchemy>=2.1.6",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+b-backend-fastapi = "b_backend_fastapi:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"

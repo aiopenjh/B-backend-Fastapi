@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:17
+    container_name: b-backend-postgres
+    restart: unless-stopped
+    environment:
+      # 값은 .env에서 읽습니다 (compose가 프로젝트 루트의 .env를 자동 로드)
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env에 POSTGRES_PASSWORD를 설정하세요}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    ports:
+      # 내 PC에서만 접속 가능하도록 localhost에 바인딩
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # 컨테이너를 지워도 데이터가 유지되도록 named volume 사용
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
