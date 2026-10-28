@@ -1,6 +1,6 @@
 # 아키텍처와 API 설계
 
-상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
+상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
 
 ## 1. 요청 하나가 처리되는 흐름
 
@@ -56,7 +56,7 @@ src/
 ├── restaurant/              # 담당 2   (아래 모듈도 모두 같은 4계층)
 ├── slot/                    # 담당 3
 ├── reservation/             # 담당 4 (생성·취소) + 담당 5 (조회)
-└── owner/                   # 담당 5
+└── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
 ```
 
 모든 모듈·계층 패키지에 `__init__.py`를 둡니다.
@@ -64,11 +64,11 @@ src/
 | 모듈 | 담당 | 테이블 | 핵심 도메인 객체 |
 | --- | --- | --- | --- |
 | `common/`, `main.py` | `database.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `AppError` |
-| `user` | 담당 1 | `users` (+ 선택 `token_blacklist`) | `User` |
+| `user` | 담당 1 | `users`, `token_blacklist` | `User` |
 | `restaurant` | 담당 2 | `restaurants`, `menus` | `Restaurant`, `Menu` |
 | `slot` | 담당 3 | `reservation_slots` | `TimeSlot` |
-| `reservation` | 담당 4 · 담당 5 | `reservations` (+ 선택 `idempotency_records`) | `Reservation` |
-| `owner` | 담당 5 | `restaurant_members` | `RestaurantMember` |
+| `reservation` | 담당 4 · 담당 5 | `reservations` | `Reservation` |
+| `owner` | 담당 5 | 없음 (`restaurants.owner_id`로 판단) | — |
 
 `reservation` 모듈은 두 사람이 나눠 쓰므로 **파일 단위로 담당을 나눕니다** (쓰기 = 담당 4, 조회 = 담당 5).
 
@@ -80,6 +80,8 @@ src/
 | `presentation/schemas.py` (`ReservationCreate`, `ReservationOut`), `presentation/router.py` | 담당 4 |
 | `application/query_service.py`, `infrastructure/query_repository.py`, `presentation/query_router.py` | 담당 5 |
 
+`owner` 모듈은 **자기 테이블이 없는 조회·권한 모듈**입니다. 운영자 역할 검사 의존성(`require_owner`)과 운영자용 조회 API를 둡니다. `presentation`, `application`, `infrastructure`(다른 모듈 ORM 모델을 JOIN하는 조회 레포지토리)만 쓰고 `domain`은 비워 둡니다.
+
 ### 모듈 사이 참조 규칙
 
 모듈 안에서는 1장의 계층 방향을 따릅니다. 다른 모듈의 코드는 아래 범위에서만 가져다 씁니다.
@@ -87,10 +89,10 @@ src/
 | 다른 모듈의 무엇을 | 허용 | 예 |
 | --- | --- | --- |
 | `domain` 객체 · 예외 | 허용 | 예약 서비스가 `TimeSlot.reserve()` 호출 |
-| `application`의 조회 함수 (커밋하지 않음) | 허용 | 식당 수정 API가 `owner`의 `is_member()` 호출 |
+| `application`의 조회 함수 (커밋하지 않음) | 허용 | `owner` 서비스가 `restaurant`의 식당 조회 함수 호출 |
 | `infrastructure` 레포지토리 | **같은 트랜잭션이 꼭 필요할 때만**, 세션을 넘겨서 사용. 커밋은 호출한 서비스가 함 | 예약 서비스가 `slot` 레포지토리로 슬롯 행 락 |
 | `infrastructure` ORM 모델 | FK 선언과 조회용 JOIN에만 | 예약 조회의 `reservations` ⋈ `reservation_slots` |
-| `presentation` | 금지. 예외: `user.presentation.dependencies.get_current_user` | — |
+| `presentation` | 금지. 예외: 인증·권한 의존성 `user.presentation.dependencies.get_current_user`, `owner.presentation.dependencies.require_owner` | 식당 수정 API가 `require_owner` 사용 |
 
 ### DB 세션
 
@@ -105,15 +107,12 @@ src/
 
 ```mermaid
 erDiagram
-    users ||--o{ restaurant_members : "소속"
-    restaurants ||--o{ restaurant_members : "운영자"
+    users ||--o{ restaurants : "운영"
     restaurants ||--o{ menus : "메뉴"
     restaurants ||--o{ reservation_slots : "시간대"
     users ||--o{ reservations : "예약자"
     reservation_slots ||--o{ reservations : "예약"
-    users ||--o{ token_blacklist : "선택"
-    users ||--o{ idempotency_records : "선택"
-    reservations |o--o{ idempotency_records : "선택"
+    users ||--o{ token_blacklist : "로그아웃"
 
     users {
         BIGINT id PK
@@ -128,6 +127,7 @@ erDiagram
     }
     restaurants {
         BIGINT id PK
+        BIGINT owner_id FK "운영자 users.id"
         VARCHAR(150) name
         TEXT description
         VARCHAR(255) address
@@ -148,12 +148,6 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
-    restaurant_members {
-        BIGINT id PK
-        BIGINT user_id FK
-        BIGINT restaurant_id FK
-        TIMESTAMPTZ created_at
-    }
     reservation_slots {
         BIGINT id PK
         BIGINT restaurant_id FK
@@ -167,7 +161,7 @@ erDiagram
     }
     reservations {
         BIGINT id PK
-        BIGINT user_id FK
+        BIGINT user_id FK "예약자, NOT NULL"
         BIGINT slot_id FK
         INTEGER party_size
         VARCHAR(16) status "CONFIRMED | CANCELLED"
@@ -182,41 +176,35 @@ erDiagram
         TIMESTAMPTZ expires_at
         TIMESTAMPTZ created_at
     }
-    idempotency_records {
-        BIGINT id PK
-        BIGINT user_id FK
-        VARCHAR(50) operation "예약 | 취소"
-        VARCHAR(128) idempotency_key
-        CHAR(64) request_hash
-        BIGINT reservation_id FK
-        TIMESTAMPTZ expires_at
-        TIMESTAMPTZ created_at
-    }
 ```
 
 | 테이블 | 용도 | 담당 | 범위 |
 | --- | --- | --- | --- |
 | `users` | 시드 계정 (비밀번호는 해시로 저장), 역할 `CUSTOMER`/`OWNER` | 담당 1 | 필수 |
-| `restaurants` | 공개 식당 정보와 운영 상태 | 담당 2 | 필수 |
+| `restaurants` | 공개 식당 정보, 운영 상태, 운영자(`owner_id`) | 담당 2 | 필수 |
 | `menus` | 식당별 메뉴와 가격 | 담당 2 | 필수 |
-| `restaurant_members` | 어떤 운영자가 어떤 식당 소속인지 | 담당 5 | 필수 |
 | `reservation_slots` | 시간대, 수용 인원, 예약된 인원, 1회 최대 인원 | 담당 3 | 필수 |
 | `reservations` | 예약자, 슬롯, 인원, 상태, 시각 | 담당 4 | 필수 |
-| `token_blacklist` | 로그아웃한 토큰(`jti`)을 만료까지 차단 | 담당 1 | 선택 과제 |
-| `idempotency_records` | 같은 요청을 재시도해도 예약이 두 번 생기지 않게 막음 | 담당 4 | 선택 과제 |
+| `token_blacklist` | 로그아웃한 토큰(`jti`)을 만료까지 차단 | 담당 1 | 필수 |
+
+**ERD 수정 (2026-10-28)**
+
+- `restaurant_members` 삭제 → `restaurants.owner_id`(FK → `users.id`). 식당 하나에 운영자 한 명이고, 운영자 한 명은 식당 여러 개를 가질 수 있습니다(1:N). 그래서 JOIN 테이블 없이 FK 컬럼 하나로 충분합니다.
+- `idempotency_records` 삭제. 재시도 중복은 6장의 중복 예약 규칙으로 일부 막고, 남는 경우는 한계로 설명합니다.
+- `reservations.user_id`는 NOT NULL을 유지합니다. 예약 행은 예약이 확정될 때만 INSERT하므로 예약자가 없는 예약은 존재하지 않습니다. "예약 가능"은 예약 행이 아니라 슬롯의 `capacity − reserved_guests`로 판단합니다. 빈 예약 행을 미리 만들어 두고 `user_id`를 채우는 방식은 쓰지 않습니다.
 
 ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담당이 이유를 설명할 수 있어야 합니다.
 
-- 모든 FK에 외래 키 제약, `restaurant_id`·`user_id`·`slot_id`에 인덱스
-- `users.email` UNIQUE, `restaurant_members (user_id, restaurant_id)` UNIQUE, `token_blacklist.token_jti` UNIQUE
+- 모든 FK에 외래 키 제약, `owner_id`·`restaurant_id`·`user_id`·`slot_id`에 인덱스
+- `restaurants.owner_id`, `reservations.user_id`, `token_blacklist.user_id`는 NOT NULL
+- `users.email` UNIQUE, `token_blacklist.token_jti` UNIQUE (요청마다 이 컬럼으로 조회하므로 인덱스 역할도 함)
 - `menus.price >= 0`
 - `reservation_slots`: `0 <= reserved_guests <= capacity`, `max_party_size >= 1`, `starts_at < ends_at`, 인덱스 `(restaurant_id, starts_at)`
 - `reservations`: `party_size >= 1`, `status IN ('CONFIRMED', 'CANCELLED')`
-- `idempotency_records (user_id, operation, idempotency_key)` UNIQUE
 
 타입 대응: `BIGINT` PK → `BigInteger` 자동 증가, `TIMESTAMPTZ` → `DateTime(timezone=True)`. `deleted_at`은 소프트 삭제 표시입니다. 값이 있는 행은 공개 조회에서 빼고, 삭제·탈퇴 API는 만들지 않습니다.
 
-**시드 데이터** (lifespan에서 넣음, 20건 이상): 식당 3곳(서로 다른 `cuisine`), 메뉴 9개, 고객 2명, 서로 다른 식당 소속 운영자 2명, 슬롯 12개 이상(열린 슬롯, 꽉 찬 슬롯, `max_party_size`가 작은 슬롯 포함). 슬롯 시각은 시드를 넣는 날 기준 **앞으로의 날짜**로 계산하고, 한 식당 안에서 겹치지 않게 합니다. 재시작할 때는 이미 시드가 있으면(예: 시드 이메일 존재) 건너뜁니다.
+**시드 데이터** (lifespan에서 넣음, 20건 이상): 식당 3곳(서로 다른 `cuisine`), 메뉴 9개, 고객 2명, 운영자 2명(운영자 A는 식당 2곳, 운영자 B는 1곳을 `owner_id`로 소유), 슬롯 12개 이상(열린 슬롯, 꽉 찬 슬롯, `max_party_size`가 작은 슬롯 포함). 슬롯 시각은 시드를 넣는 날 기준 **앞으로의 날짜**로 계산하고, 한 식당 안에서 겹치지 않게 합니다. 재시작할 때는 이미 시드가 있으면(예: 시드 이메일 존재) 건너뜁니다.
 
 ## 4. 예약 규칙
 
@@ -229,8 +217,8 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 - 예약은 바로 확정. 결제, 임시 홀드, 승인, 일정 변경 없음. 상태는 `CONFIRMED`, `CANCELLED` 두 가지
 - 취소는 예약자 본인만, 슬롯 시작 전까지만. 취소하면 `cancelled_at`을 기록하고 좌석을 복구
 - 이미 취소한 예약은 다시 취소할 수 없음 (409, 좌석도 다시 복구하지 않음)
-- 고객은 자기 예약만, 운영자는 소속 식당의 예약만 봄. 운영자는 고객 예약을 취소하지 않음
-- 운영자 계정과 소속은 시드로만 만듦. 일반 요청으로 권한을 얻을 수 없음
+- 고객은 자기 예약만, 운영자는 자기 식당(`owner_id`)의 예약만 봄. 운영자는 고객 예약을 취소하지 않음
+- 운영자 계정과 식당 소유(`owner_id`)는 시드로만 만듦. 일반 요청으로 권한을 얻을 수 없음
 - 시각은 타임존 포함으로 저장. 날짜 필터와 "하루"의 기준은 **Asia/Seoul 고정** (ERD에 식당별 타임존 컬럼 없음). 가격은 원 단위 정수
 - 예약 오픈 시각 규칙은 두지 않음 (ERD에 컬럼 없음)
 
@@ -253,26 +241,42 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 | --- | --- | --- | --- |
 | 1 | `user` | `POST /auth/login` | OAuth2 폼(`username`=이메일, `password`), 토큰 발급 |
 | 1 | `user` | `GET /users/me` | 현재 사용자 의존성 |
+| 1 | `user` | `POST /auth/logout` | 현재 토큰의 `jti`를 블랙리스트에 저장, 204 |
 | 2 | `restaurant` | `GET /restaurants` | 검색(`q`) · 필터(`cuisine`) · 정렬(`sort`) · 페이지(`page`/`page_size`) |
 | 2 | `restaurant` | `GET /restaurants/{id}` | 상세 + 메뉴, 404 |
-| 2 | `restaurant` | `PATCH /owner/restaurants/{id}` | 허용된 필드만 수정, 소속 확인 |
+| 2 | `restaurant` | `PATCH /owner/restaurants/{id}` | 허용된 필드만 수정, 역할·소유 확인 |
 | 3 | `slot` | `GET /restaurants/{id}/availability` | `date`, `party_size`, `TimeSlot.can_accept()` |
 | 4 | `reservation` | `POST /reservations` | `slot_id`/`party_size`, 행 락 트랜잭션 |
 | 4 | `reservation` | `POST /reservations/{id}/cancel` | 상태 전환, 좌석 복구 |
 | 5 | `reservation` | `GET /users/me/reservations` | 로그인한 사용자의 예약 목록 |
 | 5 | `reservation` | `GET /reservations/{id}` | 본인 예약이거나 해당 식당 운영자일 때만 |
-| 5 | `owner` | `GET /owner/restaurants` | 현재 운영자의 소속 식당 |
-| 5 | `owner` | `GET /owner/restaurants/{id}/reservations` | 소속 기준으로 걸러진 예약, 날짜 필터(선택) |
+| 5 | `owner` | `GET /owner/restaurants` | 현재 운영자가 소유한 식당 (`WHERE owner_id = 나`) |
+| 5 | `owner` | `GET /owner/restaurants/{id}/reservations` | 소유 확인 후 그 식당의 예약, 날짜 필터(선택) |
 
 경로 접두어와 모듈은 다를 수 있습니다. 예를 들어 `/restaurants/{id}/availability`는 슬롯 규칙을 쓰므로 `slot` 모듈에 둡니다. `PATCH /owner/restaurants/{id}`는 식당 정보를 바꾸므로 `restaurant` 모듈에 둡니다.
 
-선택 과제 API (`POST /auth/signup`, `POST /auth/logout`, `Idempotency-Key` 헤더)는 필수 흐름이 다 돌아간 뒤에 추가합니다.
+선택 과제 API(`POST /auth/signup`)는 필수 흐름이 다 돌아간 뒤에 추가합니다.
 
 ## 6. 보안과 트랜잭션
 
 **인증**: 비밀번호는 검증된 해시 라이브러리로 저장하고 비교합니다 (README 기술 스택). 암호화 로직을 직접 만들지 않습니다. 토큰은 PyJWT로 만든 짧은 수명의 Bearer JWT입니다. `sub`=사용자 id, `exp`, `jti`를 넣습니다. 로그인은 `OAuth2PasswordRequestForm`(폼 전송)으로 받습니다. 그래서 `/docs`의 **Authorize** 버튼으로 바로 로그인해서 다른 API를 시험할 수 있습니다.
 
-**로그아웃**: 기본 범위에서는 서버가 토큰을 무효화하지 않습니다. 토큰은 만료될 때까지 유효하고, 이 점은 시연 때 한계로 설명합니다. 선택 과제로 `POST /auth/logout`을 만들면 `jti`를 `token_blacklist`에 저장하고, `get_current_user`가 차단 목록을 확인합니다.
+**로그아웃 (블랙리스트)**: JWT는 서버가 저장하지 않습니다. 그래서 아무것도 하지 않으면 로그아웃한 토큰도 만료 전까지 그대로 쓸 수 있습니다. `POST /auth/logout`은 현재 토큰의 `jti`와 `exp`를 `token_blacklist`에 저장하고 204를 돌려줍니다. `get_current_user`는 아래 순서로 검사합니다.
+
+1. 서명·만료 검사 (DB 없이 계산만). 실패하면 401
+2. `token_jti`로 블랙리스트 조회. 있으면 401
+3. 사용자 조회. 없거나 `deleted_at`이 있으면 401
+
+블랙리스트는 PostgreSQL 테이블이고 Redis를 쓰지 않습니다. 만료된 행(`expires_at < now()`)은 앱 시작 때 lifespan에서 지웁니다. 블랙리스트는 로그아웃한 그 토큰 하나만 막고, 다른 기기에서 받은 토큰까지 막지는 않습니다.
+
+**운영자 권한 (2단계)**: 운영자 API는 역할과 소유를 차례로 확인합니다.
+
+| 단계 | 확인 | 실패 시 | 위치 |
+| --- | --- | --- | --- |
+| 1. 역할 | `role == OWNER` | 403 | `owner/presentation/dependencies.py` — `require_owner` (모든 `/owner/*` 라우트에 적용) |
+| 2. 소유 | `restaurant.owner_id == 현재 사용자 id` | 403 | `restaurant/domain/restaurant.py` — `Restaurant.is_owned_by(user_id)` |
+
+FK는 "그 id의 사용자가 존재한다"만 보장하고 역할은 확인하지 않습니다. 그래서 1단계를 따로 둡니다. 운영자 식당 목록(`GET /owner/restaurants`)은 `WHERE owner_id = 나` 조건 자체가 2단계 검증입니다. 남의 식당은 404로 숨기지 않고 403을 돌려줍니다. 식당은 `GET /restaurants/{id}`로 누구나 존재를 알 수 있기 때문입니다. 반대로 남의 예약은 존재 자체가 개인 정보라서 404로 숨깁니다.
 
 **예약 생성**은 서비스가 아래를 **한 트랜잭션 안에서** 처리합니다.
 
@@ -293,7 +297,7 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 
 행 락 코드는 기본 구현에 넣습니다. **동시 요청을 실제로 재현하는 테스트는 선택 과제**입니다. 할 때는 서로 독립된 PostgreSQL 연결(세션 두 개)로 겹치게 실행합니다. 순차 요청, 목, Python 락으로는 DB 동시성을 검증할 수 없습니다. 참고: [PostgreSQL 행 락](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS)
 
-**멱등성 (선택 과제, 담당 4)**: `Idempotency-Key` 헤더를 받습니다. 같은 사용자·작업·키·요청 해시로 다시 오면 기존 예약을 돌려줍니다. 같은 키인데 요청 내용이 다르면 409 `IDEMPOTENCY_KEY_REUSED`를 돌려줍니다. 키 선점은 `idempotency_records`의 UNIQUE 제약으로 같은 트랜잭션 안에서 합니다.
+**재시도 중복**: 예약 요청 중복 방지 테이블(`idempotency_records`)은 ERD에서 뺐습니다. 같은 사용자가 같은 슬롯에 두 번 예약되는 것은 중복 예약 규칙(409 `DUPLICATE_RESERVATION`)이 막습니다. 네트워크 오류 뒤 재시도하면서 다른 슬롯에 예약되는 경우는 시연 때 한계로 설명합니다.
 
 ## 7. 범위에서 뺀 것
 
@@ -303,8 +307,10 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 | CI | 제외 (2026-10-28) | PR 전에 로컬에서 테스트, 실행 결과를 PR에 기록 |
 | Redis 캐시 | 제외 (2026-10-28) | 모든 조회를 PostgreSQL에서 바로 읽음 |
 | Alembic 마이그레이션 | 제외 (2026-10-28) | lifespan `create_all`. 스키마가 바뀌면 로컬 DB를 다시 만듦 |
-| 회원가입, 로그아웃 토큰 차단 | 선택 과제 (담당 1) | 시드 계정으로 로그인 |
-| 멱등성, 동시성 재현 테스트 | 선택 과제 (담당 4) | 행 락 코드 + 순차 테스트 |
+| 회원가입 | 선택 과제 (담당 1) | 시드 계정으로 로그인 |
+| 예약 요청 중복 방지 (멱등성) | 제외 — ERD에서 테이블 삭제 (2026-10-28) | 같은 슬롯 중복 예약 규칙 |
+| 한 식당을 운영자 여러 명이 공동 운영 | 제외 — `restaurant_members` 삭제 (2026-10-28) | 식당 하나에 운영자 한 명 (`owner_id`) |
+| 동시성 재현 테스트 | 선택 과제 (담당 4) | 행 락 코드 + 순차 테스트 |
 | 예약 오픈 시각 | 제외 (ERD에 컬럼 없음) | 슬롯 시작 전이면 예약 가능 |
 | 외부 배포 | 제출 조건일 때만 | 로컬 데모 |
 
