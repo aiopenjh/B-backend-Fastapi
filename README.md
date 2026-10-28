@@ -93,15 +93,15 @@ flowchart TD
 src/
 ├── main.py              # 앱 생성, lifespan(테이블 생성 + 시드), 미들웨어, 라우터 등록
 ├── common/              # DB 세션, 설정, 공통 에러 형식, Page[T], 미들웨어
-├── user/                # 담당 1: 로그인 · 현재 사용자
+├── user/                # 담당 1 강성수: 로그인 · 로그아웃 · 현재 사용자
 │   ├── domain/
 │   ├── application/
 │   ├── infrastructure/
 │   └── presentation/
-├── restaurant/          # 담당 2: 식당 · 메뉴 (모듈마다 같은 4계층)
-├── slot/                # 담당 3: 예약 시간대 · 예약 가능 조회 · 시드
-├── reservation/         # 담당 4: 예약 생성·취소 / 담당 5: 예약 조회
-└── owner/               # 담당 5: 운영자 권한 검사 · 운영자 조회 (자기 테이블 없음)
+├── restaurant/          # 담당 2 김태양: 식당 · 메뉴 (모듈마다 같은 4계층)
+├── slot/                # 담당 3 이영민: 예약 시간대 · 예약 가능 조회 · 시드
+├── reservation/         # 담당 4 김민지: 예약 생성·취소 / 담당 5 최지훈: 예약 조회
+└── owner/               # 담당 5 최지훈: 운영자 권한 검사 · 운영자 조회 (자기 테이블 없음)
 ```
 
 각 모듈·계층 패키지에 `__init__.py`를 포함합니다. 현재 저장소의 레이어 우선 골격(`src/domain/`, `src/infrastructure/database.py` 등)은 위 구조로 옮길 예정입니다.

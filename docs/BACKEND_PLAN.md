@@ -39,11 +39,11 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 
 | 담당 | 모듈 | 맡는 테이블 | API | 공용 부품 |
 | --- | --- | --- | --- | --- |
-| **담당 1** | `src/user/` | `users` · `token_blacklist` | `POST /auth/login` · `GET /users/me` · `POST /auth/logout` | `get_current_user` · 요청 로그/CORS 미들웨어 |
-| **담당 2** | `src/restaurant/` | `restaurants` · `menus` | `GET /restaurants` · `GET /restaurants/{id}` · `PATCH /owner/restaurants/{id}` | `Page[T]` · 공통 에러 형식 · `Restaurant.is_owned_by` |
-| **담당 3** | `src/slot/` | `reservation_slots` | `GET /restaurants/{id}/availability` | `TimeSlot` 도메인 규칙 · lifespan 시드 |
-| **담당 4** | `src/reservation/` (쓰기) | `reservations` | `POST /reservations` · `POST /reservations/{id}/cancel` | `ReservationOut` · `Reservation` 도메인 규칙 |
-| **담당 5** | `src/owner/` + `src/reservation/` (조회) | 없음 (다른 테이블을 JOIN해 조회) | `GET /users/me/reservations` · `GET /reservations/{id}` · `GET /owner/restaurants` · `GET /owner/restaurants/{id}/reservations` | `require_owner` (운영자 역할 검사) |
+| **담당 1 · 강성수** | `src/user/` | `users` · `token_blacklist` | `POST /auth/login` · `GET /users/me` · `POST /auth/logout` | `get_current_user` · 요청 로그/CORS 미들웨어 |
+| **담당 2 · 김태양** | `src/restaurant/` | `restaurants` · `menus` | `GET /restaurants` · `GET /restaurants/{id}` · `PATCH /owner/restaurants/{id}` | `Page[T]` · 공통 에러 형식 · `Restaurant.is_owned_by` |
+| **담당 3 · 이영민** | `src/slot/` | `reservation_slots` | `GET /restaurants/{id}/availability` | `TimeSlot` 도메인 규칙 · lifespan 시드 |
+| **담당 4 · 김민지** | `src/reservation/` (쓰기) | `reservations` | `POST /reservations` · `POST /reservations/{id}/cancel` | `ReservationOut` · `Reservation` 도메인 규칙 |
+| **담당 5 · 최지훈** | `src/owner/` + `src/reservation/` (조회) | 없음 (다른 테이블을 JOIN해 조회) | `GET /users/me/reservations` · `GET /reservations/{id}` · `GET /owner/restaurants` · `GET /owner/restaurants/{id}/reservations` | `require_owner` (운영자 역할 검사) |
 
 모든 경로 앞에는 `/api/v1`이 붙습니다. 담당 4는 트랜잭션이 들어가는 쓰기 2개에 집중하고, 예약 조회는 담당 5가 같은 모듈 안 별도 파일(`query_*.py`)로 만듭니다 ([ARCHITECTURE 2장](ARCHITECTURE.md#2-폴더-구조와-담당)).
 
@@ -92,7 +92,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 ## 4. 담당별 상세
 
-### 담당 1 · 인증 · 사용자 (`src/user/`)
+### 담당 1 (강성수) · 인증 · 사용자 (`src/user/`)
 
 **도메인**: 시드로 넣은 고객·운영자 계정으로 로그인하고, 보호된 API가 "지금 요청한 사람이 누구인지" 알 수 있게 합니다. 로그아웃하면 그 토큰을 블랙리스트에 넣어 더 이상 쓰지 못하게 합니다. 모든 팀원이 이 결과를 씁니다. 앱 전체에 걸리는 미들웨어(요청 로그·처리 시간, CORS)도 맡습니다.
 
@@ -130,7 +130,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **테스트**: 올바른 계정 로그인 → 200 / 틀린 비밀번호 → 401 / 로그아웃한 토큰으로 `GET /users/me` → 401
 
-### 담당 2 · 식당 · 메뉴 (`src/restaurant/`)
+### 담당 2 (김태양) · 식당 · 메뉴 (`src/restaurant/`)
 
 **도메인**: 누구나 보는 식당 목록·상세와 메뉴, 그리고 운영자만 쓰는 식당 정보 수정입니다. "이 식당의 주인인가"(`Restaurant.is_owned_by`)도 식당의 규칙이라 담당 2가 만듭니다. 팀 전체가 쓰는 **공통 응답 형식**(목록 `Page[T]`, 에러 응답)도 맡습니다. 공통 실습 기준 예제를 이어받습니다.
 
@@ -167,7 +167,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **테스트 2개**: 있는 식당 상세 → 200 + 메뉴 / 없는 id → 404
 
-### 담당 3 · 예약 가능 시간 · 시드 (`src/slot/`)
+### 담당 3 (이영민) · 예약 가능 시간 · 시드 (`src/slot/`)
 
 **도메인**: 날짜와 인원을 고르면 그 식당에서 예약할 수 있는 시간대를 보여 줍니다. "이 슬롯에 N명이 들어갈 수 있나" 규칙을 `TimeSlot`에 만들어 **담당 4의 예약 생성과 공유**합니다. 팀 전체가 쓰는 lifespan 테이블 생성과 시드도 관리합니다.
 
@@ -201,7 +201,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **테스트 2개**: 열린 슬롯 `available: true` · 꽉 찬 슬롯 `false` / `party_size=0` → 422 (+ `TimeSlot` 단위 테스트)
 
-### 담당 4 · 예약 생성 · 취소 (`src/reservation/` 쓰기)
+### 담당 4 (김민지) · 예약 생성 · 취소 (`src/reservation/` 쓰기)
 
 **도메인**: 예약을 만들고 취소합니다. 슬롯 인원을 바꾸는 유일한 쓰기라서 **트랜잭션과 행 락**을 배우는 담당입니다. 취소 규칙은 `Reservation` 도메인 객체에 둡니다.
 
@@ -240,7 +240,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **테스트 2개**: 남은 자리 있는 슬롯 → 201 + `reserved_guests` 증가 / 꽉 찬 슬롯 → 409 (+ `Reservation` 단위 테스트)
 
-### 담당 5 · 예약 조회 · 운영자 (`src/owner/` + `src/reservation/` 조회)
+### 담당 5 (최지훈) · 예약 조회 · 운영자 (`src/owner/` + `src/reservation/` 조회)
 
 **도메인**: 고객은 자기 예약만, 운영자는 자기 식당 예약만 보게 합니다. **인증(누구인가)과 인가(볼 수 있는가)를 구분**하는 담당입니다. 운영자 역할 검사 `require_owner`를 만들어 모든 운영자 API에 공유합니다.
 
@@ -276,7 +276,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 ## 5. 일정 (ROADMAP 기준)
 
-| 일차 | 담당 1 | 담당 2 | 담당 3 | 담당 4 | 담당 5 |
+| 일차 | 담당 1 강성수 | 담당 2 김태양 | 담당 3 이영민 | 담당 4 김민지 | 담당 5 최지훈 |
 | --- | --- | --- | --- | --- | --- |
 | D1~D3 (10.26~28) | 공통 실습: 식당 상세 4계층 → 404/422 → DB → 테스트 2개 · **G1** 후 모듈 배정 | ← | ← | ← | ← |
 | D4 (10.29) | users · 로그인(`jti` 포함) · `get_current_user` 공유 | 식당 상세·목록 · `Page[T]`·에러 형식 공유 | 슬롯 모델 · `TimeSlot` 공유 · **lifespan 시드 공유** | reservations 모델 · `Reservation` 도메인 · 생성 서비스 뼈대 | `require_owner` · 운영자 조회 레포지토리 뼈대 |

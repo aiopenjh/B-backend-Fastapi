@@ -64,11 +64,11 @@ src/
 | 모듈 | 담당 | 테이블 | 핵심 도메인 객체 |
 | --- | --- | --- | --- |
 | `common/`, `main.py` | `database.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `AppError` |
-| `user` | 담당 1 | `users`, `token_blacklist` | `User` |
-| `restaurant` | 담당 2 | `restaurants`, `menus` | `Restaurant`, `Menu` |
-| `slot` | 담당 3 | `reservation_slots` | `TimeSlot` |
-| `reservation` | 담당 4 · 담당 5 | `reservations` | `Reservation` |
-| `owner` | 담당 5 | 없음 (`restaurants.owner_id`로 판단) | — |
+| `user` | 담당 1 (강성수) | `users`, `token_blacklist` | `User` |
+| `restaurant` | 담당 2 (김태양) | `restaurants`, `menus` | `Restaurant`, `Menu` |
+| `slot` | 담당 3 (이영민) | `reservation_slots` | `TimeSlot` |
+| `reservation` | 담당 4 (김민지) · 담당 5 (최지훈) | `reservations` | `Reservation` |
+| `owner` | 담당 5 (최지훈) | 없음 (`restaurants.owner_id`로 판단) | — |
 
 `reservation` 모듈은 두 사람이 나눠 쓰므로 **파일 단위로 담당을 나눕니다** (쓰기 = 담당 4, 조회 = 담당 5).
 
