@@ -9,6 +9,7 @@
 | 문서 | 내용 |
 | --- | --- |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | 모듈·계층 구조, ERD, 예약 규칙, API, 트랜잭션 |
+| [API_SPEC](docs/API_SPEC.md) | API 명세 작성 기준, 공통 응답·에러 형식, 템플릿 |
 | [BACKEND_PLAN](docs/BACKEND_PLAN.md) | 담당 1~5별 모듈·테이블·API·배울 것 |
 | [ROADMAP](docs/ROADMAP.md) | 12일 일정과 체크포인트 |
 | [WORKFLOW](docs/WORKFLOW.md) | 브랜치·리뷰·통합 방식 |
