@@ -23,7 +23,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | `presentation` | 요청 받기, Pydantic 입력 검증, 현재 사용자 확인, 결과를 응답 스키마로 변환 | SQL 작성, 업무 규칙 판단 | `router.py`, `schemas.py` |
 | `application` | 레포지토리로 조회 → 도메인 규칙 실행 → 저장 → `commit()` | 규칙을 직접 계산, HTTP 응답 만들기 | `service.py` |
-| `domain` | 순수 파이썬 객체(`dataclass`)와 업무 규칙, 규칙 위반 예외 | FastAPI · SQLAlchemy · Pydantic import | `<엔티티>.py`, `exceptions.py` |
+| `domain` | 순수 파이썬 객체(`dataclass`)와 업무 규칙, 규칙 위반 예외 | FastAPI · SQLAlchemy · Pydantic import | `<엔티티>.py`, `exceptions.py`, `repository.py`(레포지토리 인터페이스, 선택) |
 | `infrastructure` | ORM 모델, 레포지토리(조회·저장, ORM 모델 ↔ 도메인 객체 변환) | `commit()` (서비스가 함) | `models.py`, `repository.py` |
 
 **공통 실습 (D1~D3)**: 모두가 식당 상세 조회를 4계층으로 만듭니다. 라우터 → 서비스 → 레포지토리 → 도메인 `Restaurant` → 없으면 404. 처음에는 레포지토리를 메모리 리스트로 만들고, 그다음 DB 쿼리로 바꿉니다. **레포지토리만 바뀌고 다른 계층은 그대로**인 것을 직접 확인하는 것이 목표입니다.
@@ -32,7 +32,8 @@ flowchart LR
 - **모듈**: `src/` 아래의 도메인 폴더 하나 (`user`, `restaurant` …). 같은 앱 안에서 코드를 나눈 단위이고, 따로 배포하는 서비스가 아님
 - **도메인 객체**: DB를 모르는 순수 파이썬 객체. 업무 규칙과 상태 변경 메서드를 가짐
 - **ORM 모델**: DB 테이블과 1:1로 대응하는 SQLAlchemy 클래스
-- **레포지토리**: ORM 모델로 DB를 읽고 써서, 도메인 객체로 바꿔 돌려주는 클래스
+- **레포지토리**: ORM 모델로 DB를 읽고 써서, 도메인 객체로 바꿔 돌려주는 클래스. 인터페이스(ABC)를 `domain`에 두면 `infrastructure`가 그것을 구현하므로 참조 방향(`infrastructure → domain`)이 그대로 유지되고, 메모리 구현 ↔ DB 구현을 바꿔도 서비스는 바뀌지 않음
+- **컨테이너**: `src/container.py`. 세션 → 레포지토리 구현체 → 서비스를 `Depends`로 조립하는 곳. 구현체를 고르는 코드는 여기에만 둠
 - **서비스**: 하나의 유스케이스(예약하기, 취소하기)의 순서를 조율하고 트랜잭션을 확정
 - **세션/트랜잭션**: 비동기 `AsyncSession` 하나가 요청 하나의 DB 작업을 묶음
 
@@ -41,30 +42,45 @@ flowchart LR
 ```text
 src/
 ├── main.py                  # 앱 생성, lifespan(테이블 생성 + 시드), 미들웨어, 라우터 등록
+├── container.py             # 의존성 조립: 세션 → 레포지토리 구현체 → 서비스
 ├── common/                  # 여러 모듈이 함께 쓰는 기반
 │   ├── config.py            # 환경변수(.env) 읽기
-│   ├── database.py          # 비동기 엔진, AsyncSession 의존성, ORM Base
+│   ├── database.py          # 비동기 엔진, AsyncSession 의존성
+│   ├── model.py             # ORM 공용 Base (모든 infrastructure/models.py가 상속)
 │   ├── errors.py            # AppError 계열 예외 (순수 파이썬, 도메인에서도 사용)
-│   ├── error_handlers.py    # 공통 에러 응답 형식으로 변환
+│   ├── schemas.py           # APIResponse[T] 응답 봉투 (성공·실패 공통)
+│   ├── error_handlers.py    # 예외 → 실패 봉투(APIResponse)로 변환
 │   ├── pagination.py        # Page[T] 목록 응답
 │   └── middleware.py        # 요청 로그 · 처리 시간, CORS
-├── user/                    # 담당 1
+├── auth/                    # 담당 1 (로그인 · 로그아웃 · 현재 사용자 의존성)
 │   ├── domain/
 │   ├── application/
 │   ├── infrastructure/
 │   └── presentation/
+│       ├── routers/v1/router.py
+│       ├── schemas.py
+│       └── dependencies.py  # get_current_user
+├── user/                    # 담당 1 (사용자 정보)
+│   ├── domain/
+│   ├── application/
+│   ├── infrastructure/
+│   └── presentation/
+│       └── routers/v1/router.py
 ├── restaurant/              # 담당 2   (아래 모듈도 모두 같은 4계층)
 ├── slot/                    # 담당 3
 ├── reservation/             # 담당 4 (생성·취소) + 담당 5 (조회)
 └── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
 ```
 
-모든 모듈·계층 패키지에 `__init__.py`를 둡니다.
+모든 모듈·계층 패키지에 `__init__.py`를 둡니다 (`routers/`, `routers/v1/` 포함).
+
+`auth`와 `user`는 라우터를 API 버전별 폴더(`presentation/routers/v1/router.py`)에 둡니다. 라우터 자체의 `prefix`는 `/auth`, `/users`처럼 리소스 경로만 쓰고, `/api/v1`은 `main.py`에서 `include_router(..., prefix="/api/v1")`로 붙입니다.
 
 | 모듈 | 담당 | 테이블 | 핵심 도메인 객체 |
 | --- | --- | --- | --- |
-| `common/`, `main.py` | `database.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `AppError` |
-| `user` | 담당 1 (강성수) | `users`, `token_blacklist` | `User` |
+| `common/`, `main.py` | `database.py`·`model.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `AppError` |
+| `auth` | 담당 1 (강성수) | `token_blacklist` | — (토큰 발급·검증, 블랙리스트) |
+| `user` | 담당 1 (강성수) | `users` | `User` |
 | `restaurant` | 담당 2 (김태양) | `restaurants`, `menus` | `Restaurant`, `Menu` |
 | `slot` | 담당 3 (이영민) | `reservation_slots` | `TimeSlot` |
 | `reservation` | 담당 4 (김민지) · 담당 5 (최지훈) | `reservations` | `Reservation` |
@@ -92,14 +108,14 @@ src/
 | `application`의 조회 함수 (커밋하지 않음) | 허용 | `owner` 서비스가 `restaurant`의 식당 조회 함수 호출 |
 | `infrastructure` 레포지토리 | **같은 트랜잭션이 꼭 필요할 때만**, 세션을 넘겨서 사용. 커밋은 호출한 서비스가 함 | 예약 서비스가 `slot` 레포지토리로 슬롯 행 락 |
 | `infrastructure` ORM 모델 | FK 선언과 조회용 JOIN에만 | 예약 조회의 `reservations` ⋈ `reservation_slots` |
-| `presentation` | 금지. 예외: 인증·권한 의존성 `user.presentation.dependencies.get_current_user`, `owner.presentation.dependencies.require_owner` | 식당 수정 API가 `require_owner` 사용 |
+| `presentation` | 금지. 예외: 인증·권한 의존성 `auth.presentation.dependencies.get_current_user`, `owner.presentation.dependencies.require_owner` | 식당 수정 API가 `require_owner` 사용 |
 
 ### DB 세션
 
 - 모든 DB 작업은 비동기입니다 (`create_async_engine` + `asyncpg` + `AsyncSession`). 라우터와 서비스, 레포지토리 메서드는 `async def`입니다.
 - 세션은 요청 하나당 하나만 씁니다 (`Depends(get_session)`). 한 세션을 `asyncio.gather` 등으로 동시에 쓰지 않습니다.
 - `commit()`은 application 서비스에서만 합니다. 레포지토리는 id가 필요할 때 `flush()`까지만 합니다.
-- 테이블은 앱 시작 시 lifespan에서 `Base.metadata.create_all`로 만듭니다. Alembic은 쓰지 않습니다 (7장).
+- 테이블은 앱 시작 시 lifespan에서 `Base.metadata.create_all`로 만듭니다 (`Base`는 `common/model.py`). `create_all` 전에 모든 모듈의 `infrastructure/models.py`가 import되어 있어야 테이블이 `Base.metadata`에 등록됩니다. Alembic은 쓰지 않습니다 (7장).
 
 > 현재 저장소에는 레이어를 먼저 나눈 골격(`src/domain/`, `src/application/` …)과 `src/infrastructure/database.py`(`AsyncConnection` 의존성)가 있습니다. 위 모듈 구조로 옮길 때 `database.py`는 `src/common/database.py`로 옮기고, ORM용 `AsyncSession` 의존성을 추가합니다.
 
@@ -239,9 +255,9 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 
 | 담당 | 모듈 | 메서드와 경로 | 핵심 포인트 |
 | --- | --- | --- | --- |
-| 1 | `user` | `POST /auth/login` | OAuth2 폼(`username`=이메일, `password`), 토큰 발급 |
+| 1 | `auth` | `POST /auth/login` | OAuth2 폼(`username`=이메일, `password`), 토큰 발급 |
 | 1 | `user` | `GET /users/me` | 현재 사용자 의존성 |
-| 1 | `user` | `POST /auth/logout` | 현재 토큰의 `jti`를 블랙리스트에 저장, 204 |
+| 1 | `auth` | `POST /auth/logout` | 현재 토큰의 `jti`를 블랙리스트에 저장, 204 |
 | 2 | `restaurant` | `GET /restaurants` | 검색(`q`) · 필터(`cuisine`) · 정렬(`sort`) · 페이지(`page`/`page_size`) |
 | 2 | `restaurant` | `GET /restaurants/{id}` | 상세 + 메뉴, 404 |
 | 2 | `restaurant` | `PATCH /owner/restaurants/{id}` | 허용된 필드만 수정, 역할·소유 확인 |
