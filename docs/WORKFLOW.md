@@ -33,9 +33,9 @@
 
 ## 4. 브랜치와 리뷰
 
-main에서 짧게 쓰고 끝낼 기능 브랜치를 땁니다. 각자 따로 구현한 걸 마지막 날까지 들고 있지 않습니다.
+`dev`에서 짧게 쓰고 끝낼 기능 브랜치를 따고, PR도 `dev`로 보냅니다. 각자 따로 구현한 걸 마지막 날까지 들고 있지 않습니다.
 
-- 브랜치 이름: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`
+- 브랜치 이름: `feat/<topic>`, `fix/<topic>`, `docs/<topic>` 또는 `<이니셜>-<topic>` (예: `feat/user-auth`, `cjh-owner-restaurants`)
 - 커밋 메시지는 결과가 드러나게, scope는 모듈 이름으로. 예: `feat(reservation): prevent double seat restore on cancel`
 
 PR에는 동작, 계약/스키마 변경, 실제로 돌린 테스트 결과, 알려진 한계, 재현 가능한 요청 예시를 넣습니다. 작성자가 아닌 팀원이 diff를 읽고 동작 하나를 재현해 봅니다. 공용 코드(`common/`, `main.py`)나 보안·트랜잭션 코드는 별도 기술 리뷰도 받습니다. 리뷰 후 크게 고쳤다면 다시 리뷰를 받습니다.

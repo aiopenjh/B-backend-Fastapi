@@ -120,7 +120,7 @@
 | 500 | `INTERNAL_SERVER_ERROR` | 처리하지 못한 예외. 요청 로그 미들웨어가 잡아 `request_id`가 든 실패 봉투로 응답하고 스택을 로그에 남김 |
 | 503 | `SERVICE_UNAVAILABLE` | DB 연결 실패 |
 
-401·403·404·422·503 코드 이름은 담당 2(김태양)의 초안이고 팀이 확정합니다 ([BACKEND_PLAN 7장](BACKEND_PLAN.md#7-팀이-확인할-것)). 새 코드가 필요하면 이 표에 먼저 추가하고 공유합니다.
+401·403·404·422·500·503 코드는 `common/errors.py`의 `CommonErrorCode`에 들어 있습니다 (HTTP 상태와 기본 메시지를 함께 가짐). 409 코드는 아직 코드에 없고, 쓰는 담당이 추가합니다. 새 코드가 필요하면 이 표에 먼저 추가하고 공유합니다.
 
 ### 예시 데이터
 
@@ -217,7 +217,8 @@ Authorization: Bearer <access_token>
 
 {
   "slot_id": 7,
-  "party_size": 2
+  "party_size": 2,
+  "contact_phone": "010-1234-5678"
 }
 ```
 
@@ -225,6 +226,7 @@ Authorization: Bearer <access_token>
 | --- | --- | --- | --- | --- |
 | `slot_id` | body | 정수 | O | 존재하는 슬롯 id |
 | `party_size` | body | 정수 | O | 1 이상 (상한은 슬롯의 `max_party_size`로 409에서 판단) |
+| `contact_phone` | body | 문자열 | X | 연락처, 20자 이하 |
 
 **응답 상세**
 
@@ -255,6 +257,7 @@ Authorization: Bearer <access_token>
     "starts_at": "2026-10-30T18:00:00+09:00",
     "ends_at": "2026-10-30T19:00:00+09:00",
     "party_size": 2,
+    "contact_phone": "010-1234-5678",
     "status": "CONFIRMED",
     "created_at": "2026-10-28T15:20:00+09:00",
     "cancelled_at": null,

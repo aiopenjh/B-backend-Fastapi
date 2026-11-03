@@ -1,6 +1,6 @@
 # 아키텍처와 API 설계
 
-상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
+상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수 · 2026-11-03 dev 코드(PR #2~#4) 기준으로 파일 이름·현재 상태 갱신). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
 
 ## 1. 요청 하나가 처리되는 흐름
 
@@ -24,7 +24,7 @@ flowchart LR
 | `presentation` | 요청 받기, Pydantic 입력 검증, 현재 사용자 확인, 결과를 응답 스키마로 변환 | SQL 작성, 업무 규칙 판단 | `router.py`, `schemas.py` |
 | `application` | 레포지토리로 조회 → 도메인 규칙 실행 → 저장 → `commit()` | 규칙을 직접 계산, HTTP 응답 만들기 | `service.py` |
 | `domain` | 순수 파이썬 객체(`dataclass`)와 업무 규칙, 규칙 위반 예외 | FastAPI · SQLAlchemy · Pydantic import | `<엔티티>.py`, `exceptions.py`, `repository.py`(레포지토리 인터페이스, 선택) |
-| `infrastructure` | ORM 모델, 레포지토리(조회·저장, ORM 모델 ↔ 도메인 객체 변환) | `commit()` (서비스가 함) | `models.py`, `repository.py` |
+| `infrastructure` | ORM 모델, 레포지토리(조회·저장, ORM 모델 ↔ 도메인 객체 변환) | `commit()` (서비스가 함) | `models.py`, `repository.py` (인터페이스를 구현할 때는 `repositories.py`) |
 
 **공통 실습 (D1~D3)**: 모두가 식당 상세 조회를 4계층으로 만듭니다. 라우터 → 서비스 → 레포지토리 → 도메인 `Restaurant` → 없으면 404. 처음에는 레포지토리를 메모리 리스트로 만들고, 그다음 DB 쿼리로 바꿉니다. **레포지토리만 바뀌고 다른 계층은 그대로**인 것을 직접 확인하는 것이 목표입니다.
 
@@ -44,14 +44,15 @@ src/
 ├── main.py                  # 앱 생성, lifespan(테이블 생성 + 시드), 미들웨어, 라우터 등록
 ├── container.py             # 의존성 조립: 세션 → 레포지토리 구현체 → 서비스
 ├── common/                  # 여러 모듈이 함께 쓰는 기반
-│   ├── config.py            # 환경변수(.env) 읽기
-│   ├── database.py          # 비동기 엔진, AsyncSession 의존성
+│   ├── config.py            # 환경변수(.env) 읽기 (예정. 지금은 database.py가 .env를 직접 읽음)
+│   ├── database.py          # 비동기 엔진, AsyncSession 의존성 get_session
 │   ├── model.py             # ORM 공용 Base (모든 infrastructure/models.py가 상속)
-│   ├── errors.py            # AppError 계열 예외 (순수 파이썬, 도메인에서도 사용)
+│   ├── errors.py            # 에러 코드표 ErrorCode · CommonErrorCode (+ AppError 계열 예외 예정)
 │   ├── schemas.py           # APIResponse[T] 응답 봉투 (성공·실패 공통)
-│   ├── error_handlers.py    # 예외 → 실패 봉투(APIResponse)로 변환
-│   ├── pagination.py        # Page[T] 목록 응답
-│   └── middleware.py        # 요청 로그 · 처리 시간, CORS
+│   ├── context.py           # 요청 id(request_id_var). 미들웨어가 넣고 APIResponse가 읽음
+│   ├── error_handlers.py    # 예외 → 실패 봉투(APIResponse)로 변환 (예정)
+│   ├── pagination.py        # Page[T] 목록 응답 (예정)
+│   └── middleware.py        # 요청 id · 요청 로그 · 처리 시간, 처리 못 한 예외 → 500 봉투, CORS
 ├── auth/                    # 담당 1 (로그인 · 로그아웃 · 현재 사용자 의존성)
 │   ├── domain/
 │   ├── application/
@@ -59,11 +60,11 @@ src/
 │   └── presentation/
 │       ├── routers/v1/router.py
 │       ├── schemas.py
-│       └── dependencies.py  # get_current_user
+│       └── dependencies.py  # get_current_user (예정)
 ├── user/                    # 담당 1 (사용자 정보)
-│   ├── domain/
+│   ├── domain/              # user.py(User, Role), repository.py(UserRepository 인터페이스)
 │   ├── application/
-│   ├── infrastructure/
+│   ├── infrastructure/      # repositories.py(SQLAlchemyUserRepository)
 │   └── presentation/
 │       └── routers/v1/router.py
 ├── restaurant/              # 담당 2   (아래 모듈도 모두 같은 4계층)
@@ -78,7 +79,7 @@ src/
 
 | 모듈 | 담당 | 테이블 | 핵심 도메인 객체 |
 | --- | --- | --- | --- |
-| `common/`, `main.py` | `database.py`·`model.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `AppError` |
+| `common/`, `main.py` | `database.py`·`model.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `APIResponse`, `ErrorCode` (`AppError` 예정) |
 | `auth` | 담당 1 (강성수) | `token_blacklist` | — (토큰 발급·검증, 블랙리스트) |
 | `user` | 담당 1 (강성수) | `users` | `User` |
 | `restaurant` | 담당 2 (김태양) | `restaurants`, `menus` | `Restaurant`, `Menu` |
@@ -117,7 +118,7 @@ src/
 - `commit()`은 application 서비스에서만 합니다. 레포지토리는 id가 필요할 때 `flush()`까지만 합니다.
 - 테이블은 앱 시작 시 lifespan에서 `Base.metadata.create_all`로 만듭니다 (`Base`는 `common/model.py`). `create_all` 전에 모든 모듈의 `infrastructure/models.py`가 import되어 있어야 테이블이 `Base.metadata`에 등록됩니다. Alembic은 쓰지 않습니다 (7장).
 
-> 현재 저장소에는 레이어를 먼저 나눈 골격(`src/domain/`, `src/application/` …)과 `src/infrastructure/database.py`(`AsyncConnection` 의존성)가 있습니다. 위 모듈 구조로 옮길 때 `database.py`는 `src/common/database.py`로 옮기고, ORM용 `AsyncSession` 의존성을 추가합니다.
+> `src/common/database.py`에는 ORM용 `get_session`(`AsyncSession`)과, 처음 골격에서 쓰던 `get_conn`(`AsyncConnection`, 연결 실패 시 503)이 함께 있습니다. ORM 코드는 `get_session`을 씁니다.
 
 ## 3. 데이터 모델 (ERD)
 
@@ -180,6 +181,7 @@ erDiagram
         BIGINT user_id FK "예약자, NOT NULL"
         BIGINT slot_id FK
         INTEGER party_size
+        VARCHAR(20) contact_phone "연락처, 선택"
         VARCHAR(16) status "CONFIRMED | CANCELLED"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at

@@ -62,6 +62,26 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | 소유 확인 `Restaurant.is_owned_by(user_id)` | 담당 2 | 2 · 5 | D5 | `restaurant.owner_id == user.id`를 직접 비교 |
 | `ReservationOut` 응답 스키마 + `Reservation.can_cancel()` | 담당 4 | 4 · 5 | D5 | 4장의 필드 표를 그대로 따름 |
 
+### 공용 부품 현재 상태 (2026-11-03, dev 기준)
+
+| 부품 | 상태 | 위치 (들어온 PR) |
+| --- | --- | --- |
+| 응답 봉투 `APIResponse[T]` (`ok`·`fail`) | 있음 | `common/schemas.py` (#3) |
+| 에러 코드표 `ErrorCode`·`CommonErrorCode` | 있음 | `common/errors.py` (#3) |
+| 요청 로그·처리 시간·CORS 미들웨어, 요청 id | 있음 | `common/middleware.py`, `common/context.py` (#3) |
+| ORM 공용 `Base` | 있음 | `common/model.py` (#3) |
+| `AsyncSession` 의존성 `get_session` | 있음 | `common/database.py` (#3) |
+| `User`·`Role`, `UserRepository` 인터페이스 | 있음 (구현체 `SQLAlchemyUserRepository`는 아직 빈 껍데기) | `user/domain/`, `user/infrastructure/repositories.py`, `container.py` (#3) |
+| auth·user 라우터 골격 (`/api/v1/auth`, `/api/v1/users`) | 있음 (로그인 본문은 아직 없음) | `*/presentation/routers/v1/router.py`, `main.py` (#3) |
+| `ReservationModel`, `Reservation`(`create`), `ReservationOut` | 있음 | `reservation/` (#4) |
+| `require_owner` | 있음 (가져오는 `get_current_user`·`ForbiddenError`·`User.is_owner`가 아직 없어 이름 맞춤 필요) | `owner/presentation/dependencies.py` (#2) |
+| `get_current_user` | 없음 | `auth/presentation/dependencies.py` 예정 |
+| `AppError` 계열 예외 + 예외 핸들러 | 없음 | `common/errors.py`, `common/error_handlers.py` 예정 |
+| `Page[T]` | 없음 | `common/pagination.py` 예정 |
+| `UserModel`, `TokenBlacklistModel`, `Restaurant`·`RestaurantModel`, `TimeSlot`·슬롯 모델 | 없음 | 각 모듈 예정 |
+| `Reservation.can_cancel()`, `ReservationOut.from_domain()` | 없음 | `reservation/` 예정 |
+| lifespan `create_all` + 시드 | 없음 (`main.py`에 lifespan이 없고, `common/model.py`의 `init_models`는 빈 함수) | `main.py`, `src/seed.py` 예정 |
+
 ## 3. 다 같이 배우는 공통 기초 (D1~D3)
 
 ROADMAP 그대로, 처음 3일은 모두 같은 작은 기능을 4계층으로 만들며 아래 개념을 익힙니다. 이 개념은 이후 모든 담당이 그대로 씁니다.
@@ -211,14 +231,14 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **도메인**: 예약을 만들고 취소합니다. 슬롯 인원을 바꾸는 유일한 쓰기라서 **트랜잭션과 행 락**을 배우는 담당입니다. 취소 규칙은 `Reservation` 도메인 객체에 둡니다.
 
-**테이블** — `reservations`: `id`, `user_id`(FK·IX), `slot_id`(FK·IX), `party_size`, `status`(`CONFIRMED` · `CANCELLED`), `created_at`, `updated_at`, `cancelled_at`
+**테이블** — `reservations`: `id`, `user_id`(FK·IX), `slot_id`(FK·IX), `party_size`, `contact_phone`(선택), `status`(`CONFIRMED` · `CANCELLED`), `created_at`, `updated_at`, `cancelled_at`
 
 | API | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
-| `POST /reservations` | 토큰 + `{slot_id, party_size}` | 201 `ReservationOut` | 422 · 401 · 404 슬롯 없음 · 409 `SLOT_SOLD_OUT` / `PARTY_SIZE_EXCEEDED` / `SLOT_ALREADY_STARTED` / `DUPLICATE_RESERVATION` |
+| `POST /reservations` | 토큰 + `{slot_id, party_size, contact_phone?}` | 201 `ReservationOut` | 422 · 401 · 404 슬롯 없음 · 409 `SLOT_SOLD_OUT` / `PARTY_SIZE_EXCEEDED` / `SLOT_ALREADY_STARTED` / `DUPLICATE_RESERVATION` |
 | `POST /reservations/{id}/cancel` | 토큰 | 200 `ReservationOut` | 401 · 404 없음·남의 예약 · 409 `ALREADY_CANCELLED` / `CANCELLATION_NOT_ALLOWED` |
 
-`ReservationOut` = `id, user_id, slot_id, restaurant_id, starts_at, ends_at, party_size, status, created_at, cancelled_at, can_cancel` — 예약 + 슬롯으로 만듭니다.
+`ReservationOut` = `id, user_id, slot_id, restaurant_id, starts_at, ends_at, party_size, contact_phone, status, created_at, cancelled_at, can_cancel` — 예약 + 슬롯으로 만듭니다.
 
 `can_cancel = 요청한 사람이 예약자 AND status = CONFIRMED AND 슬롯 시작 전` — `Reservation.can_cancel()` 하나로 계산하고 `cancel()`도 같은 판단을 씁니다. 운영자가 보면 항상 `false`입니다.
 
@@ -307,5 +327,5 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 ## 7. 팀이 확인할 것
 
 - `restaurants.status` 값(예: `OPEN`·`CLOSED`)과, `CLOSED` 식당의 슬롯 예약을 막을지 (지금은 표시용)
-- 에러 코드 이름 — 409 코드는 [ARCHITECTURE 4장](ARCHITECTURE.md#4-예약-규칙)에 있음. 나머지(`VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`)는 담당 2가 초안을 만들고 팀이 정함
-- 모듈 골격 정리 (커밋 5fff636에서 시작) — 남은 것: `database.py`를 `src/restaurant/infrastructure/`에서 `src/common/`으로 이동, `reservation`·`common` 모듈과 빠진 `infrastructure/` 패키지 추가, `src/owner/`는 자기 테이블이 없으므로 `domain/`은 비워 둠. D4 시작 전에 지원 작업으로 정리
+- 에러 코드 이름 — 409 코드는 [ARCHITECTURE 4장](ARCHITECTURE.md#4-예약-규칙)에 있음. 공통 코드(`UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `INTERNAL_SERVER_ERROR`, `SERVICE_UNAVAILABLE`)는 `common/errors.py`의 `CommonErrorCode`로 들어옴 (PR #3). 남은 것: `AppError` 예외 모양과 409 코드를 어디에 둘지
+- 모듈 골격 정리 (커밋 5fff636에서 시작) — 완료: `database.py`는 `src/common/`으로 옮겼고, `common`·`auth`·`reservation` 모듈이 생김. `src/owner/domain/`은 비워 둠

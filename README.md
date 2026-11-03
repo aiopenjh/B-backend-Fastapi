@@ -4,7 +4,7 @@
 
 가게 예약 서비스 예시를 통해 **요청 받기 → 업무 규칙 확인 → DB 저장 → 결과 응답**의 흐름을 배우고 구현합니다.
 
-> 현재는 구현 초기 단계입니다 (Docker PostgreSQL과 비동기 DB 연결까지 준비). 세부 설계는 [docs/](docs/)를 봅니다.
+> 현재는 구현 중입니다 (2026-11-03 dev 기준). Docker PostgreSQL, 비동기 DB 세션, 공통 응답 봉투, 요청 로그·CORS 미들웨어, auth·user 골격, 예약 모델이 들어왔습니다. 세부 설계와 남은 공용 부품은 [docs/](docs/)와 [BACKEND_PLAN 2장](docs/BACKEND_PLAN.md#공용-부품-현재-상태-2026-11-03-dev-기준)을 봅니다.
 
 | 문서 | 내용 |
 | --- | --- |
@@ -32,8 +32,9 @@
 | API와 서버 실행 | FastAPI, Uvicorn |
 | 데이터 검증 | Pydantic |
 | 데이터 저장 | PostgreSQL 17 (Docker Compose), SQLAlchemy 비동기 ORM, asyncpg |
-| 인증 | OAuth2 비밀번호 폼, JWT(PyJWT), passlib/bcrypt |
-| 테스트 | pytest, httpx(`AsyncClient`) |
+| 인증 | OAuth2 비밀번호 폼, JWT(PyJWT), bcrypt |
+| 테스트 | pytest, pytest-asyncio, httpx(`AsyncClient`) |
+| 코드 검사 | ruff |
 
 **비동기 DB 연결은 필수입니다.** 예약 생성에는 행 락을 넣고, 여러 요청이 같은 좌석을 동시에 예약하는 상황을 **실제로 재현해 검증하는 것은 선택 도전 기능**입니다.
 
@@ -44,7 +45,7 @@
 | 대상 | 모듈 | 의미 |
 | --- | --- | --- |
 | `User` | `user` | 회원 정보 (손님 `CUSTOMER` / 운영자 `OWNER`) |
-| `TokenBlacklist` | `user` | 로그아웃으로 사용을 막은 토큰 목록 |
+| `TokenBlacklist` | `auth` | 로그아웃으로 사용을 막은 토큰 목록 |
 | `Restaurant`, `Menu` | `restaurant` | 가게의 이름·분류·주소·운영 상태, 운영자(`owner_id`)와 메뉴 |
 | `TimeSlot` | `slot` | 이용 시간, 총 수용 인원, 예약된 인원, 1회 최대 인원을 가진 시간대 |
 | `Reservation` | `reservation` | 어느 회원이 어떤 시간대에 몇 명을 예약했는지 나타내는 내역 |
@@ -61,14 +62,14 @@
 
 ## 모듈과 4계층 구조
 
-코드는 먼저 **도메인 모듈**(`user`, `restaurant`, `slot`, `reservation`, `owner`)로 나누고, 각 모듈 안을 4계층으로 나눕니다.
+코드는 먼저 **도메인 모듈**(`auth`, `user`, `restaurant`, `slot`, `reservation`, `owner`)로 나누고, 각 모듈 안을 4계층으로 나눕니다.
 
 | 계층 | 쉬운 설명 | 주요 파일 |
 | --- | --- | --- |
 | `presentation` | 요청을 받고 입력을 확인하며 결과를 응답합니다. | `router.py`, `schemas.py` |
 | `application` | 조회·규칙 실행·저장의 순서를 조율하고 저장을 확정합니다. | `service.py` |
 | `domain` | 예약 가능 여부 같은 업무 규칙과 상태 변경을 담당합니다. | `time_slot.py`, `reservation.py`, `restaurant.py` |
-| `infrastructure` | DB를 조회하고 도메인 객체로 변환하며 변경 내용을 저장합니다. | `models.py`, `repository.py` |
+| `infrastructure` | DB를 조회하고 도메인 객체로 변환하며 변경 내용을 저장합니다. | `models.py`, `repository.py`(또는 `repositories.py`) |
 
 ```mermaid
 flowchart TD
@@ -106,7 +107,7 @@ src/
 └── owner/               # 담당 5 최지훈: 운영자 권한 검사 · 운영자 조회 (자기 테이블 없음)
 ```
 
-각 모듈·계층 패키지에 `__init__.py`를 포함합니다. 현재 저장소의 레이어 우선 골격(`src/domain/`, `src/infrastructure/database.py` 등)은 위 구조로 옮길 예정입니다.
+각 모듈·계층 패키지에 `__init__.py`를 포함합니다. 처음의 레이어 우선 골격은 위 모듈 구조로 옮겼습니다 (`src/common/database.py`).
 
 ## 예약 요청 하나가 처리되는 순서
 
@@ -174,6 +175,8 @@ UI(Jinja2·React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)�
    POSTGRES_PASSWORD=<로컬 비밀번호>
    POSTGRES_DB=postgres
    POSTGRES_URL=postgresql+asyncpg://postgres:<로컬 비밀번호>@localhost:5432/postgres
+   # 선택: 허용할 프론트 주소 (쉼표 구분, 기본값 http://localhost:3000)
+   CORS_ORIGINS=http://localhost:3000
    ```
 
 2. PostgreSQL을 띄우고 의존성을 설치합니다.
@@ -186,10 +189,16 @@ UI(Jinja2·React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)�
    uv sync
    ```
 
-3. 앱을 실행합니다 (`src/main.py`가 준비된 뒤). 시작할 때 테이블과 시드가 자동으로 만들어집니다.
+3. 앱을 실행합니다. 테이블과 시드를 만드는 lifespan(담당 3)이 들어오면, 시작할 때 테이블과 시드가 자동으로 만들어집니다 (2026-11-03 기준 아직 없음).
 
    ```bash
    uv run uvicorn main:app --app-dir src --reload
+   ```
+
+4. 테스트를 돌립니다 (`pyproject.toml`에 `src` 경로와 비동기 모드가 설정되어 있음).
+
+   ```bash
+   uv run pytest
    ```
 
 ORM 모델이 바뀌어 로컬 DB를 다시 만들어야 할 때는 `docker compose down -v` 후 다시 시작합니다.
