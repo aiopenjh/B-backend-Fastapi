@@ -1,13 +1,10 @@
 # ReservationModel 을 만든다.
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, String, func
-
 from datetime import datetime
 
-# 일단 임시 Base클래스. 나중에 import받기.
-class Base(DeclarativeBase):
-    pass
+from common.model import Base
+
 
 class ReservationModel(Base):
     __tablename__ = "reservations"
