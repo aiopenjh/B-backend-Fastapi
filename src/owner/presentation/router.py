@@ -38,4 +38,10 @@ async def list_restaurant_reservations(
     owner: User = Depends(require_owner),
     service: OwnerService = Depends(create_owner_service),
 ) -> APIResponse[Page[ReservationOut]]:
-    ...
+    items, total = await service.list_restaurant_reservations(owner, restaurant_id, date, page)
+    return APIResponse.ok(data=Page(
+        items=[ReservationOut.from_domain(r, s) for r, s in items],   # 담당 4: 아직 없음
+        page=page.page,
+        page_size=page.page_size,
+        total=total,
+    ))
