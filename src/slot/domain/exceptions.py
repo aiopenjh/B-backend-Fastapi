@@ -1,3 +1,4 @@
+# [담당3-영민] TimeSlot 도메인 예외 처리
 from common.errors import AppError
 
 class SlotRuleViolation(AppError):

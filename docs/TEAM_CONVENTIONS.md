@@ -15,14 +15,14 @@
 
 모듈·계층 구분과 모듈 사이 참조 규칙은 [ARCHITECTURE.md](ARCHITECTURE.md) 1~2장을 따릅니다.
 
-- 코드는 `src/<모듈>/{presentation, application, domain, infrastructure}/`에 둠. 폴더 구조는 사람마다 새로 만들지 말고 기준 예제(`src/restaurant/`)를 따름
+- 코드는 `src/<모듈>/{presentation, application, domain, infrastructure}/`에 둠. 폴더 구조는 사람마다 새로 만들지 말고 기준 예제(`src/restaurant/`)를 따름. 예외: `auth`·`user`는 라우터를 `presentation/routers/v1/router.py`에 둠 ([ARCHITECTURE 2장](ARCHITECTURE.md#2-폴더-구조와-담당))
 - 단순 조회도 라우터 → 서비스 → 레포지토리 순서로 통일. 서비스가 얇아도 괜찮음
 - 라우터에 SQL이나 업무 규칙을 쓰지 않음. 규칙은 도메인 객체 메서드에 둠
 - `domain`은 순수 파이썬(`dataclass`, 표준 라이브러리)만 사용. FastAPI · SQLAlchemy · Pydantic import 금지
-- 레포지토리는 ORM 모델을 도메인 객체로 바꿔서 돌려줌. 추상 리포지토리 인터페이스나 제네릭 베이스 클래스는 만들지 않음 (구체 클래스 하나면 충분)
+- 레포지토리는 ORM 모델을 도메인 객체로 바꿔서 돌려줌. 레포지토리 인터페이스(ABC)를 둘 수 있음: 인터페이스는 `domain/repository.py`, 구현체(`SQLAlchemy<엔티티>Repository`)는 `infrastructure/repositories.py`에 두고, 서비스는 인터페이스 타입에만 의존. 어떤 구현체를 쓸지는 `src/container.py`에서 조립 (테스트에서는 `app.dependency_overrides`로 메모리 구현체로 교체). 여러 레포지토리가 공유하는 제네릭 베이스 클래스는 만들지 않음
 - 서비스가 자기 트랜잭션을 책임지고 `commit()`. 레포지토리·헬퍼는 커밋하지 않음 (`flush()`까지만)
 - DB 코드는 모두 `async`/`await`. 세션은 요청 하나당 하나. 한 세션을 동시에 실행되는 작업끼리 공유하지 않음
-- 다른 모듈의 `presentation`은 import하지 않음 (예외: `get_current_user`, `require_owner`)
+- 다른 모듈의 `presentation`은 import하지 않음 (예외: `auth.presentation.dependencies.get_current_user`, `owner.presentation.dependencies.require_owner`)
 
 ## 3. API 약속
 
@@ -41,8 +41,10 @@
   - 404: 없는 리소스, 또는 관련 없는 사람에게 숨긴 리소스 (예: 남의 예약)
   - 409: 예약 규칙 위반·상태 충돌 (`SLOT_SOLD_OUT`, `PARTY_SIZE_EXCEEDED`, `SLOT_ALREADY_STARTED`, `DUPLICATE_RESERVATION`, `ALREADY_CANCELLED`, `CANCELLATION_NOT_ALLOWED`)
   - 422: 잘못된 입력
+  - 500: 처리하지 못한 예외 (`INTERNAL_SERVER_ERROR`, 요청 로그 미들웨어가 봉투로 변환. `app.exception_handler(Exception)`은 이 미들웨어보다 바깥이라 호출되지 않으므로 따로 만들지 않음)
   - 503: DB 연결 실패
-- 에러 응답 형식은 하나로 통일: `error.code`, `error.message`, `error.details`, `error.request_id`. 클라이언트는 메시지 문구가 아니라 code로 분기
+- 응답 형식은 봉투 `APIResponse[T]` 하나로 통일: `success`, `code`, `message`, `errors`, `data`, `request_id`, `responded_at` ([API_SPEC 2장](API_SPEC.md#2-공통-규칙)). 예외: 로그인 성공(OAuth2 토큰 응답)과 로그아웃(204, 본문 없음). 클라이언트는 메시지 문구가 아니라 `code`로 분기하고, HTTP 상태 코드도 실패에 맞게 보냄 (실패를 200으로 보내지 않음)
+- 라우터는 `response_model=APIResponse[출력 스키마]`처럼 `data`의 타입을 지정함 (그래야 `/docs`에 스키마가 보임)
 - 도메인 규칙 위반은 `AppError`를 상속한 도메인 예외로 던지고, 공통 핸들러가 HTTP 응답으로 바꿈. 도메인에서 `HTTPException`을 쓰지 않음
 - OpenAPI 문서는 실제 구현된 API 기준
 
@@ -56,7 +58,7 @@
 
 각자 자기 필드, 관계, 제약 조건을 설명할 수 있어야 합니다. 테이블 기준은 [ARCHITECTURE 3장 ERD](ARCHITECTURE.md#3-데이터-모델-erd)입니다.
 
-- ORM 모델은 자기 모듈 `infrastructure/models.py`에 두고, 공용 `Base`(`common/database.py`)를 상속
+- ORM 모델은 자기 모듈 `infrastructure/models.py`에 두고, 공용 `Base`(`common/model.py`)를 상속
 - 테이블은 앱 시작 시 lifespan `create_all`로 생성. 마이그레이션 도구(Alembic)는 쓰지 않음
 - `create_all`은 없는 테이블만 만들고 **이미 있는 테이블의 컬럼 변경은 반영하지 않음**. 모델을 바꾸면 로컬 DB를 다시 만들고(`docker compose down -v`), PR에 그 사실을 적음
 - ERD에 없는 컬럼·테이블을 추가하려면 먼저 팀과 합의하고 ARCHITECTURE 3장을 함께 고침
