@@ -36,3 +36,7 @@ class Reservation:
             created_at=now,
             contact_phone=contact_phone
         )
+    
+    def cancel(self, now: datetime, slot) -> None:
+        self.status = ReservationStatus.CANCELLED
+        self.cancelled_at = now
