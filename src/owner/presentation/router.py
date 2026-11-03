@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.database import get_db # 공통: DB 통로
+from common.database import get_session # 공통: DB 통로
 from common.pagination import Page, PageParams, page_params # 담당 2: 목록 모양페이지
 from owner.presentation.dependencies import require_owner # 만든 오너 문
 from owner.application.service import OwnerService # 담당 5 : 매니저 (곧 만듦)
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/owner", tags=["운영자"], dependencies=[Depends(re
 async def list_my_restaurants(
     page: PageParams = Depends(page_params),
     owner: User = Depends(require_owner),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_session),
 ) -> Page[RestaurantOut]:
     items, total = await OwnerService(db).list_my_restaurants(owner, page)
     return Page(
