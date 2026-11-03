@@ -69,14 +69,10 @@ class User:
     ) -> None:
         """비밀번호 변경"""
         if not hasher.verify(old_password, self.password_hash):
-            raise InvalidOldPasswordError(
-                message="기존 비밀번호가 일치하지 않습니다.",
-            )
+            raise InvalidOldPasswordError()
 
         if old_password == new_password:
-            raise SamePasswordError(
-                message="새 비밀번호는 이전 비밀번호와 동일할 수 없습니다.",
-            )
+            raise SamePasswordError()
 
         self._validate_password(new_password)
 
