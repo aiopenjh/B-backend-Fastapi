@@ -68,7 +68,7 @@
 
 ## 6. 범위에서 뺀 것
 
-UI 연결(Jinja2 포함), CI, Redis 캐시는 범위에서 뺐습니다 (2026-10-28). API는 FastAPI의 API 문서 화면(`/docs`)과 pytest로 확인합니다. 자세한 목록은 [ARCHITECTURE.md](ARCHITECTURE.md) 7장을 봅니다.
+프론트 연결(React 등), CI, Redis 캐시는 범위에서 뺐습니다 (2026-10-28). Jinja2 화면은 2026-11-02 회의에서 다시 넣었습니다 (담당 5, 식당 목록·상세). API는 FastAPI의 API 문서 화면(`/docs`)과 pytest로 확인합니다. 자세한 목록은 [ARCHITECTURE.md](ARCHITECTURE.md) 7장을 봅니다.
 
 - DB 장애를 "결과 없음"으로 성공 처리하면 안 됨
 - 예약 완료는 서버가 성공(201)을 돌려준 뒤에만 완료로 봄

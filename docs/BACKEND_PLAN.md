@@ -4,19 +4,19 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 
 - 기준 문서: [README](../README.md), [ARCHITECTURE](ARCHITECTURE.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md)
 - 테이블 기준: [ARCHITECTURE 3장 ERD](ARCHITECTURE.md#3-데이터-모델-erd) (2026-10-28 확정)
-- 상태: 2026-10-28 개정. 6인 역할(A~F) 분담을 담당 1~5로 정리하고, `src/<도메인>/` 4계층 구조와 확정 ERD를 반영함. UI · CI · Redis는 제외. ERD 수정 반영(운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수)
+- 상태: 2026-10-28 개정. 6인 역할(A~F) 분담을 담당 1~5로 정리하고, `src/<도메인>/` 4계층 구조와 확정 ERD를 반영함. UI · CI · Redis는 제외 (Jinja2 화면은 2026-11-02 회의에서 다시 포함, 담당 5). ERD 수정 반영(운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수)
 
 ## 1. 범위
 
 ### 하는 것
 
-로그인 → 식당 목록·상세 → 예약 가능 시간 조회 → 예약 → 내 예약 목록·상세 → 취소 → 로그아웃(토큰 차단), 그리고 운영자의 자기 식당 예약 조회와 식당 정보 수정까지 **실제 PostgreSQL(비동기)로** 동작하게 만듭니다.
+로그인 → 식당 목록·상세 → 예약 가능 시간 조회 → 예약 → 내 예약 목록·상세 → 취소 → 로그아웃(토큰 차단), 그리고 운영자의 자기 식당 예약 조회와 식당 정보 수정까지 **실제 PostgreSQL(비동기)로** 동작하게 만듭니다. 식당 목록·상세는 Jinja2 화면으로도 보여 줍니다 (담당 5, 2026-11-02 추가).
 
 ### 빼는 것
 
 | 빼는 것 | 이유 | 대신 |
 | --- | --- | --- |
-| UI (Jinja2 화면, 프론트 연결) | 백엔드와 4계층 학습에 집중 | API 문서 화면(`/docs`)과 pytest로 확인 |
+| 프론트 연결 (React 등) | 백엔드와 4계층 학습에 집중 | API 문서 화면(`/docs`)과 pytest로 확인. Jinja2 화면은 2026-11-02에 다시 넣음 (담당 5) |
 | CI | 설정 비용 대비 학습 효과 작음 | PR 전에 로컬에서 테스트 실행, 결과를 PR에 기록 |
 | Redis 캐시 | 결정에 따라 제외 | 모든 조회를 DB에서 바로 읽음 |
 | Alembic 마이그레이션 | 단순하게 가기 위해 | lifespan에서 `create_all` + 시드 |
@@ -43,7 +43,7 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | **담당 2 · 김태양** | `src/restaurant/` | `restaurants` · `menus` | `GET /restaurants` · `GET /restaurants/{id}` · `PATCH /owner/restaurants/{id}` | `Page[T]` · 공통 에러 형식 · `Restaurant.is_owned_by` |
 | **담당 3 · 이영민** | `src/slot/` | `reservation_slots` | `GET /restaurants/{id}/availability` | `TimeSlot` 도메인 규칙 · lifespan 시드 |
 | **담당 4 · 김민지** | `src/reservation/` (쓰기) | `reservations` | `POST /reservations` · `POST /reservations/{id}/cancel` | `ReservationOut` · `Reservation` 도메인 규칙 |
-| **담당 5 · 최지훈** | `src/owner/` + `src/reservation/` (조회) | 없음 (다른 테이블을 JOIN해 조회) | `GET /users/me/reservations` · `GET /reservations/{id}` · `GET /owner/restaurants` · `GET /owner/restaurants/{id}/reservations` | `require_owner` (운영자 역할 검사) |
+| **담당 5 · 최지훈** | `src/owner/` + `src/reservation/` (조회) + `src/web/`·`templates/`·`static/` (화면) | 없음 (다른 테이블을 JOIN해 조회) | `GET /users/me/reservations` · `GET /reservations/{id}` · `GET /owner/restaurants` · `GET /owner/restaurants/{id}/reservations` · Jinja2 화면 2개 (식당 목록 `/` · 상세 `/web/restaurants/{id}`) | `require_owner` (운영자 역할 검사) |
 
 모든 경로 앞에는 `/api/v1`이 붙습니다. 담당 4는 트랜잭션이 들어가는 쓰기 2개에 집중하고, 예약 조회는 담당 5가 같은 모듈 안 별도 파일(`query_*.py`)로 만듭니다 ([ARCHITECTURE 2장](ARCHITECTURE.md#2-폴더-구조와-담당)).
 
@@ -297,6 +297,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 1. `require_owner` 의존성 → **D5까지 공유** (담당 2의 PATCH가 사용)
 2. `GET /owner/restaurants` (`WHERE owner_id = 나`) → `GET /owner/restaurants/{id}/reservations` (담당 2의 `is_owned_by`로 소유 확인)
 3. `GET /users/me/reservations` → `GET /reservations/{id}`
+4. Jinja2 화면 (2026-11-02 추가): 식당 목록 `/`(검색, 한 쪽 20개, 이전/다음) → 식당 상세 `/web/restaurants/{id}` → 에러 화면. 담당 2의 식당 서비스를 그대로 쓰고, `main.py`·`pyproject.toml`을 고치기 전에 팀에 알림
 
 **테스트 2개**: 운영자 A가 자기 식당 예약 조회 → 200 / 운영자 A가 운영자 B 식당 예약 조회 → 403 (+ 고객이 운영자 API 호출 → 403)
 

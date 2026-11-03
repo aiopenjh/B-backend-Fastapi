@@ -1,6 +1,6 @@
 # 아키텍처와 API 설계
 
-상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수 · 2026-11-03 dev 코드(PR #2~#4) 기준으로 파일 이름·현재 상태 갱신). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
+상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수 · 2026-11-03 dev 코드(PR #2~#4) 기준으로 파일 이름·현재 상태 갱신 · 2026-11-02 회의: Jinja2 화면 다시 포함). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
 
 ## 1. 요청 하나가 처리되는 흐름
 
@@ -70,7 +70,10 @@ src/
 ├── restaurant/              # 담당 2   (아래 모듈도 모두 같은 4계층)
 ├── slot/                    # 담당 3
 ├── reservation/             # 담당 4 (생성·취소) + 담당 5 (조회)
-└── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
+├── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
+├── web/                     # 담당 5 (Jinja2 화면 라우터. presentation만 두고 데이터는 다른 모듈 서비스로 읽음, 예정)
+├── templates/               # 담당 5 (HTML 템플릿, 예정)
+└── static/                  # 담당 5 (CSS, 예정)
 ```
 
 모든 모듈·계층 패키지에 `__init__.py`를 둡니다 (`routers/`, `routers/v1/` 포함).
@@ -275,6 +278,15 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 
 선택 과제 API(`POST /auth/signup`)는 필수 흐름이 다 돌아간 뒤에 추가합니다.
 
+**화면 (Jinja2, 담당 5, 2026-11-02 추가)**: `/api/v1` 밖의 경로로 HTML을 돌려줍니다. 응답 봉투(`APIResponse`)는 쓰지 않습니다.
+
+| 화면 | 경로 | 내용 |
+| --- | --- | --- |
+| 식당 목록 | `GET /` | 검색(`q`) · 페이지(`page`, 한 쪽 20개) · 이전/다음 |
+| 식당 상세 | `GET /web/restaurants/{id}` | 식당 정보와 메뉴, 없으면 에러 화면 |
+
+데이터는 담당 2의 식당 서비스로 읽고, 화면 라우터에 SQL을 쓰지 않습니다. 공용 파일 `main.py`(정적 파일·화면 라우터 등록)와 `pyproject.toml`(jinja2 추가)을 고치므로 팀에 먼저 알립니다.
+
 ## 6. 보안과 트랜잭션
 
 **인증**: 비밀번호는 검증된 해시 라이브러리로 저장하고 비교합니다 (README 기술 스택). 암호화 로직을 직접 만들지 않습니다. 토큰은 PyJWT로 만든 짧은 수명의 Bearer JWT입니다. `sub`=사용자 id, `exp`, `jti`를 넣습니다. 로그인은 `OAuth2PasswordRequestForm`(폼 전송)으로 받습니다. 그래서 `/docs`의 **Authorize** 버튼으로 바로 로그인해서 다른 API를 시험할 수 있습니다.
@@ -321,7 +333,8 @@ FK는 "그 id의 사용자가 존재한다"만 보장하고 역할은 확인하�
 
 | 항목 | 결정 | 대신 |
 | --- | --- | --- |
-| UI (Jinja2 화면, 프론트 연결) | 제외 (2026-10-28) | API 문서 화면(`/docs`)과 pytest로 확인 |
+| 프론트 연결 (React 등) | 제외 (2026-10-28) | API 문서 화면(`/docs`)과 pytest로 확인 |
+| Jinja2 화면 | 제외(2026-10-28) → **다시 포함 (2026-11-02, 담당 5)** | 식당 목록·상세 화면 2개 (5장) |
 | CI | 제외 (2026-10-28) | PR 전에 로컬에서 테스트, 실행 결과를 PR에 기록 |
 | Redis 캐시 | 제외 (2026-10-28) | 모든 조회를 PostgreSQL에서 바로 읽음 |
 | Alembic 마이그레이션 | 제외 (2026-10-28) | lifespan `create_all`. 스키마가 바뀌면 로컬 DB를 다시 만듦 |
