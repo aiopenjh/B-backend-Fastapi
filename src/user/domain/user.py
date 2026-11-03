@@ -4,7 +4,8 @@ import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 from datetime import datetime, UTC
-from common.exceptions import ValidationException, BadRequestException
+from common.errors import InvalidInputError
+from user.domain.exceptions import InvalidOldPasswordError, SamePasswordError
 from user.domain.hasher import PasswordHasher
 
 EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
@@ -34,7 +35,6 @@ class User:
     def __post_init__(self):
         self._validate_email(self.email)
         self._validate_name(self.name)
-        pass
 
     @classmethod
     def create(
@@ -69,15 +69,13 @@ class User:
     ) -> None:
         """비밀번호 변경"""
         if not hasher.verify(old_password, self.password_hash):
-            raise BadRequestException(
+            raise InvalidOldPasswordError(
                 message="기존 비밀번호가 일치하지 않습니다.",
-                error_code="INVALID_OLD_PASSWORD",
             )
 
         if old_password == new_password:
-            raise BadRequestException(
+            raise SamePasswordError(
                 message="새 비밀번호는 이전 비밀번호와 동일할 수 없습니다.",
-                error_code="SAME_PASSWORD",
             )
 
         self._validate_password(new_password)
@@ -88,27 +86,24 @@ class User:
     @staticmethod
     def _validate_email(email: str) -> None:
         if not EMAIL_REGEX.match(email):
-            raise ValidationException(
-                message="이메일 형식이 올바르지 않습니다.",
-                field_errors={"email": ["올바른 이메일 형식이 아닙니다."]},
+            raise InvalidInputError(
+                errors={"email": ["올바른 이메일 형식이 아닙니다."]}
             )
 
     @staticmethod
     def _validate_name(name: str) -> None:
         if not (2 <= len(name) <= 20):
-            raise ValidationException(
-                message="이름은 2자 이상 20자 이하여야 합니다.",
-                field_errors={"name": ["이름 길이는 2자 이상 20자 이하여야 합니다."]},
+            raise InvalidInputError(
+                errors={"name": ["이름 길이는 2자 이상 20자 이하여야 합니다"]}
             )
 
     @staticmethod
     def _validate_password(raw_password: str) -> None:
         if not PASSWORD_REGEX.match(raw_password):
-            raise ValidationException(
-                message="비밀번호 제약 조건을 만족하지 못했습니다.",
-                field_errors={
+            raise InvalidInputError(
+                errors={
                     "password": [
                         "비밀번호는 8자 이상이어야 하며 영문, 숫자, 특수문자를 포함해야 합니다."
                     ]
-                },
+                }
             )
