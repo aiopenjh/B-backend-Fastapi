@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-log_mode = os.getenv("LOGGING_MODE", "info").lower
+log_mode = os.getenv("LOGGING_MODE", "info").lower()
 log_level = logging.DEBUG if log_mode == "debug" else logging.INFO
 
 LOG_FORMAT = (
@@ -23,5 +23,6 @@ logging.basicConfig(
 def get_logger(name: str | None = None) -> logging.Logger:
     logger_name = name or os.getenv("LOGGER_NAME", "app")
     return logging.getLogger(logger_name)
+
 
 logger = get_logger()
