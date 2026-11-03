@@ -1,5 +1,4 @@
 import re
-from typing import Literal
 import uuid
 
 from dataclasses import dataclass
@@ -98,8 +97,8 @@ class User:
     def _validate_name(name: str) -> None:
         if not (2 <= len(name) <= 20):
             raise ValidationException(
-                message="이름은 2자 이상 10자 이하여야 합니다.",
-                field_errors={"name": ["이름 길이는 2자 이상 10자 이하여야 합니다."]},
+                message="이름은 2자 이상 20자 이하여야 합니다.",
+                field_errors={"name": ["이름 길이는 2자 이상 20자 이하여야 합니다."]},
             )
 
     @staticmethod
