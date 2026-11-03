@@ -90,8 +90,8 @@ class User:
     def _validate_email(email: str) -> None:
         if not EMAIL_REGEX.match(email):
             raise ValidationException(
-                message="이름은 2자 이상 20자 이하여야 합니다",
-                field_errors={"name": ["이름 길이는 2자 이상 20자 이하여야 합니다."]},
+                message="이메일 형식이 올바르지 않습니다.",
+                field_errors={"email": ["올바른 이메일 형식이 아닙니다."]},
             )
 
     @staticmethod
