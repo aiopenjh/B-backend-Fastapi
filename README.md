@@ -93,8 +93,9 @@ flowchart TD
 ```text
 src/
 ├── main.py              # 앱 생성, lifespan(테이블 생성 + 시드), 미들웨어, 라우터 등록
-├── common/              # DB 세션, 설정, 공통 에러 형식, Page[T], 미들웨어
-├── user/                # 담당 1 강성수: 로그인 · 로그아웃 · 현재 사용자
+├── common/              # DB 세션, ORM Base(model.py), 설정, 공통 에러 형식, Page[T], 미들웨어
+├── auth/                # 담당 1 강성수: 로그인 · 로그아웃 · 현재 사용자 의존성
+├── user/                # 담당 1 강성수: 사용자 정보 (내 정보 조회)
 │   ├── domain/
 │   ├── application/
 │   ├── infrastructure/

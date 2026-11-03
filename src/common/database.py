@@ -1,9 +1,13 @@
 import logging
 import os
-from collections.abc import AsyncIterator
-
+from collections.abc import AsyncGenerator
 from dotenv import load_dotenv
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncConnection
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 
@@ -13,13 +17,20 @@ logger = logging.getLogger(__name__)
 
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 if POSTGRES_URL is None:
-    raise RuntimeError("POSTSQL_URL 설정값을 채워주세요")
+    raise RuntimeError("POSTGRES_URL 설정값을 채워주세요")
 
 engine = create_async_engine(POSTGRES_URL)
+SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+
+# 요청 하나당 AsyncSession 하나. commit은 서비스가 함
+async def get_session() -> AsyncGenerator[AsyncSession]:
+    async with SessionLocal() as session:
+        yield session
 
 
 # 연결을 호출한 쪽에 넘기고 끝
-async def get_conn() -> AsyncIterator[AsyncConnection]:
+async def get_conn() -> AsyncGenerator[AsyncConnection]:
     # 연결 시도: 여기서 난 DB 에러만 503으로 변환
     try:
         conn = await engine.connect()
