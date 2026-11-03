@@ -1,4 +1,4 @@
-# 도메인 를래스의 업무 규칙이 맞게 동작하는지 테스트
+# 도메 를래스의 업무 규칙이 맞게 동작하는지 테스트
 from datetime import UTC, datetime
 
 from reservation.domain.reservation import Reservation, ReservationStatus
