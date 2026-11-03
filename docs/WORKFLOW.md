@@ -14,7 +14,7 @@
 | 공용 환경(Docker PostgreSQL), 실행/테스트 안내 | 지원 작업 (에이전트 활용) | 안내대로 실행, 로컬 변수 이해, API/DB 에러 읽기 |
 | 보안 기반, 트랜잭션 패턴 | 지원 작업 + 관련 담당자(담당 1, 4) | 헬퍼 설명하고 쓰기, 거절/롤백 동작 테스트 |
 | 도메인 모듈 4계층과 테스트 | 담당 1~5 (자기 모듈) | 정해진 범위 구현하고 결과 설명 |
-| 공통 응답 형식: 목록 `Page[T]`, 에러 응답 형식(`error.code`·`message`·`details`·`request_id`) | 담당 2 | 같은 형식으로 응답하고, 자기 에러 코드를 정해 공유 |
+| 공통 응답 형식: 목록 `Page[T]`, 응답 봉투 `APIResponse[T]`(`success`·`code`·`message`·`errors`·`data`·`request_id`·`responded_at`) | 담당 2 | 같은 형식으로 응답하고, 자기 에러 코드를 정해 공유 |
 | 슬롯 규칙 `TimeSlot`, lifespan 테이블 생성 + 시드 | 담당 3 (각자 자기 테이블 행 제공) | 자기 테이블 시드 행 설명 |
 | 예약 응답 `ReservationOut` · `can_cancel` | 담당 4 | 같은 스키마로 응답 |
 | 운영자 권한: 역할 검사 `require_owner`, 소유 확인 `Restaurant.is_owned_by` | 담당 5 · 담당 2 | 둘을 써서 거절 동작 테스트 |
