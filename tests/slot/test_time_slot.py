@@ -17,7 +17,7 @@ NOW = datetime(2026, 11, 4, 12, 0, tzinfo=SEOUL)
 
 def make(**over) -> TimeSlot:
     """기본값: 내일 18~19시, 정원 10, 예약2, 1회 최대 4 (API_SPEC 예시 '슬롯 7')"""
-    base = {"id": 7, "restaurant_id": 1, "starts_at": NOW + timedelta(hours=6),
+    base = {"id": 7, "restaurant_id": 1, "starts_at": NOW + timedelta(days=1, hours=6),
         "ends_at": NOW + timedelta(days=1, hours=7),
         "capacity": 10, 
         "reserved_guests": 2, 
@@ -77,3 +77,16 @@ def test_release_below_zero_is_error():
 def test_constructor_rejects_naive_datetime():
     with pytest.raises(ValueError):
         make(starts_at=datetime(2026, 11, 5, 18), ends_at=datetime(2026, 11, 5, 19))
+
+
+def test_started_and_party_size_errors_are_field_to_list():
+    """봉투 errors 는 {필드: [문장]} — 값이 list[str] 이 아니면 담당 2 핸들러에서 500 이 된다"""
+    started = make(starts_at=NOW - timedelta(hours=1), ends_at=NOW + timedelta(hours=1))
+    with pytest.raises(SlotAlreadyStarted) as e1:
+        started.reserve(1, NOW)
+    with pytest.raises(PartySizeExceeded) as e2:
+        make().reserve(5, NOW)
+    for err in (e1.value, e2.value):
+        assert err.message == err.error_code.message                      # ▶ message 를 따로 넘기지 않는다 — enum 문구 하나가 진실
+        assert all(isinstance(v, list) and all(isinstance(x, str) for x in v) for v in err.errors.values())
+    assert "slot_id" in e1.value.errors and "party_size" in e2.value.errors
