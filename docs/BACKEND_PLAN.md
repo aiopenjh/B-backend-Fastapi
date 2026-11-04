@@ -78,7 +78,7 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | 운영자 식당 목록, 운영자 식당 예약 목록 창구·매니저, `create_owner_service` | 있음 (식당·페이지 부품이 없어 `import container` 실패) | `owner/`, `container.py` (#7) |
 | `get_current_user` | 자리만 있음 (`NotImplementedError`) | `auth/presentation/dependencies.py` (#8) |
 | `AppError` 계열 예외 + 공통 에러 핸들러 | 있음 | `common/errors.py`, `common/error_handlers.py` (#8) |
-| `TimeSlot` 규칙, 슬롯 예외 3개 | 있음 (슬롯 예외 `error_code` 미지정이라 409가 아니라 500) | `slot/domain/` (#6, #8) |
+| `TimeSlot` 규칙, 슬롯 예외 3개(409), `seoul_day_range` | 있음 | `slot/domain/` (#6, #8, #10) |
 | `Page[T]` | 없음 | `common/pagination.py` 예정 |
 | `UserModel`, `TokenBlacklistModel`, `Restaurant`·`RestaurantModel`, 슬롯 모델 | 없음 | 각 모듈 예정 |
 | `Reservation.can_cancel()`, `ReservationOut.from_domain()` | 없음 | `reservation/` 예정 |

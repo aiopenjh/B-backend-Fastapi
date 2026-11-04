@@ -175,8 +175,9 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 | #6 | 3 이영민 | `TimeSlot` 규칙, 슬롯 에러 3개 | 자리 계산 규칙 (문법 오류는 #8에서 고침) |
 | #7 | 5 최지훈 | 운영자 식당 목록, 운영자 식당 예약 목록 창구·매니저, `container.py`의 `create_owner_service` | 운영자 조회. 식당·페이지 부품이 없어 실행은 아직 |
 | #8 | 1 강성수 | `AppError` 계열 예외(`Unauthorized`·`Forbidden`·`NotFound`·`InvalidInput`) + 공통 에러 핸들러, `get_current_user` 자리, 회원가입 서비스, 비밀번호 해시, **사용자 id UUID** | 에러를 한곳에서 봉투로 바꾸기 + 회원 규칙 |
+| #10 | 3 이영민 | 슬롯 예외에 `error_code` 붙임, `seoul_day_range`·`seoul_now`, 슬롯 테스트 | 슬롯 규칙 위반이 500이 아니라 409로 나감 |
 
-dev 테스트는 13개 모두 통과합니다. 아직 **앱을 켜서 API를 눌러 볼 수는 없습니다** (테이블과 시드가 없음).
+dev 테스트는 24개 모두 통과합니다. 아직 **앱을 켜서 API를 눌러 볼 수는 없습니다** (테이블과 시드가 없음).
 
 **사용자 id가 UUID로 바뀌었습니다 (#8).** 사용자 id를 받는 곳(`reservations.user_id`, `restaurants.owner_id`, `Reservation.user_id`, `ReservationOut.user_id`, `is_owned_by`)은 `int`가 아니라 `uuid.UUID`로 맞춥니다. 나머지 테이블 id는 BIGINT 그대로입니다.
 
@@ -188,7 +189,7 @@ dev 테스트는 13개 모두 통과합니다. 아직 **앱을 켜서 API를 눌
 
 | 할 일 | 담당 | 누가 기다리나 |
 | --- | --- | --- |
-| ~~`AppError` + 예외 핸들러~~ | 1 | **완료 (#8).** 슬롯 409 예외는 `error_code`를 정해야 500이 아니라 409로 나감 (담당 3) |
+| ~~`AppError` + 예외 핸들러~~ | 1 | **완료 (#8).** 슬롯 예외도 `error_code`를 붙여 409로 나감 (#10) |
 | `Page[T]` 목록 응답 (`items`·`page`·`page_size`·`total`) | 2 | 2 · 5 (목록 API 4개) |
 | `get_current_user` 실제 구현 (토큰 → 지금 요청한 사람). 자리는 #8에 있음 | 1 | 2 · 4 · 5 (로그인이 필요한 API 전부) |
 | 사용자 id `int` → `uuid.UUID` 맞추기 | 2 · 4 | 2 (`owner_id`) · 4 (`user_id`) |
