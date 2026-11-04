@@ -49,7 +49,7 @@
   "code": "OK",
   "message": "요청이 성공적으로 처리되었습니다.",
   "errors": null,
-  "data": { "id": 1, "email": "customer-a@example.com" },
+  "data": { "id": "00000000-0000-4000-8000-000000000001", "email": "customer-a@example.com" },
   "request_id": "req_8f2c1a",
   "responded_at": "2026-10-28T15:20:00+09:00"
 }
@@ -126,12 +126,14 @@
 
 모든 명세가 같은 시드 데이터를 가정하면 예시끼리 맞물립니다.
 
+사용자 id는 UUID입니다(2026-11-04, [ARCHITECTURE 3장](ARCHITECTURE.md#3-데이터-모델-erd)). 예시에서는 읽기 쉽게 `00000000-0000-4000-8000-00000000000N` 형식을 쓰고, 아래 표에서는 끝자리만 `…0001`처럼 줄여 씁니다. 실제 값은 저장할 때 정해집니다. 식당·슬롯·예약 id는 정수 그대로입니다.
+
 | id | 대상 | 설명 |
 | --- | --- | --- |
-| 사용자 1 · 2 | 고객 A · 고객 B | `role: CUSTOMER` |
-| 사용자 3 · 4 | 운영자 A · 운영자 B | `role: OWNER` |
-| 식당 1 · 2 | 운영자 A 소유 | `owner_id: 3` |
-| 식당 3 | 운영자 B 소유 | `owner_id: 4` |
+| 사용자 `…0001` · `…0002` | 고객 A · 고객 B | `role: CUSTOMER` |
+| 사용자 `…0003` · `…0004` | 운영자 A · 운영자 B | `role: OWNER` |
+| 식당 1 · 2 | 운영자 A 소유 | `owner_id: "…0003"` |
+| 식당 3 | 운영자 B 소유 | `owner_id: "…0004"` |
 | 슬롯 7 | 식당 1, 열린 슬롯 | `capacity: 10`, `reserved_guests: 2`, `max_party_size: 4` |
 | 슬롯 9 | 식당 1, 거의 찬 슬롯 | `capacity: 10`, `reserved_guests: 8`, `max_party_size: 4` |
 
@@ -249,7 +251,7 @@ Authorization: Bearer <access_token>
   "errors": null,
   "data": {
     "id": 15,
-    "user_id": 1,
+    "user_id": "00000000-0000-4000-8000-000000000001",
     "slot_id": 7,
     "restaurant_id": 1,
     "starts_at": "2026-10-30T18:00:00+09:00",
