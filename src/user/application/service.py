@@ -1,5 +1,6 @@
 # [담당1 - 강성수]
 
+from user.application.unit_of_work import UnitOfWork, ConflictError
 from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
 from user.domain.exceptions import DuplicatedUserError
@@ -8,8 +9,9 @@ from user.domain.user import User
 
 
 class UserService:
-    def __init__(self, repo: UserRepository, hasher: PasswordHasher):
+    def __init__(self, repo: UserRepository, hasher: PasswordHasher, uow: UnitOfWork):
         self.repo = repo
+        self.uow = uow
         self.hasher = hasher
 
     async def signUp(
@@ -28,4 +30,10 @@ class UserService:
             hasher=self.hasher,
         )
 
-        return await self.repo.save(user)
+        saved = await self.repo.save(user)
+        try:
+            await self.uow.commit()
+        except ConflictError:
+            # 동시 가입처럼 find_by_email 확인을 지나친 중복은 commit에서 드러난다
+            raise DuplicatedUserError()
+        return saved

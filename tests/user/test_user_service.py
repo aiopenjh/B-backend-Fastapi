@@ -5,6 +5,8 @@ import pytest
 
 from common.errors import InvalidInputError
 from user.application.service import UserService
+from user.application.unit_of_work import ConflictError, UnitOfWork
+
 from user.domain.exceptions import DuplicatedUserError
 from user.domain.repository import UserRepository
 from user.domain.user import User
@@ -32,14 +34,32 @@ class InMemoryUserRepository(UserRepository):
         return user
 
 
+class FakeUnitOfWork(UnitOfWork):
+    """commit 호출 횟수를 세는 가짜 UoW. conflict=True면 commit에서 충돌을 낸다"""
+
+    def __init__(self, conflict: bool = False) -> None:
+        self.commits = 0
+        self.conflict = conflict
+
+    async def commit(self) -> None:
+        if self.conflict:
+            raise ConflictError()
+        self.commits += 1
+
+
 @pytest.fixture
 def repo() -> InMemoryUserRepository:
     return InMemoryUserRepository()
 
 
 @pytest.fixture
-def service(repo, hasher) -> UserService:
-    return UserService(repo=repo, hasher=hasher)
+def uow() -> FakeUnitOfWork:
+    return FakeUnitOfWork()
+
+
+@pytest.fixture
+def service(repo, uow, hasher) -> UserService:
+    return UserService(repo=repo, uow=uow, hasher=hasher)
 
 
 async def test_sign_up_saves_user_with_normalized_email(service, repo):
