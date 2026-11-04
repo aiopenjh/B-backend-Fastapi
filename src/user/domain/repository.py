@@ -6,7 +6,7 @@ from user.domain.user import User
 class UserRepository(ABC):
 
     @abstractmethod
-    async def find_by_id(self, user_id: int) -> User | None:
+    async def find_by_id(self, user_id: uuid.UUID) -> User | None:
         """ID 기준으로 사용자 단건 조회"""
         pass
 

@@ -135,7 +135,7 @@ erDiagram
     users ||--o{ token_blacklist : "로그아웃"
 
     users {
-        BIGINT id PK
+        UUID id PK
         VARCHAR(254) email UK
         VARCHAR(255) password_hash
         VARCHAR(100) name
@@ -147,7 +147,7 @@ erDiagram
     }
     restaurants {
         BIGINT id PK
-        BIGINT owner_id FK "운영자 users.id"
+        UUID owner_id FK "운영자 users.id"
         VARCHAR(150) name
         TEXT description
         VARCHAR(255) address
@@ -181,7 +181,7 @@ erDiagram
     }
     reservations {
         BIGINT id PK
-        BIGINT user_id FK "예약자, NOT NULL"
+        UUID user_id FK "예약자, NOT NULL"
         BIGINT slot_id FK
         INTEGER party_size
         VARCHAR(20) contact_phone "연락처, 선택"
@@ -192,7 +192,7 @@ erDiagram
     }
     token_blacklist {
         BIGINT id PK
-        BIGINT user_id FK
+        UUID user_id FK
         VARCHAR(128) token_jti UK
         TIMESTAMPTZ expires_at
         TIMESTAMPTZ created_at
@@ -214,6 +214,12 @@ erDiagram
 - `idempotency_records` 삭제. 재시도 중복은 6장의 중복 예약 규칙으로 일부 막고, 남는 경우는 한계로 설명합니다.
 - `reservations.user_id`는 NOT NULL을 유지합니다. 예약 행은 예약이 확정될 때만 INSERT하므로 예약자가 없는 예약은 존재하지 않습니다. "예약 가능"은 예약 행이 아니라 슬롯의 `capacity − reserved_guests`로 판단합니다. 빈 예약 행을 미리 만들어 두고 `user_id`를 채우는 방식은 쓰지 않습니다.
 
+**ERD 수정 (2026-11-04)**
+
+- `users.id`를 `BIGINT`에서 `UUID`로 바꿉니다. 이 값을 참조하는 FK 3개(`restaurants.owner_id`, `reservations.user_id`, `token_blacklist.user_id`)도 `UUID`로 맞춥니다. 나머지 테이블의 PK·FK는 `BIGINT` 그대로입니다.
+- 도메인 `User.id`는 `uuid.UUID | None`입니다. `User.create()` 직후에는 `None`이고, 저장할 때 값이 정해집니다. 다른 모듈이 사용자 id를 받을 때(`Reservation.user_id`, `Restaurant.owner_id`, `is_owned_by(user_id)`, `ReservationOut.user_id` 등)도 `int`가 아니라 `uuid.UUID`로 받습니다.
+- 응답 JSON에서 사용자 id는 문자열(예: `"00000000-0000-4000-8000-000000000001"`)로 나갑니다.
+
 ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담당이 이유를 설명할 수 있어야 합니다.
 
 - 모든 FK에 외래 키 제약, `owner_id`·`restaurant_id`·`user_id`·`slot_id`에 인덱스
@@ -223,7 +229,7 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 - `reservation_slots`: `0 <= reserved_guests <= capacity`, `max_party_size >= 1`, `starts_at < ends_at`, 인덱스 `(restaurant_id, starts_at)`
 - `reservations`: `party_size >= 1`, `status IN ('CONFIRMED', 'CANCELLED')`
 
-타입 대응: `BIGINT` PK → `BigInteger` 자동 증가, `TIMESTAMPTZ` → `DateTime(timezone=True)`. `deleted_at`은 소프트 삭제 표시입니다. 값이 있는 행은 공개 조회에서 빼고, 삭제·탈퇴 API는 만들지 않습니다.
+타입 대응: `BIGINT` PK → `BigInteger` 자동 증가, `UUID`(`users.id`와 이를 참조하는 FK) → `Uuid` (`Mapped[uuid.UUID]`), `TIMESTAMPTZ` → `DateTime(timezone=True)`. `deleted_at`은 소프트 삭제 표시입니다. 값이 있는 행은 공개 조회에서 빼고, 삭제·탈퇴 API는 만들지 않습니다.
 
 **시드 데이터** (lifespan에서 넣음, 20건 이상): 식당 3곳(서로 다른 `cuisine`), 메뉴 9개, 고객 2명, 운영자 2명(운영자 A는 식당 2곳, 운영자 B는 1곳을 `owner_id`로 소유), 슬롯 12개 이상(열린 슬롯, 꽉 찬 슬롯, `max_party_size`가 작은 슬롯 포함). 슬롯 시각은 시드를 넣는 날 기준 **앞으로의 날짜**로 계산하고, 한 식당 안에서 겹치지 않게 합니다. 재시작할 때는 이미 시드가 있으면(예: 시드 이메일 존재) 건너뜁니다.
 
