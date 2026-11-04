@@ -39,7 +39,7 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 
 | 담당 | 모듈 | 맡는 테이블 | API | 공용 부품 |
 | --- | --- | --- | --- | --- |
-| **담당 1 · 강성수** | `src/user/` | `users` · `token_blacklist` | `POST /auth/login` · `GET /users/me` · `POST /auth/logout` | `get_current_user` · 요청 로그/CORS 미들웨어 |
+| **담당 1 · 강성수** | `src/auth/` · `src/user/` | `token_blacklist` (auth) · `users` (user) | `POST /auth/login` · `GET /users/me` · `POST /auth/logout` | `get_current_user` · 요청 로그/CORS 미들웨어 |
 | **담당 2 · 김태양** | `src/restaurant/` | `restaurants` · `menus` | `GET /restaurants` · `GET /restaurants/{id}` · `PATCH /owner/restaurants/{id}` | `Page[T]` · 공통 에러 형식 · `Restaurant.is_owned_by` |
 | **담당 3 · 이영민** | `src/slot/` | `reservation_slots` | `GET /restaurants/{id}/availability` | `TimeSlot` 도메인 규칙 · lifespan 시드 |
 | **담당 4 · 김민지** | `src/reservation/` (쓰기) | `reservations` | `POST /reservations` · `POST /reservations/{id}/cancel` | `ReservationOut` · `Reservation` 도메인 규칙 |
@@ -71,7 +71,7 @@ ROADMAP 그대로, 처음 3일은 모두 같은 작은 기능을 4계층으로 �
 | 경로 · 쿼리 파라미터, 타입 검증 | [Path Parameters](https://fastapi.tiangolo.com/tutorial/path-params/), [Query Parameters](https://fastapi.tiangolo.com/tutorial/query-params/) | 모든 GET API |
 | 요청 바디와 Pydantic 모델 | [Request Body](https://fastapi.tiangolo.com/tutorial/body/) | 예약 생성, 식당 수정 |
 | 입력·출력 스키마 분리 | [Response Model](https://fastapi.tiangolo.com/tutorial/response-model/) | 모든 API (비밀번호 해시 제외) |
-| 에러 응답 | [Handling Errors](https://fastapi.tiangolo.com/tutorial/handling-errors/) | 공통 에러 형식 `error.code` · `message` · `details` · `request_id` |
+| 에러 응답 | [Handling Errors](https://fastapi.tiangolo.com/tutorial/handling-errors/) | 공통 응답 봉투 `APIResponse[T]` (`success` · `code` · `message` · `errors` · `data` · `request_id` · `responded_at`) |
 | 라우터로 파일 나누기 | [Bigger Applications](https://fastapi.tiangolo.com/tutorial/bigger-applications/) | `src/<모듈>/presentation/router.py` |
 | 의존성 주입 | [Dependencies](https://fastapi.tiangolo.com/tutorial/dependencies/) | DB 세션, 현재 사용자 |
 | 비동기 DB 모델 · 세션 · 조회 | [SQLAlchemy 2.0 ORM 튜토리얼](https://docs.sqlalchemy.org/en/20/tutorial/), [asyncio 확장](https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html) | 모든 테이블, `AsyncSession` |
@@ -84,7 +84,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **모두가 지키는 것**
 
-- 자기 테이블의 ORM 모델은 자기 모듈의 `infrastructure/models.py`에 두고, 공용 `Base`를 상속합니다. 컬럼·제약을 직접 설명할 수 있어야 합니다.
+- 자기 테이블의 ORM 모델은 자기 모듈의 `infrastructure/models.py`에 두고, 공용 `Base`(`common/model.py`)를 상속합니다. 컬럼·제약을 직접 설명할 수 있어야 합니다.
 - 도메인 객체는 FastAPI·SQLAlchemy·Pydantic을 import하지 않습니다. 규칙 위반은 `AppError`를 상속한 도메인 예외로 던집니다.
 - 커밋은 application 서비스에서 한 번만 합니다. 레포지토리와 헬퍼는 커밋하지 않습니다.
 - 응답은 출력 스키마로만 내보냅니다. ORM 모델이나 도메인 객체를 그대로 반환하지 않습니다.
@@ -92,7 +92,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 ## 4. 담당별 상세
 
-### 담당 1 (강성수) · 인증 · 사용자 (`src/user/`)
+### 담당 1 (강성수) · 인증 · 사용자 (`src/auth/`, `src/user/`)
 
 **도메인**: 시드로 넣은 고객·운영자 계정으로 로그인하고, 보호된 API가 "지금 요청한 사람이 누구인지" 알 수 있게 합니다. 로그아웃하면 그 토큰을 블랙리스트에 넣어 더 이상 쓰지 못하게 합니다. 모든 팀원이 이 결과를 씁니다. 앱 전체에 걸리는 미들웨어(요청 로그·처리 시간, CORS)도 맡습니다.
 
@@ -100,12 +100,18 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 | API | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
-| `POST /auth/login` | 폼 `username`(이메일) · `password` | 200 `{access_token, token_type: "bearer", expires_in}` | 422 형식 오류 · 401 이메일·비밀번호 불일치 |
-| `GET /users/me` | `Authorization: Bearer …` | 200 `{id, email, name, phone, role}` | 401 토큰 없음·만료 |
+| `POST /auth/login` | 폼 `username`(이메일) · `password` | 200 `{access_token, token_type: "bearer", expires_in}` (봉투 없이 최상위, OAuth2 표준) | 422 형식 오류 · 401 이메일·비밀번호 불일치 |
+| `GET /users/me` | `Authorization: Bearer …` | 200 `data: {id, email, name, phone, role}` | 401 토큰 없음·만료 |
 | `get_current_user` (의존성) | 토큰 | 도메인 `User` | 401 (블랙리스트 토큰, 탈퇴 `deleted_at` 계정도 401) |
 | `POST /auth/logout` | `Authorization: Bearer …` | 204 (이 토큰은 이후 401) | 401 토큰 없음·만료·이미 로그아웃 |
 
-**계층별 파일**: `domain/user.py` · `application/service.py`(로그인·로그아웃) · `infrastructure/models.py`(`UserModel`, `TokenBlacklistModel`), `repository.py`, `security.py`(해시·JWT·`jti`) · `presentation/router.py`, `schemas.py`, `dependencies.py`(`get_current_user`) · `common/middleware.py`
+**계층별 파일** (라우터는 두 모듈 모두 `presentation/routers/v1/router.py`):
+
+- `auth/`: `application/service.py`(로그인·로그아웃) · `infrastructure/models.py`(`TokenBlacklistModel`), `repository.py`, `security.py`(해시·JWT·`jti`) · `presentation/routers/v1/router.py`(`/auth`), `schemas.py`, `dependencies.py`(`get_current_user`)
+- `user/`: `domain/user.py`, `repository.py`(`UserRepository` 인터페이스) · `application/service.py`(내 정보 조회) · `infrastructure/models.py`(`UserModel`), `repositories.py` · `presentation/routers/v1/router.py`(`/users`), `schemas.py`
+- `common/middleware.py`
+
+`auth` 서비스는 로그인할 때 `user` 모듈의 레포지토리로 사용자를 조회합니다 (ARCHITECTURE 2장의 다른 모듈 `domain`·`infrastructure` 참조 규칙).
 
 **배우고 바로 적용하기**
 
@@ -153,7 +159,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 | `Query(ge=1, le=100)`, `Literal` 검증 | `page`, `page_size`, `sort` |
 | `where` · `ilike` · `offset` · `limit` · `count`, 고정 정렬 | 검색·필터·정렬·페이지 나누기 |
 | 제네릭 `Page[T]` 스키마 | 공용 목록 응답 → **담당 5도 사용** |
-| 예외 핸들러 `@app.exception_handler` | `AppError`·422·`HTTPException`을 `{"error": {code, message, details, request_id}}`로 → **모두 사용** |
+| 예외 핸들러 `@app.exception_handler` | `AppError`·422·`HTTPException`을 실패 봉투 `APIResponse`(`success: false`, `code`, `message`, `errors`, `request_id`)로 → **모두 사용** |
 | 비동기에서 관계 함께 불러오기 (`selectinload`) | 상세에 메뉴 포함 (비동기에선 지연 로딩이 안 됨) |
 | `model_dump(exclude_unset=True)` 부분 수정 | PATCH — 보낸 필드만 바꾸기 |
 | 권한 규칙을 도메인 메서드로 표현 | `Restaurant.is_owned_by()` → **담당 5도 사용** |
@@ -175,7 +181,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 | API | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
-| `GET /restaurants/{id}/availability` | `date`(YYYY-MM-DD) · `party_size`(1 이상) | 200 `{restaurant_id, date, slots[{id, starts_at, ends_at, remaining, max_party_size, available}]}` | 422 · 404 |
+| `GET /restaurants/{id}/availability` | `date`(YYYY-MM-DD) · `party_size`(1 이상) | 200 `data: {restaurant_id, date, slots[{id, starts_at, ends_at, remaining, max_party_size, available}]}` | 422 · 404 |
 
 `available = TimeSlot.can_accept(party_size, now)` = 시작 전 AND `party_size ≤ max_party_size` AND `capacity − reserved_guests ≥ party_size`. 저장하지 않고 응답 때 계산합니다.
 

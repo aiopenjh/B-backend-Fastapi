@@ -11,7 +11,7 @@
 | **API 하나 = 명세 하나** (경우마다 나누지 않음) | 같은 경로·메서드가 여러 번 나오지 않게 합니다 |
 | **요청 상세는 한 가지 형식만** | 잘못된 값은 "다른 요청"이 아니라 "실패 응답을 받는 경우"입니다 |
 | **응답 상세는 상태 코드별로 나눔** | 성공 1개와 실패 여러 개를 코드로 구분합니다 |
-| **실패 응답 본문은 공통 형식을 따름** | 경우마다 다른 건 `error.code`뿐입니다. 형식을 매번 다시 쓰지 않습니다 |
+| **성공·실패 응답 본문은 모두 공통 봉투(`APIResponse`)를 따름** | 성공이면 `data`만, 실패면 `code`·`message`·`errors`만 경우마다 다릅니다. 형식을 매번 다시 쓰지 않습니다 |
 | **실패 예시는 "이 요청 → 이 응답"으로 짝지음** | 그대로 실패 테스트 케이스가 됩니다 |
 | **같은 200 안에서 값만 다른 경우는 실패가 아님** | 예: 예약 가능 조회의 `available: true/false`는 200 예시 하나에 둘 다 보이게 씁니다 |
 
@@ -27,33 +27,81 @@
 | 시각 | 오프셋 포함 ISO 8601, Asia/Seoul 기준 (예: `2026-10-30T18:00:00+09:00`) |
 | 가격 | 원 단위 정수 |
 
-### 목록 응답 `Page[T]`
+### 응답 봉투 `APIResponse[T]` (`common/schemas.py`)
+
+모든 응답 본문은 아래 봉투 하나로 감쌉니다. 성공 여부는 `success`와 HTTP 상태 코드가 **항상 같이** 말합니다 (실패를 200으로 보내지 않습니다).
+
+| 필드 | 타입 | 성공 | 실패 |
+| --- | --- | --- | --- |
+| `success` | 불리언 | `true` | `false` |
+| `code` | 문자열 | `"OK"` | 에러 코드 표의 값 (예: `"SLOT_SOLD_OUT"`) |
+| `message` | 문자열 | 처리 결과 메시지 | 사람이 읽을 실패 이유 |
+| `errors` | 객체 또는 `null` | `null` | 필드 이름 → 메시지 목록 (예: `{"party_size": ["1 이상이어야 합니다."]}`), 특정 필드가 없으면 `{}` |
+| `data` | `T` 또는 `null` | 출력 스키마 (`UserOut`, `ReservationOut`, `Page[T]` …) | `null` |
+| `request_id` | 문자열 | 요청 로그 미들웨어가 만든 id (응답 헤더 `X-Request-ID`와 같은 값) | 같음 |
+| `responded_at` | 시각 | 응답 시각 | 같음 |
+
+성공:
 
 ```json
 {
-  "items": [],
-  "page": 1,
-  "page_size": 20,
-  "total": 0
+  "success": true,
+  "code": "OK",
+  "message": "요청이 성공적으로 처리되었습니다.",
+  "errors": null,
+  "data": { "id": "00000000-0000-4000-8000-000000000001", "email": "customer-a@example.com" },
+  "request_id": "req_8f2c1a",
+  "responded_at": "2026-10-28T15:20:00+09:00"
+}
+```
+
+실패:
+
+```json
+{
+  "success": false,
+  "code": "SLOT_SOLD_OUT",
+  "message": "남은 자리가 부족합니다.",
+  "errors": {},
+  "data": null,
+  "request_id": "req_8f2c1a",
+  "responded_at": "2026-10-28T15:20:00+09:00"
+}
+```
+
+클라이언트는 `message` 문구가 아니라 `code`로 분기합니다. 실패 봉투는 라우터에서 직접 만들지 않습니다. 서비스·도메인이 `AppError` 계열 예외를 던지면 공통 핸들러(`common/error_handlers.py`)가 실패 봉투로 바꿉니다. FastAPI 기본 422(`RequestValidationError`)도 같은 핸들러가 `VALIDATION_ERROR` 봉투로 바꿉니다.
+
+**봉투를 쓰지 않는 예외 (2개)**
+
+| API | 이유 | 응답 |
+| --- | --- | --- |
+| `POST /auth/login` 성공 | OAuth2 표준 토큰 응답이어야 `/docs`의 Authorize 버튼이 동작함 | 200 `{access_token, token_type, expires_in}` (최상위) |
+| `POST /auth/logout` 성공 | 204는 본문이 없음 | 204, 본문 없음 |
+
+두 API도 **실패 응답은 봉투**를 씁니다 (예: 로그인 실패 401).
+
+### 목록 응답 `Page[T]`
+
+목록은 `data` 안에 `Page[T]`를 넣습니다.
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "message": "요청이 성공적으로 처리되었습니다.",
+  "errors": null,
+  "data": {
+    "items": [],
+    "page": 1,
+    "page_size": 20,
+    "total": 0
+  },
+  "request_id": "req_8f2c1a",
+  "responded_at": "2026-10-28T15:20:00+09:00"
 }
 ```
 
 `page` 기본 1, `page_size` 기본 20·최대 100. 정렬 순서는 항상 같게 합니다.
-
-### 실패 응답 공통 형식
-
-```json
-{
-  "error": {
-    "code": "SLOT_SOLD_OUT",
-    "message": "남은 자리가 부족합니다.",
-    "details": {},
-    "request_id": "req_8f2c1a"
-  }
-}
-```
-
-클라이언트는 `message` 문구가 아니라 `code`로 분기합니다.
 
 ### 에러 코드
 
@@ -69,6 +117,7 @@
 | 409 | `ALREADY_CANCELLED` | 이미 취소한 예약 |
 | 409 | `CANCELLATION_NOT_ALLOWED` | 시작 시각이 지나 취소할 수 없음 |
 | 422 | `VALIDATION_ERROR` | 형식이 잘못된 입력 (필드 누락, 타입·범위 위반) |
+| 500 | `INTERNAL_SERVER_ERROR` | 처리하지 못한 예외. 요청 로그 미들웨어가 잡아 `request_id`가 든 실패 봉투로 응답하고 스택을 로그에 남김 |
 | 503 | `SERVICE_UNAVAILABLE` | DB 연결 실패 |
 
 401·403·404·422·503 코드 이름은 담당 2(김태양)의 초안이고 팀이 확정합니다 ([BACKEND_PLAN 7장](BACKEND_PLAN.md#7-팀이-확인할-것)). 새 코드가 필요하면 이 표에 먼저 추가하고 공유합니다.
@@ -77,12 +126,14 @@
 
 모든 명세가 같은 시드 데이터를 가정하면 예시끼리 맞물립니다.
 
+사용자 id는 UUID입니다(2026-11-04, [ARCHITECTURE 3장](ARCHITECTURE.md#3-데이터-모델-erd)). 예시에서는 읽기 쉽게 `00000000-0000-4000-8000-00000000000N` 형식을 쓰고, 아래 표에서는 끝자리만 `…0001`처럼 줄여 씁니다. 실제 값은 저장할 때 정해집니다. 식당·슬롯·예약 id는 정수 그대로입니다.
+
 | id | 대상 | 설명 |
 | --- | --- | --- |
-| 사용자 1 · 2 | 고객 A · 고객 B | `role: CUSTOMER` |
-| 사용자 3 · 4 | 운영자 A · 운영자 B | `role: OWNER` |
-| 식당 1 · 2 | 운영자 A 소유 | `owner_id: 3` |
-| 식당 3 | 운영자 B 소유 | `owner_id: 4` |
+| 사용자 `…0001` · `…0002` | 고객 A · 고객 B | `role: CUSTOMER` |
+| 사용자 `…0003` · `…0004` | 운영자 A · 운영자 B | `role: OWNER` |
+| 식당 1 · 2 | 운영자 A 소유 | `owner_id: "…0003"` |
+| 식당 3 | 운영자 B 소유 | `owner_id: "…0004"` |
 | 슬롯 7 | 식당 1, 열린 슬롯 | `capacity: 10`, `reserved_guests: 2`, `max_party_size: 4` |
 | 슬롯 9 | 식당 1, 거의 찬 슬롯 | `capacity: 10`, `reserved_guests: 8`, `max_party_size: 4` |
 
@@ -121,13 +172,17 @@ Authorization: Bearer <access_token>
 
 | 상태 | code | 언제 |
 | --- | --- | --- |
-| 200 | — | 성공 |
+| 200 | `OK` | 성공 |
 | 4xx | `...` | |
 
-성공 응답 예시:
+성공 응답 예시 (봉투의 `data` 부분만 쓰고, 나머지 필드는 공통 형식을 따름):
 
 ```json
-{ }
+{
+  "success": true,
+  "code": "OK",
+  "data": { }
+}
 ```
 
 **실패 예시** (요청 → 응답, 최소 1개)
@@ -177,7 +232,7 @@ Authorization: Bearer <access_token>
 
 | 상태 | code | 언제 |
 | --- | --- | --- |
-| 201 | — | 예약 성공 |
+| 201 | `OK` | 예약 성공 |
 | 401 | `UNAUTHORIZED` | 토큰 없음·만료·로그아웃한 토큰 |
 | 404 | `NOT_FOUND` | 없는 `slot_id` |
 | 409 | `SLOT_ALREADY_STARTED` | 시작 시각이 지난 슬롯 |
@@ -186,21 +241,29 @@ Authorization: Bearer <access_token>
 | 409 | `DUPLICATE_RESERVATION` | 같은 슬롯에 이미 `CONFIRMED` 예약이 있음 |
 | 422 | `VALIDATION_ERROR` | 필드 누락, `party_size`가 0 이하 |
 
-성공 응답 예시 (`ReservationOut`):
+성공 응답 예시 (`APIResponse[ReservationOut]`):
 
 ```json
 {
-  "id": 15,
-  "user_id": 1,
-  "slot_id": 7,
-  "restaurant_id": 1,
-  "starts_at": "2026-10-30T18:00:00+09:00",
-  "ends_at": "2026-10-30T19:00:00+09:00",
-  "party_size": 2,
-  "status": "CONFIRMED",
-  "created_at": "2026-10-28T15:20:00+09:00",
-  "cancelled_at": null,
-  "can_cancel": true
+  "success": true,
+  "code": "OK",
+  "message": "예약이 완료되었습니다.",
+  "errors": null,
+  "data": {
+    "id": 15,
+    "user_id": "00000000-0000-4000-8000-000000000001",
+    "slot_id": 7,
+    "restaurant_id": 1,
+    "starts_at": "2026-10-30T18:00:00+09:00",
+    "ends_at": "2026-10-30T19:00:00+09:00",
+    "party_size": 2,
+    "status": "CONFIRMED",
+    "created_at": "2026-10-28T15:20:00+09:00",
+    "cancelled_at": null,
+    "can_cancel": true
+  },
+  "request_id": "req_5d1e42",
+  "responded_at": "2026-10-28T15:20:00+09:00"
 }
 ```
 
@@ -211,12 +274,13 @@ Authorization: Bearer <access_token>
 요청: POST /api/v1/reservations  {"slot_id": 9, "party_size": 3}   (고객 A, 남은 자리 2)
 응답: 409
 {
-  "error": {
-    "code": "SLOT_SOLD_OUT",
-    "message": "남은 자리가 부족합니다.",
-    "details": {"remaining": 2, "requested": 3},
-    "request_id": "req_8f2c1a"
-  }
+  "success": false,
+  "code": "SLOT_SOLD_OUT",
+  "message": "남은 자리가 부족합니다.",
+  "errors": {"party_size": ["남은 자리(2명)보다 많습니다. 요청: 3명"]},
+  "data": null,
+  "request_id": "req_8f2c1a",
+  "responded_at": "2026-10-28T15:20:00+09:00"
 }
 ```
 
@@ -225,11 +289,12 @@ Authorization: Bearer <access_token>
 요청: POST /api/v1/reservations  {"slot_id": 7, "party_size": 0}
 응답: 422
 {
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "입력값이 올바르지 않습니다.",
-    "details": {"party_size": "1 이상이어야 합니다."},
-    "request_id": "req_3b9d70"
-  }
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "message": "입력값이 올바르지 않습니다.",
+  "errors": {"party_size": ["1 이상이어야 합니다."]},
+  "data": null,
+  "request_id": "req_3b9d70",
+  "responded_at": "2026-10-28T15:20:01+09:00"
 }
 ```
