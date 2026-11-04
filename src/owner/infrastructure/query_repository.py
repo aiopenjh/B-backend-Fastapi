@@ -1,17 +1,17 @@
 # [담당 5] 운영자 창고: DB에서 꺼내기
 import uuid
-from datetime import date, datetime, time, timedelta
+from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.schemas import SEOUL  # 담당 1: 서울 시간대
 from reservation.domain.reservation import Reservation  # 담당 4: 예약
 from reservation.infrastructure.models import ReservationModel  # 담당 4: 예약 표(DB)
 from reservation.infrastructure.repository import to_reservation  # 담당 4: 표 → 예약 (아직 없음)
 from restaurant.domain.restaurant import Restaurant  # 담당 2: 식당
 from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB)
 from restaurant.infrastructure.repository import to_restaurant  # 담당 2: 표 → 식당
+from slot.domain.day_range import seoul_day_range  # 담당 3: 서울 기준 하루 범위
 from slot.domain.time_slot import TimeSlot  # 담당 3: 슬롯
 from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB) (아직 없음)
 from slot.infrastructure.repository import to_time_slot  # 담당 3: 표 → 슬롯 (아직 없음)
@@ -43,8 +43,8 @@ class OwnerQueryRepository:
         conditions = [ReservationSlotModel.restaurant_id == restaurant_id]
         if day is not None:
             # 서울 기준 그날 00:00 ~ 다음 날 00:00에 시작하는 슬롯만
-            start = datetime.combine(day, time.min, tzinfo=SEOUL)
-            conditions += [ReservationSlotModel.starts_at >= start, ReservationSlotModel.starts_at < start + timedelta(days=1)]
+            start, end = seoul_day_range(day)
+            conditions += [ReservationSlotModel.starts_at >= start, ReservationSlotModel.starts_at < end]
         joined = select(ReservationModel, ReservationSlotModel).join(
             ReservationSlotModel, ReservationSlotModel.id == ReservationModel.slot_id
         )
