@@ -62,7 +62,7 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | 소유 확인 `Restaurant.is_owned_by(user_id)` | 담당 2 | 2 · 5 | D5 | `restaurant.owner_id == user.id`를 직접 비교 |
 | `ReservationOut` 응답 스키마 + `Reservation.can_cancel()` | 담당 4 | 4 · 5 | D5 | 4장의 필드 표를 그대로 따름 |
 
-### 공용 부품 현재 상태 (2026-11-03, dev 기준)
+### 공용 부품 현재 상태 (2026-11-04, dev 기준)
 
 | 부품 | 상태 | 위치 (들어온 PR) |
 | --- | --- | --- |
@@ -71,14 +71,16 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | 요청 로그·처리 시간·CORS 미들웨어, 요청 id | 있음 | `common/middleware.py`, `common/context.py` (#3) |
 | ORM 공용 `Base` | 있음 | `common/model.py` (#3) |
 | `AsyncSession` 의존성 `get_session` | 있음 | `common/database.py` (#3) |
-| `User`·`Role`, `UserRepository` 인터페이스 | 있음 (구현체 `SQLAlchemyUserRepository`는 아직 빈 껍데기) | `user/domain/`, `user/infrastructure/repositories.py`, `container.py` (#3) |
+| `User`(UUID id, `create`·`change_password`)·`Role`, `UserRepository` 인터페이스, 비밀번호 해시, 회원가입 서비스 | 있음 (구현체 `SQLAlchemyUserRepository`는 아직 빈 껍데기) | `user/` (#3, #8) |
 | auth·user 라우터 골격 (`/api/v1/auth`, `/api/v1/users`) | 있음 (로그인 본문은 아직 없음) | `*/presentation/routers/v1/router.py`, `main.py` (#3) |
 | `ReservationModel`, `Reservation`(`create`), `ReservationOut` | 있음 | `reservation/` (#4) |
-| `require_owner` | 있음 (가져오는 `get_current_user`·`ForbiddenError`·`User.is_owner`가 아직 없어 이름 맞춤 필요) | `owner/presentation/dependencies.py` (#2) |
-| `get_current_user` | 없음 | `auth/presentation/dependencies.py` 예정 |
-| `AppError` 계열 예외 + 예외 핸들러 | 없음 | `common/errors.py`, `common/error_handlers.py` 예정 |
+| `require_owner` | 있음 (`user.role != Role.OWNER`로 확인) | `owner/presentation/dependencies.py` (#2, #7) |
+| 운영자 식당 목록, 운영자 식당 예약 목록 창구·매니저, `create_owner_service` | 있음 (식당·페이지 부품이 없어 `import container` 실패) | `owner/`, `container.py` (#7) |
+| `get_current_user` | 자리만 있음 (`NotImplementedError`) | `auth/presentation/dependencies.py` (#8) |
+| `AppError` 계열 예외 + 공통 에러 핸들러 | 있음 | `common/errors.py`, `common/error_handlers.py` (#8) |
+| `TimeSlot` 규칙, 슬롯 예외 3개 | 있음 (슬롯 예외 `error_code` 미지정이라 409가 아니라 500) | `slot/domain/` (#6, #8) |
 | `Page[T]` | 없음 | `common/pagination.py` 예정 |
-| `UserModel`, `TokenBlacklistModel`, `Restaurant`·`RestaurantModel`, `TimeSlot`·슬롯 모델 | 없음 | 각 모듈 예정 |
+| `UserModel`, `TokenBlacklistModel`, `Restaurant`·`RestaurantModel`, 슬롯 모델 | 없음 | 각 모듈 예정 |
 | `Reservation.can_cancel()`, `ReservationOut.from_domain()` | 없음 | `reservation/` 예정 |
 | lifespan `create_all` + 시드 | 없음 (`main.py`에 lifespan이 없고, `common/model.py`의 `init_models`는 빈 함수) | `main.py`, `src/seed.py` 예정 |
 

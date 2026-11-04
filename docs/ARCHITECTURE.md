@@ -47,10 +47,11 @@ src/
 │   ├── config.py            # 환경변수(.env) 읽기 (예정. 지금은 database.py가 .env를 직접 읽음)
 │   ├── database.py          # 비동기 엔진, AsyncSession 의존성 get_session
 │   ├── model.py             # ORM 공용 Base (모든 infrastructure/models.py가 상속)
-│   ├── errors.py            # 에러 코드표 ErrorCode · CommonErrorCode (+ AppError 계열 예외 예정)
+│   ├── errors.py            # 에러 코드표 ErrorCode · CommonErrorCode, AppError 계열 예외
 │   ├── schemas.py           # APIResponse[T] 응답 봉투 (성공·실패 공통)
 │   ├── context.py           # 요청 id(request_id_var). 미들웨어가 넣고 APIResponse가 읽음
-│   ├── error_handlers.py    # 예외 → 실패 봉투(APIResponse)로 변환 (예정)
+│   ├── error_handlers.py    # AppError · 422 → 실패 봉투(APIResponse)로 변환
+│   ├── logger.py            # 로그 설정 (LOGGING_MODE=debug면 DEBUG)
 │   ├── pagination.py        # Page[T] 목록 응답 (예정)
 │   └── middleware.py        # 요청 id · 요청 로그 · 처리 시간, 처리 못 한 예외 → 500 봉투, CORS
 ├── auth/                    # 담당 1 (로그인 · 로그아웃 · 현재 사용자 의존성)
@@ -60,7 +61,7 @@ src/
 │   └── presentation/
 │       ├── routers/v1/router.py
 │       ├── schemas.py
-│       └── dependencies.py  # get_current_user (예정)
+│       └── dependencies.py  # get_current_user (자리만 있음, 구현 예정)
 ├── user/                    # 담당 1 (사용자 정보)
 │   ├── domain/              # user.py(User, Role), repository.py(UserRepository 인터페이스)
 │   ├── application/
@@ -82,7 +83,7 @@ src/
 
 | 모듈 | 담당 | 테이블 | 핵심 도메인 객체 |
 | --- | --- | --- | --- |
-| `common/`, `main.py` | `database.py`·`model.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `APIResponse`, `ErrorCode` (`AppError` 예정) |
+| `common/`, `main.py` | `database.py`·`model.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `APIResponse`, `ErrorCode`, `AppError` |
 | `auth` | 담당 1 (강성수) | `token_blacklist` | — (토큰 발급·검증, 블랙리스트) |
 | `user` | 담당 1 (강성수) | `users` | `User` |
 | `restaurant` | 담당 2 (김태양) | `restaurants`, `menus` | `Restaurant`, `Menu` |
