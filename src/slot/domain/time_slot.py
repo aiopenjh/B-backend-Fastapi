@@ -20,7 +20,7 @@ class TimeSlot:
     max_party_size: int
 
     def __post_init__(self) -> None:
-        if self.starts_at.tzinfo is None or self.ends_at tzinfo is None:
+        if self.starts_at.tzinfo is None or self.ends_at.tzinfo is None:
             raise ValueError("starts_at/ends_at must be timezone aware")
         if self.starts_at >= self.ends_at:
             raise ValueError("starts_at must be before ends_at")
@@ -41,7 +41,7 @@ class TimeSlot:
     
     """요청 판정"""
     
-    def _violation(self, party_size: int) -> SlotRuleViolation: | None:
+    def _violation(self, party_size: int, now: datetime) -> SlotRuleViolation | None:
         if party_size < 1:
             raise ValueError("party_size must be >= 1")
         if self.has_started(now):
@@ -51,9 +51,8 @@ class TimeSlot:
             return PartySizeExceeded("최대 인원 초과했습니다.", {"max_party_size":
             self.max_party_size, "requested": party_size})
         if party_size > self.remaining:
-            return SlotSoldOut("남은 자리가 부족합니다.", {"remaining": self.remaining,
-            "requested": party_size})
-            return None
+            return SlotSoldOut({"party_size": [f"남은 자리({self.remaining}명)보다 많습니다. 요청: {party_size}명"]})
+        return None
         
     def can_accept(self, party_size: int, now: datetime) -> bool:
         return self._violation(party_size, now) is None

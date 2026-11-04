@@ -13,3 +13,4 @@ class PartySizeExceeded(SlotRuleViolation):
 class SlotSoldOut(SlotRuleViolation):
     code = "SLOT_SOLD_OUT"
 
+    

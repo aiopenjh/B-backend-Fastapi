@@ -29,3 +29,6 @@ class CommonErrorCode(ErrorCode, Enum):
         HTTPStatus.SERVICE_UNAVAILABLE,
         "서비스를 일시적으로 사용할 수 없습니다.",
     )
+
+class AppError(Exception):  # 임시(담당3-영민) — 커밋 금지, 내일(11/4) 진짜 AppError() 로 삭제
+    pass
