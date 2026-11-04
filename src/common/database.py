@@ -1,7 +1,5 @@
-import logging
 import os
 from collections.abc import AsyncGenerator
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncSession,
@@ -10,10 +8,9 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
+from common.logger import get_logger
 
-load_dotenv()
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 POSTGRES_URL = os.getenv("POSTGRES_URL")
 if POSTGRES_URL is None:
