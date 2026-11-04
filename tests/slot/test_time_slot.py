@@ -7,6 +7,8 @@ from slot.domain.day_range import SEOUL
 from slot.domain.exceptions import (
     PartySizeExceeded,
     SlotAlreadyStarted,
+    SlotErrorCode,
+    SlotRuleViolation,
     SlotSoldOut,
 )
 from slot.domain.time_slot import TimeSlot
