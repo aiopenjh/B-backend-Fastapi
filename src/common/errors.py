@@ -17,9 +17,14 @@ class ErrorCode(Enum):
 # 값이 같은 멤버는 별칭이 되므로 @unique로 정의 시점에 막음
 @unique
 class CommonErrorCode(ErrorCode):
+    BAD_REQUEST = (HTTPStatus.BAD_REQUEST, "잘못된 요청입니다.")
     UNAUTHORIZED = (HTTPStatus.UNAUTHORIZED, "인증이 필요합니다.")
     FORBIDDEN = (HTTPStatus.FORBIDDEN, "권한이 없습니다.")
     NOT_FOUND = (HTTPStatus.NOT_FOUND, "리소스를 찾을 수 없습니다.")
+    METHOD_NOT_ALLOWED = (
+        HTTPStatus.METHOD_NOT_ALLOWED,
+        "허용되지 않은 요청 방식입니다.",
+    )
     VALIDATION_ERROR = (HTTPStatus.UNPROCESSABLE_CONTENT, "입력값이 올바르지 않습니다.")
     INTERNAL_SERVER_ERROR = (
         HTTPStatus.INTERNAL_SERVER_ERROR,
