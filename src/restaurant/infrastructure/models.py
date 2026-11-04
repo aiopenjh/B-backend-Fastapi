@@ -17,17 +17,17 @@ from common.model import Base
 
 
 class RestaurantModel(Base):
-    __tablename__ = "Restaurants"
+    __tablename__ = "restaurants"
 
-    # UUID 기본 키 (text 리터럴로 DB 레벨 기본값 생성)
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    # BIGINT 자동 증가 기본 키
+    id: Mapped[int] = mapped_column(
+        BigInteger,
         primary_key=True,
-        server_default=text("gen_random_uuid()"),
+        autoincrement=True,
     )
-    # 식당 주인(운영자). ERD의 컬럼 이름은 user_id
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id"), nullable=False, index=True
+    # 식당 주인(운영자). users_id
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -51,7 +51,7 @@ class RestaurantModel(Base):
     menus: Mapped[list["MenuModel"]] = relationship(
         back_populates="restaurant",
         lazy="selectin",
-        order_by="(Menumodel.created_at, MenuModel.id)",
+        order_by="MenuModel.id",
     )
 
 
@@ -63,13 +63,14 @@ class MenuModel(Base):
         CheckConstraint("price >= 0", name="ck_menus_price_non_negative"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True),
+    id: Mapped[int] = mapped_column(
+        BigInteger,
         primary_key=True,
-        server_default=text("gen_random_uuid()"),
+        autoincrement=True,
     )
-    restaurant_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("restaurant.id"), nullable=False, index=True
+    restaurant_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("restaurants.id"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
