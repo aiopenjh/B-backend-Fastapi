@@ -17,12 +17,12 @@ if POSTGRES_URL is None:
     raise RuntimeError("POSTGRES_URL 설정값을 채워주세요")
 
 engine = create_async_engine(POSTGRES_URL)
-SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 # 요청 하나당 AsyncSession 하나. commit은 서비스가 함
 async def get_session() -> AsyncGenerator[AsyncSession]:
-    async with SessionLocal() as session:
+    async with AsyncSessionLocal() as session:
         yield session
 
 

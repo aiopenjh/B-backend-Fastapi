@@ -1,3 +1,4 @@
+# [담당1 - 강성수]
 from user.application.service import UserService
 from user.domain.repository import UserRepository
 

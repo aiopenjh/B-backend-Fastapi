@@ -1,8 +1,9 @@
+# [담당 4] 예약 응답 스키마 테스트 : API 명세 예시 검증
 from reservation.presentation.schemas import ReservationOut
 
 SPEC_EXAMPLE = {
     "id": 15,
-    "user_id": 1,
+    "user_id": "00000000-0000-4000-8000-000000000001",
     "slot_id": 7,
     "restaurant_id": 1,
     "starts_at": "2026-10-30T18:00:00+09:00",

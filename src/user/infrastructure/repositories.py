@@ -1,9 +1,11 @@
+# [담당1 - 강성수]
 import uuid
 
 from user.domain.repository import UserRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from user.domain.user import User
+from user.domain.value_object import Email
 
 
 class SQLAlchemyUserRepository(UserRepository):
@@ -14,7 +16,7 @@ class SQLAlchemyUserRepository(UserRepository):
     async def find_by_id(self, user_id: uuid.UUID) -> User | None:
         raise NotImplementedError
 
-    async def find_by_email(self, email: str) -> User | None:
+    async def find_by_email(self, email: Email) -> User | None:
         raise NotImplementedError
 
     async def save(self, user: User) -> User:
