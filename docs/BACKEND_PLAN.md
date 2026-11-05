@@ -74,13 +74,13 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | `User`(UUID id, `create`·`change_password`)·`Role`, `Email` 값 객체, `UserRepository` 인터페이스, `UserModel`, 비밀번호 해시, 회원가입 서비스(`create_user_service`) | 있음 (구현체 `SQLAlchemyUserRepository`는 아직 빈 껍데기) | `user/`, `container.py` (#3, #8, #14) |
 | auth·user 라우터 골격 (`/api/v1/auth`, `/api/v1/users`) | 있음 (로그인 본문은 아직 없음) | `*/presentation/routers/v1/router.py`, `main.py` (#3) |
 | `ReservationModel`(`user_id` UUID), `Reservation`(`create`·`cancel`, 재취소 409 `ALREADY_CANCELLED`), `ReservationOut` | 있음 | `reservation/` (#4, #15) |
-| `require_owner` | 있음. 단 dev에서는 #14 이후 옛 이름 `get_current_user`를 import해서 깨져 있음 → `feat/owner-reservations`에서 `get_authenticated_user`·`is_owner()`로 고침 | `owner/presentation/dependencies.py` (#2, #7) |
+| `require_owner` | 있음. 단 dev에서는 #14 이후 옛 이름 `get_current_user`를 import해서 깨져 있음 → `feat/owner-reservation-queries`에서 `get_authenticated_user`·`is_owner()`로 고침 | `owner/presentation/dependencies.py` (#2, #7) |
 | 운영자 식당 목록, 운영자 식당 예약 목록 창구·매니저, `create_owner_service` | 있음 (식당·페이지 부품이 없어 `import container` 실패) | `owner/`, `container.py` (#7) |
 | `get_authenticated_user` → `AuthenticatedUser`(`user_id`·`role`·`is_owner()`·`is_customer()`) | VO는 있음, 의존성은 자리만 있음 (`NotImplementedError`) | `auth/domain/value_object.py`, `auth/presentation/dependencies.py` (#8, #14) |
 | `AppError` 계열 예외 + 공통 에러 핸들러 (422 문구 한국어, `HTTPException`도 봉투로) | 있음 | `common/errors.py`, `common/error_handlers.py` (#8, #12) |
 | `TimeSlot` 규칙, 슬롯 예외 3개(409), `seoul_day_range` | 있음 | `slot/domain/` (#6, #8, #10) |
 | `Page[T]` | 없음 | `common/pagination.py` 예정 |
-| 운영자 창고, 내 예약 목록·예약 상세 (창구·매니저·창고·`create_reservation_query_service`) | 코드 있음, PR 전 | `feat/owner-reservations`, `feat/reservation-queries` (담당 5) |
+| 운영자 창고, 내 예약 목록·예약 상세 (창구·매니저·창고·`create_reservation_query_service`) | 코드 있음, PR 전 | `feat/owner-reservation-queries` (담당 5) |
 | `TokenBlacklistModel`, `Restaurant`·`RestaurantModel`, 슬롯 모델 | 없음 | 각 모듈 예정 |
 | `Reservation.can_cancel()`, `ReservationOut.from_domain()` | 없음 | `reservation/` 예정 |
 | lifespan `create_all` + 시드 | 없음 (`main.py`에 lifespan이 없고, `common/model.py`의 `init_models`는 빈 함수) | `main.py`, `src/seed.py` 예정 |

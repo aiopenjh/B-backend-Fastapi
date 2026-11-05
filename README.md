@@ -181,14 +181,12 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 | #14 | 1 강성수 | **`get_current_user` → `get_authenticated_user`**, 돌려주는 값 `User` → **`AuthenticatedUser`**(`user_id`·`role`·`is_owner()`·`is_customer()`, `auth/domain/value_object.py`), `UserModel`, `Email` 값 객체, `create_user_service` | 로그인한 사람을 가벼운 값 하나로 받음. 이름이 바뀌어 쓰는 쪽(담당 2·4·5)도 맞춰야 함 |
 | #15 | 4 김민지 | `Reservation.cancel()`(재취소 409 `ALREADY_CANCELLED`), `reservations.user_id` UUID | 예약 취소 규칙 |
 
-### 올라갈 PR (담당 5 최지훈, 2026-11-05 기준 브랜치에 푸시됨)
+### 올라갈 PR 2개 (담당 5 최지훈, 2026-11-05 기준 브랜치에 푸시됨)
 
-| 브랜치 | 들어갈 것 | 쉽게 말하면 |
+| PR (브랜치) | 들어갈 것 | 쉽게 말하면 |
 | --- | --- | --- |
-| `feat/owner-reservations` | 운영자 창고 `owner/infrastructure/query_repository.py`(`list_restaurants`·`get_restaurant`·`list_reservations`, 날짜 필터는 `seoul_day_range`), owner 3파일을 `get_authenticated_user`·`AuthenticatedUser`로 맞춤 | 운영자 식당·예약 목록이 DB에서 꺼내짐. dev의 `require_owner` import 오류도 여기서 고침 |
-| `feat/reservation-queries` | `GET /users/me/reservations`(상태 필터, 이용 시각 최신순), `GET /reservations/{reservation_id}`(본인·그 식당 운영자만, 나머지 404), `reservation/` `query_repository.py`·`query_service.py`·`presentation/query_router.py`, `container.py`의 `create_reservation_query_service` | 내 예약 목록·예약 상세. `main.py` 등록은 부품이 들어온 뒤 |
-| `feat/web-pages` | Jinja2 화면 틀: `web.py`(`/ui`), `web_data.py`, `templates/`, `static/`, `pyproject.toml`(jinja2), `main.py`(`register_web`) | 운영자 화면 3개. 데이터 연결은 인증 구현 뒤 |
-| `docs/sync-with-code` | 이 문서 갱신 | 코드와 문서 이름 맞추기 |
+| ① 내 API + 문서 (`feat/owner-reservation-queries`) | 운영자 창고 `owner/infrastructure/query_repository.py`(`list_restaurants`·`get_restaurant`·`list_reservations`, 날짜 필터는 `seoul_day_range`), owner 3파일을 `get_authenticated_user`·`AuthenticatedUser`로 맞춤 · `GET /users/me/reservations`(상태 필터, 이용 시각 최신순) · `GET /reservations/{reservation_id}`(본인·그 식당 운영자만, 나머지 404) · `reservation/` `query_repository.py`·`query_service.py`·`presentation/query_router.py`, `container.py`의 `create_reservation_query_service` · 이 문서 갱신 | 운영자 API와 내 예약 API 4개 완성. dev의 `require_owner` import 오류도 여기서 고침. `main.py` 등록은 부품이 들어온 뒤 |
+| ② 화면 (`feat/web-pages`) | Jinja2 화면 틀: `web.py`(`/ui`), `web_data.py`, `templates/`, `static/`, `pyproject.toml`(jinja2), `main.py`(`register_web`) | 운영자 화면 3개. 공용 파일을 고쳐서 따로 리뷰. 데이터 연결은 인증 구현 뒤 |
 
 dev 테스트는 42개 모두 통과합니다. 아직 **앱을 켜서 API를 눌러 볼 수는 없습니다** (테이블과 시드가 없음).
 
@@ -234,7 +232,7 @@ dev 테스트는 42개 모두 통과합니다. 아직 **앱을 켜서 API를 눌
 | 2 | 식당 상세 → 식당 목록(검색·필터·정렬) → 식당 정보 수정 |
 | 3 | 예약 가능 시간 조회 |
 | 4 | 예약 생성(행 락) → 예약 취소 |
-| 5 | 운영자 식당 목록(#7) → 운영자 식당 예약 목록(#7 창구·매니저, 창고는 `feat/owner-reservations`) → 내 예약 목록 → 예약 상세 (둘 다 `feat/reservation-queries`, 코드 완료) → Jinja2 화면(`feat/web-pages`, 운영자 화면 틀 완료 · 식당 목록·상세는 식당 부품 뒤) |
+| 5 | 운영자 식당 목록(#7) → 운영자 식당 예약 목록(#7 창구·매니저, 창고는 ① PR) → 내 예약 목록 → 예약 상세 (둘 다 ① PR `feat/owner-reservation-queries`, 코드 완료) → Jinja2 화면(`feat/web-pages`, 운영자 화면 틀 완료 · 식당 목록·상세는 식당 부품 뒤) |
 
 **5 동작 확인** — `/docs`에서 한 번에 이어서 눌러 봅니다. 고객 A 로그인 → 식당 목록 → 상세 → 예약 가능 조회 → 예약 → 내 예약 → 취소 → 로그아웃 → 같은 토큰 401 / 운영자 A 로그인 → 내 식당 → 그 식당 예약 → 운영자 B 식당 예약 403. 각자 테스트 2개(정상 1 · 실패 1).
 
