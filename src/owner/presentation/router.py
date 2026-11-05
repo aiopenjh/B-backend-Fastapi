@@ -8,7 +8,7 @@ from owner.presentation.dependencies import require_owner # 만든 오너 문
 from owner.application.service import OwnerService # 담당 5 : 매니저 (곧 만듦)
 from restaurant.presentation.schemas import RestaurantOut # 담당 2 : 식당 응답 모양
 from reservation.presentation.schemas import ReservationOut # 담당 4 : 민지님
-from user.domain.user import User # 담당 1 : 회원
+from auth.domain.value_object import AuthenticatedUser # 담당 1 : 회원
 from container import create_owner_service # 담당 5: 매니저 공장
 
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/owner", tags=["운영자"], dependencies=[Depends(re
 @router.get("/restaurants", response_model=APIResponse[Page[RestaurantOut]], summary="내가 운영하는 식당 목록")
 async def list_my_restaurants(
     page: PageParams = Depends(page_params),
-    owner: User = Depends(require_owner),
+    owner: AuthenticatedUser = Depends(require_owner),
     service: OwnerService = Depends(create_owner_service),
 ) -> APIResponse[Page[RestaurantOut]]:
     items, total = await service.list_my_restaurants(owner, page)
@@ -35,7 +35,7 @@ async def list_restaurant_reservations(
     restaurant_id: int,
     date: date | None = None,
     page: PageParams = Depends(page_params),
-    owner: User = Depends(require_owner),
+    owner: AuthenticatedUser = Depends(require_owner),
     service: OwnerService = Depends(create_owner_service),
 ) -> APIResponse[Page[ReservationOut]]:
     items, total = await service.list_restaurant_reservations(owner, restaurant_id, date, page)
