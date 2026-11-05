@@ -1,3 +1,5 @@
+# [담당1 - 강성수]
+
 from enum import unique
 from http import HTTPStatus
 

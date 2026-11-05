@@ -1,14 +1,17 @@
+# [담당1 - 강성수]
 import re
 import uuid
 
 from dataclasses import dataclass
 from enum import StrEnum
 from datetime import datetime, UTC
-from common.errors import InvalidInputError
+
 from user.domain.exceptions import InvalidOldPasswordError, SamePasswordError
 from user.domain.hasher import PasswordHasher
+from user.domain.value_object import Email
 
-EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+from common.errors import InvalidInputError
+
 PASSWORD_REGEX = re.compile(
     r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$"
 )
@@ -21,7 +24,7 @@ class Role(StrEnum):
 
 @dataclass
 class User:
-    email: str
+    email: Email
     password_hash: str
     name: str
     phone: str
@@ -33,13 +36,12 @@ class User:
     deleted_at: datetime | None = None
 
     def __post_init__(self):
-        self._validate_email(self.email)
         self._validate_name(self.name)
 
     @classmethod
     def create(
         cls,
-        email: str,
+        email: Email,
         raw_password: str,
         name: str,
         phone: str,
@@ -78,13 +80,6 @@ class User:
 
         self.password_hash = hasher.hash(new_password)
         self.updated_at = datetime.now(UTC)
-
-    @staticmethod
-    def _validate_email(email: str) -> None:
-        if not EMAIL_REGEX.match(email):
-            raise InvalidInputError(
-                errors={"email": ["올바른 이메일 형식이 아닙니다."]}
-            )
 
     @staticmethod
     def _validate_name(name: str) -> None:

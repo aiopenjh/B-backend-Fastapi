@@ -1,3 +1,5 @@
+# [담당1 - 강성수]
+
 from abc import ABC, abstractmethod
 
 

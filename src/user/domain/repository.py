@@ -1,6 +1,9 @@
+# [담당1 - 강성수]
+
 import uuid
 from abc import ABC, abstractmethod
 from user.domain.user import User
+from user.domain.value_object import Email
 
 
 class UserRepository(ABC):
@@ -11,7 +14,7 @@ class UserRepository(ABC):
         pass
 
     @abstractmethod
-    async def find_by_email(self, email: str) -> User | None:
+    async def find_by_email(self, email: Email) -> User | None:
         """이메일 기준으로 사용자 단건 조회"""
         pass
 
