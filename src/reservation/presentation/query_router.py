@@ -28,3 +28,15 @@ async def list_my_reservations(
         page_size=page.page_size,
         total=total,
     ))
+
+
+# 5단계: 예약 상세
+@router.get("/reservations/{reservation_id}", response_model=APIResponse[ReservationOut], summary="예약 상세")
+async def get_reservation(
+    reservation_id: int,
+    me: AuthenticatedUser = Depends(get_authenticated_user),
+    service: ReservationQueryService = Depends(create_reservation_query_service),
+) -> APIResponse[ReservationOut]:
+    # 매니저에게 "이 예약 보여 줘도 되는지 보고 꺼내 와" 시키기
+    reservation, slot = await service.get_reservation(me, reservation_id)
+    return APIResponse.ok(data=ReservationOut.from_domain(reservation, slot))
