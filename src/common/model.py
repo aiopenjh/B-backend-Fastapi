@@ -25,6 +25,10 @@ class DateTimeBase:
     )
 
 
-def init_models():
+def init_models() -> None:
     """SQLAlchemy 모델 메타데이터 등록"""
+    """모델을 import해서 등록만 함 None: 추가"""
     import user.infrastructure.models  # 회원 [담당1-강성수]
+    import reservation.infrastructure.models # 예약 [담당4-김민지]
+    import slot.infrastructure.models # 슬롯[담당3-이영민]
+    """순환 import 방지를 위해 함수 안에서 import"""
