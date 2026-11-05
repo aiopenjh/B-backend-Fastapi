@@ -10,6 +10,7 @@ from reservation.infrastructure.repository import to_reservation # 담당4 표->
 from slot.infrastructure.repository import to_time_slot # 담당3: 표->슬롯
 from slot.domain.time_slot import TimeSlot  # 담당 3: 슬롯
 from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB) (아직 없음)
+from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB) (아직 없음)
 
 
 class ReservationQueryRepository:
@@ -37,3 +38,19 @@ class ReservationQueryRepository:
         )
 
         return [(to_reservation(r), to_time_slot(s)) for r, s in rows], total or 0
+
+    # 5단계: 예약 하나 + 슬롯 + 그 식당 주인 번호
+    async def get_reservation(self, reservation_id: int) -> tuple[Reservation, TimeSlot, uuid.UUID] | None:
+        result = await self.db.execute(
+            select(ReservationModel, ReservationSlotModel, RestaurantModel.owner_id)
+            .join(ReservationSlotModel, ReservationSlotModel.id == ReservationModel.slot_id)
+            .join(RestaurantModel, RestaurantModel.id == ReservationSlotModel.restaurant_id)
+            .where(ReservationModel.id == reservation_id)
+        )
+        row = result.first()  # 한 줄만. 없으면 None
+
+        if row is None:
+            return None
+
+        r, s, owner_id = row
+        return to_reservation(r), to_time_slot(s), owner_id
