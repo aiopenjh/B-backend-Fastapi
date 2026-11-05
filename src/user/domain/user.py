@@ -20,6 +20,7 @@ PASSWORD_REGEX = re.compile(
 class Role(StrEnum):
     CUSTOMER = "CUSTOMER"
     OWNER = "OWNER"
+    ADMIN = "ADMIN"
 
 
 @dataclass
