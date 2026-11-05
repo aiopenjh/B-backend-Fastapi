@@ -34,6 +34,8 @@ class SQLAlchemyUserRepository(UserRepository):
             phone=user.phone,
             role=user.role.value,
             created_at=user.created_at,
+            updated_at=user.updated_at,
+            deleted_at=user.deleted_at,
         )
-        self.session.add(user_model)
+        await self.session.merge(user_model)
         return user
