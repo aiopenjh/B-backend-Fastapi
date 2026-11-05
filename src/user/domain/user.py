@@ -6,7 +6,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from datetime import datetime, UTC
 
-from user.domain.exceptions import InvalidOldPasswordError, SamePasswordError
+from user.domain.exceptions import (
+    InvalidOldPasswordError,
+    InvalidRoleChangeError,
+    SamePasswordError,
+)
 from user.domain.hasher import PasswordHasher
 from user.domain.value_object import Email
 
@@ -21,6 +25,9 @@ class Role(StrEnum):
     CUSTOMER = "CUSTOMER"
     OWNER = "OWNER"
     ADMIN = "ADMIN"
+
+
+ASSIGNABLE_ROLES = frozenset({Role.CUSTOMER, Role.OWNER})
 
 
 @dataclass
@@ -81,6 +88,17 @@ class User:
         self._validate_password(new_password)
 
         self.password_hash = hasher.hash(new_password)
+        self.updated_at = datetime.now(UTC)
+
+    def change_owner_role(self, new_role: Role) -> None:
+        """관리자가 CUSTOMER <-> OWNER 사이에서 역할을 바꾼다"""
+        if self.role is Role.ADMIN or new_role not in ASSIGNABLE_ROLES:
+            raise InvalidRoleChangeError()
+
+        if self.role is new_role:
+            return
+
+        self.role = new_role
         self.updated_at = datetime.now(UTC)
 
     @staticmethod
