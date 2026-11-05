@@ -63,6 +63,7 @@ class SQLAlchemyReservationRepository(ReservationRepository):
             select(ReservationModel)
             .where(ReservationModel.id == reservation_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         model = (await self.session.execute(stmt)).scalar_one_or_none()
         return to_reservation(model) if model else None
