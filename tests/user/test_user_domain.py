@@ -21,7 +21,7 @@ def test_create_stores_hash_not_raw_password(hasher):
     assert user.password_hash != VALID_PASSWORD
 
 
-def test_new_user_is_unsaved_customer(hasher):
+def test_new_user_is_customer_with_identity(hasher):
     user = User.create(
         email=Email("alice@example.com"),
         raw_password=VALID_PASSWORD,
@@ -31,7 +31,7 @@ def test_new_user_is_unsaved_customer(hasher):
     )
 
     assert user.role is Role.CUSTOMER
-    assert user.id is None
+    assert user.id is not None
 
 
 def test_create_rejects_weak_password(hasher):

@@ -52,6 +52,7 @@ class User:
         password_hash = hasher.hash(raw_password)
 
         return cls(
+            id=uuid.uuid4(),
             email=email,
             name=name,
             password_hash=password_hash,
