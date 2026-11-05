@@ -14,7 +14,6 @@
 | [ROADMAP](docs/ROADMAP.md) | 12일 일정과 체크포인트 |
 | [WORKFLOW](docs/WORKFLOW.md) | 브랜치·리뷰·통합 방식 |
 | [TEAM_CONVENTIONS](docs/TEAM_CONVENTIONS.md) | 코드·API·DB·테스트 규칙 |
-| [JINJA2_TEMPLATE_GUIDE](docs/JINJA2_TEMPLATE_GUIDE.md) | 화면 실행 방법, 현재 구현 범위, 인증·실제 데이터 연결 순서 |
 
 ## 프로젝트 목표
 
@@ -35,11 +34,10 @@
 | 데이터 저장 | PostgreSQL 17 (Docker Compose), SQLAlchemy 비동기 ORM, asyncpg |
 | 인증 | OAuth2 비밀번호 폼, JWT(PyJWT), passlib/bcrypt |
 | 테스트 | pytest, httpx(`AsyncClient`) |
-| 화면 템플릿 | Jinja2, StaticFiles |
 
 **비동기 DB 연결은 필수입니다.** 예약 생성에는 행 락을 넣고, 여러 요청이 같은 좌석을 동시에 예약하는 상황을 **실제로 재현해 검증하는 것은 선택 도전 기능**입니다.
 
-**화면 작업 (2026-11-04)**: Jinja2로 로그인·운영 식당·식당 예약 목록의 화면 틀을 추가했습니다. 인증·DB 데이터 연결은 후속 작업이며, 실행 방법은 [화면 가이드](docs/JINJA2_TEMPLATE_GUIDE.md)를 봅니다. CI와 Redis 캐시는 기존 제외 범위를 유지합니다. API는 Swagger UI(`/docs`)와 pytest로 확인합니다.
+**범위에서 뺀 것 (2026-10-28)**: UI(Jinja2 화면 포함), CI, Redis 캐시. API는 Swagger UI(`/docs`)와 pytest로 확인합니다.
 
 ## 가게 예약 도메인
 
@@ -145,7 +143,7 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 - **B 후속 작업과 다운로드:** `BackgroundTasks`로 후속 로그를 처리하고 `StreamingResponse`로 CSV를 내려받습니다.
 - **C 회원가입:** 회원가입 API로 고객 계정을 만듭니다.
 
-별도 React UI, CI, Redis 캐시, 예약 요청 중복 방지(멱등성)는 범위에서 제외합니다. 실제 결제 연동과 상용 메일·SMS 발송도 제외합니다. 외부 배포는 제출 조건일 때만 합니다.
+UI(Jinja2·React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)는 범위에서 제외합니다. 실제 결제 연동과 상용 메일·SMS 발송도 제외합니다. 외부 배포는 제출 조건일 때만 합니다.
 
 ## 큰 진행 순서
 

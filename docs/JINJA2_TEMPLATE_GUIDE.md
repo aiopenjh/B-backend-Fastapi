@@ -127,7 +127,7 @@ def get_owner_ui_queries(
 ### 2. 인증 연결
 
 - [ ] `auth/presentation/routers/v1/router.py`의 `login()` 구현. 현재 `pass`.
-- [ ] `auth/presentation/dependencies.py`의 `get_current_user()` 구현. 현재 `NotImplementedError`.
+- [ ] `auth/presentation/dependencies.py`의 `get_authenticated_user()` 구현 (#14에서 이름이 바뀜, `AuthenticatedUser`를 돌려줌). 현재 `NotImplementedError`.
 - [ ] 문서 계약인 OAuth2 `username=이메일/password`와 토큰 응답 확인.
 - [ ] 일반 HTML 링크/폼 이동에서 인증을 유지할 방식을 확정하고 구현. Bearer 헤더는 링크 이동에 자동 첨부되지 않는다.
 - [ ] `require_owner`와 요청별 서비스를 위 연결 함수에 주입.

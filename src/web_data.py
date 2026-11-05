@@ -1,3 +1,4 @@
+# [담당 5] 화면용 연결: 화면 ↔ 운영자 매니저
 """Jinja2용 조회 어댑터. 기존 서비스를 재사용하고 SQL은 작성하지 않는다."""
 
 from dataclasses import dataclass
@@ -6,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from owner.application.service import OwnerService
-    from user.domain.user import User
+    from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
 
 
 @dataclass
@@ -24,7 +25,7 @@ class PageResult:
 class OwnerUIQueries:
     """require_owner를 통과한 사용자와 요청 단위 서비스를 주입받는다."""
 
-    def __init__(self, owner: "User", service: "OwnerService"):
+    def __init__(self, owner: "AuthenticatedUser", service: "OwnerService"):
         self.owner = owner
         self.service = service
 

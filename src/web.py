@@ -1,3 +1,4 @@
+# [담당 5] Jinja2 화면 창구: /ui 주소로 HTML 돌려주기
 """기존 조회 흐름을 위한 HTML 화면. 인증·실제 데이터 연결은 후속 작업이다."""
 
 from datetime import date as Date, datetime
