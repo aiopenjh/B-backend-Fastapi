@@ -1,5 +1,6 @@
 # [담당1 - 강성수]
 import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
