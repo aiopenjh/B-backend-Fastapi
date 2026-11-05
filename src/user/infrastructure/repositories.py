@@ -34,5 +34,5 @@ class SQLAlchemyUserRepository(UserRepository):
             role=user.role.value,
             created_at=user.created_at,
         )
-        self.session.add(user_model)
+        self.session.add(user)
         return user
