@@ -1,15 +1,16 @@
 # [담당1 - 강성수]
 
-from user.application.unit_of_work import UnitOfWork, ConflictError
+from user.application.unit_of_work import ConflictError, UnitOfWork
+from user.domain.exceptions import DuplicatedUserError
 from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
-from user.domain.exceptions import DuplicatedUserError
-from user.domain.value_object import Email
 from user.domain.user import User
+from user.domain.value_object import Email
 
 
 class UserService:
-    def __init__(self, repo: UserRepository, hasher: PasswordHasher, uow: UnitOfWork):
+
+    def __init__(self, repo: UserRepository, uow: UnitOfWork, hasher: PasswordHasher):
         self.repo = repo
         self.uow = uow
         self.hasher = hasher

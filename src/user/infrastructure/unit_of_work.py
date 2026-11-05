@@ -14,4 +14,5 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
         try:
             await self.session.commit()
         except IntegrityError as e:
+            await self.session.rollback()
             raise ConflictError() from e
