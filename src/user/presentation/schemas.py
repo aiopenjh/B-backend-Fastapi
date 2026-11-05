@@ -1,3 +1,5 @@
+# [담당1 - 강성수]
+
 import uuid
 from typing import Annotated
 from pydantic import BaseModel, EmailStr, Field, StringConstraints, ConfigDict
