@@ -1,9 +1,40 @@
+{# [담당 5] 로그인 화면: 로그인 API 연결 전이라 입력을 잠가 둠 #}
 {% extends "base.html" %}
 {% block title %}로그인{% endblock %}
 {% block content %}
-<div class="login-layout"><section class="welcome"><p class="eyebrow">YOUR RESTAURANT, IN ORDER</p><h1>예약부터 방문까지.<br>우리 식당의 하루를<br><span>한눈에.</span></h1><p class="welcome-copy">식당을 선택하고, 방문 일정을 확인하세요.<br>필요한 예약 정보만 깔끔하게 모았습니다.</p>
-<div class="table-art" aria-hidden="true"><div class="seat seat-one"></div><div class="seat seat-two"></div><div class="plate"><div class="plate-inner"><span>TABLE</span><small>A PLACE FOR EVERY GUEST</small></div></div><div class="seat seat-three"></div><div class="seat seat-four"></div><span class="art-caption">좋은 식사의 시작, 빈틈없는 예약.</span></div></section>
-<section class="login-card" aria-labelledby="login-title"><span class="small-logo" aria-hidden="true">t</span><h2 id="login-title">반가워요, 운영자님</h2><p class="muted">식당의 예약을 확인해 보세요.</p>
-<form aria-describedby="login-help"><fieldset disabled><legend class="sr-only">로그인 정보</legend><label for="username">이메일</label><input id="username" name="username" type="email" autocomplete="username" placeholder="이메일 주소를 입력하세요"><label for="password">비밀번호</label><input id="password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요"><button class="button button-primary full-width" type="button" disabled>로그인</button></fieldset></form>
-<p id="login-help" class="form-help"><span class="status-dot"></span>로그인 연결 준비 중 · 입력은 비활성 상태입니다.</p><div class="card-divider"><span>먼저 둘러보세요</span></div><a class="button button-outline full-width" href="{{ url_for('ui_restaurants') }}">운영 화면 미리보기 <span aria-hidden="true">↗</span></a><p class="login-footnote">현재 미리보기에는 실제 계정과 예약이 없습니다.</p></section></div>
+<div class="login-layout">
+  <section class="welcome">
+    <p class="eyebrow">YOUR RESTAURANT, IN ORDER</p>
+    <h1>예약부터 방문까지.<br>우리 식당의 하루를<br><span>한눈에.</span></h1>
+    <p class="welcome-copy">식당을 선택하고, 방문 일정을 확인하세요.<br>필요한 예약 정보만 깔끔하게 모았습니다.</p>
+    <div class="table-art" aria-hidden="true">
+      <div class="seat seat-one"></div>
+      <div class="seat seat-two"></div>
+      <div class="plate"><div class="plate-inner"><span>TABLE</span><small>A PLACE FOR EVERY GUEST</small></div></div>
+      <div class="seat seat-three"></div>
+      <div class="seat seat-four"></div>
+      <span class="art-caption">좋은 식사의 시작, 빈틈없는 예약.</span>
+    </div>
+  </section>
+
+  <section class="login-card" aria-labelledby="login-title">
+    <span class="small-logo" aria-hidden="true">t</span>
+    <h2 id="login-title">반가워요, 운영자님</h2>
+    <p class="muted">식당의 예약을 확인해 보세요.</p>
+    <form aria-describedby="login-help">
+      <fieldset disabled>
+        <legend class="sr-only">로그인 정보</legend>
+        <label for="username">이메일</label>
+        <input id="username" name="username" type="email" autocomplete="username" placeholder="이메일 주소를 입력하세요">
+        <label for="password">비밀번호</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요">
+        <button class="button button-primary full-width" type="button" disabled>로그인</button>
+      </fieldset>
+    </form>
+    <p id="login-help" class="form-help"><span class="status-dot"></span>로그인 연결 준비 중 · 입력은 비활성 상태입니다.</p>
+    <div class="card-divider"><span>먼저 둘러보세요</span></div>
+    <a class="button button-outline full-width" href="{{ url_for('ui_restaurants') }}">운영 화면 미리보기 <span aria-hidden="true">↗</span></a>
+    <p class="login-footnote">현재 미리보기에는 실제 계정과 예약이 없습니다.</p>
+  </section>
+</div>
 {% endblock %}
