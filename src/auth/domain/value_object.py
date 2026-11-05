@@ -6,6 +6,7 @@ from dataclasses import dataclass
 class AuthRole(StrEnum):
     OWNER = "OWNER"
     CUSTOMER = "CUSTOMER"
+    ADMIN = "ADMIN"
 
 
 @dataclass(frozen=True)
@@ -18,3 +19,6 @@ class AuthenticatedUser:
 
     def is_customer(self) -> bool:
         return self.role == AuthRole.CUSTOMER
+
+    def is_admin(self) -> bool:
+        return self.role == AuthRole.ADMIN
