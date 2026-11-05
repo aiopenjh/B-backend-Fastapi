@@ -22,7 +22,7 @@
 - 레포지토리는 ORM 모델을 도메인 객체로 바꿔서 돌려줌. 레포지토리 인터페이스(ABC)를 둘 수 있음: 인터페이스는 `domain/repository.py`, 구현체(`SQLAlchemy<엔티티>Repository`)는 `infrastructure/repositories.py`에 두고, 서비스는 인터페이스 타입에만 의존. 어떤 구현체를 쓸지는 `src/container.py`에서 조립 (테스트에서는 `app.dependency_overrides`로 메모리 구현체로 교체). 여러 레포지토리가 공유하는 제네릭 베이스 클래스는 만들지 않음
 - 서비스가 자기 트랜잭션을 책임지고 `commit()`. 레포지토리·헬퍼는 커밋하지 않음 (`flush()`까지만)
 - DB 코드는 모두 `async`/`await`. 세션은 요청 하나당 하나. 한 세션을 동시에 실행되는 작업끼리 공유하지 않음
-- 다른 모듈의 `presentation`은 import하지 않음 (예외: `auth.presentation.dependencies.get_current_user`, `owner.presentation.dependencies.require_owner`)
+- 다른 모듈의 `presentation`은 import하지 않음 (예외: `auth.presentation.dependencies.get_authenticated_user`, `owner.presentation.dependencies.require_owner`)
 
 ## 3. API 약속
 
@@ -50,7 +50,7 @@
 
 ## 4. 인증과 소유권
 
-제공된 `get_current_user`·`require_owner` 의존성과 `Restaurant.is_owned_by`를 쓰고, 각각 뭘 돌려주는지, 어디서 요청을 거절하는지 설명할 수 있어야 합니다. 로그인만으로는 부족하고, 운영자 역할만으로도 부족합니다. 개인 리소스마다 소유자 확인(예약의 `user_id`, 식당의 `owner_id`)이 따로 있어야 합니다. 관련 없는 고객, 다른 식당 운영자로 API를 직접 호출해서 테스트합니다.
+제공된 `get_authenticated_user`·`require_owner` 의존성(둘 다 `AuthenticatedUser`를 돌려줌)과 `Restaurant.is_owned_by`를 쓰고, 각각 뭘 돌려주는지, 어디서 요청을 거절하는지 설명할 수 있어야 합니다. 로그인만으로는 부족하고, 운영자 역할만으로도 부족합니다. 개인 리소스마다 소유자 확인(예약의 `user_id`, 식당의 `owner_id`)이 따로 있어야 합니다. 관련 없는 고객, 다른 식당 운영자로 API를 직접 호출해서 테스트합니다.
 
 운영자 권한과 식당 소유(`owner_id`)는 시드로만 줍니다. 로그아웃한 토큰은 `token_blacklist`(PostgreSQL, Redis 없음)로 차단합니다. 비밀값(`POSTGRES_URL`, JWT 서명 키 등)은 각자 `.env`에 넣고, 커밋하지 않습니다. 외부에 배포한다면 HTTPS와 허용 origin을 명시합니다.
 
@@ -68,7 +68,7 @@
 
 ## 6. 범위에서 뺀 것
 
-프론트 연결(React 등), CI, Redis 캐시는 범위에서 뺐습니다 (2026-10-28). Jinja2 화면은 2026-11-02 회의에서 다시 넣었습니다 (담당 5, 식당 목록·상세). API는 FastAPI의 API 문서 화면(`/docs`)과 pytest로 확인합니다. 자세한 목록은 [ARCHITECTURE.md](ARCHITECTURE.md) 7장을 봅니다.
+프론트 연결(React 등), CI, Redis 캐시는 범위에서 뺐습니다 (2026-10-28). Jinja2 화면은 2026-11-02 회의에서 다시 넣었습니다 (담당 5, 운영자 화면 틀 먼저 · 식당 목록·상세는 식당 부품 뒤). API는 FastAPI의 API 문서 화면(`/docs`)과 pytest로 확인합니다. 자세한 목록은 [ARCHITECTURE.md](ARCHITECTURE.md) 7장을 봅니다.
 
 - DB 장애를 "결과 없음"으로 성공 처리하면 안 됨
 - 예약 완료는 서버가 성공(201)을 돌려준 뒤에만 완료로 봄
