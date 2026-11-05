@@ -5,6 +5,7 @@ import pytest
 
 from common.errors import InvalidInputError
 from user.application.service import UserService
+from user.application.unit_of_work import ConflictError, UnitOfWork
 from user.domain.exceptions import DuplicatedUserError
 from user.domain.repository import UserRepository
 from user.domain.user import User
@@ -32,14 +33,32 @@ class InMemoryUserRepository(UserRepository):
         return user
 
 
+class FakeUnitOfWork(UnitOfWork):
+    """commit 호출 횟수를 세는 가짜 UoW. conflict=True면 commit에서 충돌을 낸다"""
+
+    def __init__(self, conflict: bool = False) -> None:
+        self.commits = 0
+        self.conflict = conflict
+
+    async def commit(self) -> None:
+        if self.conflict:
+            raise ConflictError()
+        self.commits += 1
+
+
 @pytest.fixture
 def repo() -> InMemoryUserRepository:
     return InMemoryUserRepository()
 
 
 @pytest.fixture
-def service(repo, hasher) -> UserService:
-    return UserService(repo=repo, hasher=hasher)
+def uow() -> FakeUnitOfWork:
+    return FakeUnitOfWork()
+
+
+@pytest.fixture
+def service(repo, uow, hasher) -> UserService:
+    return UserService(repo=repo, uow=uow, hasher=hasher)
 
 
 async def test_sign_up_saves_user_with_normalized_email(service, repo):
@@ -68,3 +87,25 @@ async def test_sign_up_with_invalid_email_saves_nothing(service, repo):
         await service.signUp("not-an-email", VALID_PASSWORD, "김철수", "010-1234-5678")
 
     assert repo.users == {}
+
+
+async def test_sign_up_commits_once(service, uow):
+    await service.signUp("alice@example.com", VALID_PASSWORD, "고길동", "010-1234-5678")
+
+    assert uow.commits == 1
+
+
+async def test_rejected_sign_up_does_not_commit(service, uow):
+    with pytest.raises(InvalidInputError):
+        await service.signUp("not-an-email", VALID_PASSWORD, "고길동", "010-1234-5678")
+
+    assert uow.commits == 0
+
+
+async def test_conflict_at_commit_becomes_duplicated_user(repo, hasher):
+    service = UserService(repo=repo, uow=FakeUnitOfWork(conflict=True), hasher=hasher)
+
+    with pytest.raises(DuplicatedUserError):
+        await service.signUp("test@test.org", VALID_PASSWORD, "고길동", "010-1234-5678")
+
+
