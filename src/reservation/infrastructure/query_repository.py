@@ -32,7 +32,7 @@ class ReservationQueryRepository:
 
         rows = await self.db.execute(
             joined.where(*conditions)
-            .order_by(ReservationSlotModel.starts_at.desc())
+            .order_by(ReservationSlotModel.starts_at.desc(), ReservationModel.id.desc())  # 같은 시각이면 최근 예약 먼저
             .offset(offset)
             .limit(limit)
         )
