@@ -1,0 +1,11 @@
+{# [담당 5] 왼쪽 메뉴 조각: base.html이 include로 끼워 넣음 #}
+<aside class="sidebar">
+  <a class="brand" href="{{ url_for('ui_login') }}" aria-label="TABLE 첫 화면"><span class="brand-symbol">t</span>TABLE<span class="owner-label">OWNER</span></a>
+  <p class="nav-label">WORKSPACE</p>
+  <nav aria-label="주 메뉴">
+    <a href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants','reservations'] %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>운영 식당</a>
+    <a href="{{ url_for('ui_login') }}" {% if active_page == 'login' %}aria-current="page"{% endif %}><span aria-hidden="true">↪</span>로그인</a>
+  </nav>
+  <div class="sidebar-note"><span class="status-dot"></span>화면 미리보기<p>실제 계정·예약 연결 전</p></div>
+  <div class="sidebar-footer">KANT PROJECT<span>가게 예약 서비스</span></div>
+</aside>

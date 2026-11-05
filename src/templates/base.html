@@ -1,9 +1,21 @@
+{# [담당 5] 모든 화면의 기본 틀: 각 화면은 extends로 물려받고 content 블록만 채움 #}
 <!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{% block title %}예약 서비스{% endblock %} · TABLE</title><link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}"></head>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}예약 서비스{% endblock %} · TABLE</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
 <body class="{% if active_page == 'login' %}is-login{% endif %}">
-<a class="skip-link" href="#content">본문으로 이동</a>
-<aside class="sidebar"><a class="brand" href="{{ url_for('ui_login') }}" aria-label="TABLE 첫 화면"><span class="brand-symbol">t</span>TABLE<span class="owner-label">OWNER</span></a><p class="nav-label">WORKSPACE</p>
-<nav aria-label="주 메뉴"><a href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants','reservations'] %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>운영 식당</a><a href="{{ url_for('ui_login') }}" {% if active_page == 'login' %}aria-current="page"{% endif %}><span aria-hidden="true">↪</span>로그인</a></nav>
-<div class="sidebar-note"><span class="status-dot"></span>화면 미리보기<p>실제 계정·예약 연결 전</p></div><div class="sidebar-footer">KANT PROJECT<span>가게 예약 서비스</span></div></aside>
-<div class="workspace"><header class="topbar"><span>운영자 워크스페이스</span><span class="preview-chip">PREVIEW</span></header><main id="content" class="page-wrap">{% block content %}{% endblock %}</main><footer class="site-footer"><strong>TABLE</strong><span>식당 운영을 위한 예약 공간</span></footer></div>
-</body></html>
+  <a class="skip-link" href="#content">본문으로 이동</a>
+  {% include "components/sidebar.html" %}
+  <div class="workspace">
+    {% include "components/header.html" %}
+    <main id="content" class="page-wrap">
+      {% block content %}{% endblock %}
+    </main>
+    {% include "components/footer.html" %}
+  </div>
+</body>
+</html>
