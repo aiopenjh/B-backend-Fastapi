@@ -41,7 +41,7 @@ class Reservation:
             contact_phone=contact_phone
         )
     
-    def cancel(self, now: datetime, slot) -> None:
+    def cancel(self, now: datetime) -> None:
         if self.status is ReservationStatus.CANCELLED:
             raise AlreadyCancelledError()
         self.status = ReservationStatus.CANCELLED
