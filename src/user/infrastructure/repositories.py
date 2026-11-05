@@ -1,11 +1,13 @@
 # [담당1 - 강성수]
 import uuid
-
-from user.domain.repository import UserRepository
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from user.domain.user import User
+from user.domain.hasher import PasswordHasher
+from user.domain.repository import UserRepository
+from user.domain.user import Role, User
 from user.domain.value_object import Email
+from user.infrastructure.models import UserModel
 
 
 class SQLAlchemyUserRepository(UserRepository):
@@ -14,10 +16,24 @@ class SQLAlchemyUserRepository(UserRepository):
         self.session = session
 
     async def find_by_id(self, user_id: uuid.UUID) -> User | None:
-        raise NotImplementedError
+        stmt = select(UserModel).where(UserModel.id == user_id)
+        user_model = await self.session.scalar(stmt)
+        return user_model.to_user() if user_model else None
 
     async def find_by_email(self, email: Email) -> User | None:
-        raise NotImplementedError
+        stmt = select(UserModel).where(UserModel.email == email.value)
+        user_model = await self.session.scalar(stmt)
+        return user_model.to_user() if user_model else None
 
     async def save(self, user: User) -> User:
-        raise NotImplementedError
+        user_model = UserModel(
+            id=user.id,
+            email=user.email.value,
+            name=user.name,
+            PasswordHasher=user.password_hash,
+            phone=user.phone,
+            role=user.role.value,
+            created=user.created_at,
+        )
+        self.session.add(user_model)
+        return user
