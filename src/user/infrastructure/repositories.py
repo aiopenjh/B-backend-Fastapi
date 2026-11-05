@@ -1,11 +1,10 @@
 # [담당1 - 강성수]
 import uuid
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
-from user.domain.user import Role, User
+from user.domain.user import User
 from user.domain.value_object import Email
 from user.infrastructure.models import UserModel
 
@@ -30,10 +29,10 @@ class SQLAlchemyUserRepository(UserRepository):
             id=user.id,
             email=user.email.value,
             name=user.name,
-            PasswordHasher=user.password_hash,
+            password_hash=user.password_hash,
             phone=user.phone,
             role=user.role.value,
-            created=user.created_at,
+            created_at=user.created_at,
         )
         self.session.add(user_model)
         return user
