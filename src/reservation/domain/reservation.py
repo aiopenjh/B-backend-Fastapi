@@ -46,3 +46,10 @@ class Reservation:
             raise AlreadyCancelledError()
         self.status = ReservationStatus.CANCELLED
         self.cancelled_at = now
+
+    def can_cancel(self, user_id: uuid.UUID, now: datetime, slot) -> bool:
+        return (
+            self.user_id == user_id 
+            and self.status is ReservationStatus.CONFIRMED 
+            and not slot.has_started(now)
+            )
