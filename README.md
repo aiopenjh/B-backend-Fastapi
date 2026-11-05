@@ -4,7 +4,7 @@
 
 가게 예약 서비스 예시를 통해 **요청 받기 → 업무 규칙 확인 → DB 저장 → 결과 응답**의 흐름을 배우고 구현합니다.
 
-> 현재는 구현 초기 단계입니다 (Docker PostgreSQL과 비동기 DB 연결까지 준비). 세부 설계는 [docs/](docs/)를 봅니다.
+> 현재는 **3 기본 구현** 단계입니다 (2026-11-05 dev 기준). 지금까지 들어온 것과 다음에 할 일은 [지금 어디까지 왔나](#지금-어디까지-왔나-2026-11-05-dev-기준)를 봅니다. 세부 설계는 [docs/](docs/)를 봅니다.
 
 | 문서 | 내용 |
 | --- | --- |
@@ -32,19 +32,21 @@
 | API와 서버 실행 | FastAPI, Uvicorn |
 | 데이터 검증 | Pydantic |
 | 데이터 저장 | PostgreSQL 17 (Docker Compose), SQLAlchemy 비동기 ORM, asyncpg |
-| 인증 | OAuth2 비밀번호 폼, JWT(PyJWT), passlib/bcrypt |
-| 테스트 | pytest, httpx(`AsyncClient`) |
+| 인증 | OAuth2 비밀번호 폼, JWT(PyJWT), bcrypt |
+| 테스트 | pytest, pytest-asyncio, httpx(`AsyncClient`) |
+| 코드 검사 | ruff |
+| 화면 | Jinja2 템플릿 (담당 5, `feat/web-pages` PR에서 설치) |
 
 **비동기 DB 연결은 필수입니다.** 예약 생성에는 행 락을 넣고, 여러 요청이 같은 좌석을 동시에 예약하는 상황을 **실제로 재현해 검증하는 것은 선택 도전 기능**입니다.
 
-**범위에서 뺀 것 (2026-10-28)**: UI(Jinja2 화면 포함), CI, Redis 캐시. API는 Swagger UI(`/docs`)와 pytest로 확인합니다.
+**범위에서 뺀 것 (2026-10-28)**: 프론트 연결(React 등), CI, Redis 캐시. API는 Swagger UI(`/docs`)와 pytest로 확인합니다. **Jinja2 화면은 2026-11-02 회의에서 다시 넣었습니다** (담당 5: 식당 목록·상세).
 
 ## 가게 예약 도메인
 
 | 대상 | 모듈 | 의미 |
 | --- | --- | --- |
 | `User` | `user` | 회원 정보 (손님 `CUSTOMER` / 운영자 `OWNER`) |
-| `TokenBlacklist` | `user` | 로그아웃으로 사용을 막은 토큰 목록 |
+| `TokenBlacklist` | `auth` | 로그아웃으로 사용을 막은 토큰 목록 |
 | `Restaurant`, `Menu` | `restaurant` | 가게의 이름·분류·주소·운영 상태, 운영자(`owner_id`)와 메뉴 |
 | `TimeSlot` | `slot` | 이용 시간, 총 수용 인원, 예약된 인원, 1회 최대 인원을 가진 시간대 |
 | `Reservation` | `reservation` | 어느 회원이 어떤 시간대에 몇 명을 예약했는지 나타내는 내역 |
@@ -61,14 +63,14 @@
 
 ## 모듈과 4계층 구조
 
-코드는 먼저 **도메인 모듈**(`user`, `restaurant`, `slot`, `reservation`, `owner`)로 나누고, 각 모듈 안을 4계층으로 나눕니다.
+코드는 먼저 **도메인 모듈**(`auth`, `user`, `restaurant`, `slot`, `reservation`, `owner`)로 나누고, 각 모듈 안을 4계층으로 나눕니다.
 
 | 계층 | 쉬운 설명 | 주요 파일 |
 | --- | --- | --- |
 | `presentation` | 요청을 받고 입력을 확인하며 결과를 응답합니다. | `router.py`, `schemas.py` |
 | `application` | 조회·규칙 실행·저장의 순서를 조율하고 저장을 확정합니다. | `service.py` |
 | `domain` | 예약 가능 여부 같은 업무 규칙과 상태 변경을 담당합니다. | `time_slot.py`, `reservation.py`, `restaurant.py` |
-| `infrastructure` | DB를 조회하고 도메인 객체로 변환하며 변경 내용을 저장합니다. | `models.py`, `repository.py` |
+| `infrastructure` | DB를 조회하고 도메인 객체로 변환하며 변경 내용을 저장합니다. | `models.py`, `repository.py`(또는 `repositories.py`) |
 
 ```mermaid
 flowchart TD
@@ -103,10 +105,14 @@ src/
 ├── restaurant/          # 담당 2 김태양: 식당 · 메뉴 (모듈마다 같은 4계층)
 ├── slot/                # 담당 3 이영민: 예약 시간대 · 예약 가능 조회 · 시드
 ├── reservation/         # 담당 4 김민지: 예약 생성·취소 / 담당 5 최지훈: 예약 조회
-└── owner/               # 담당 5 최지훈: 운영자 권한 검사 · 운영자 조회 (자기 테이블 없음)
+├── owner/               # 담당 5 최지훈: 운영자 권한 검사 · 운영자 조회 (자기 테이블 없음)
+├── web.py               # 담당 5 최지훈: Jinja2 화면 라우터 /ui (PR 예정)
+├── web_data.py          # 담당 5 최지훈: 화면 ↔ 운영자 매니저 연결 (PR 예정)
+├── templates/           # 담당 5 최지훈: HTML 템플릿 (PR 예정)
+└── static/              # 담당 5 최지훈: CSS (PR 예정)
 ```
 
-각 모듈·계층 패키지에 `__init__.py`를 포함합니다. 현재 저장소의 레이어 우선 골격(`src/domain/`, `src/infrastructure/database.py` 등)은 위 구조로 옮길 예정입니다.
+각 모듈·계층 패키지에 `__init__.py`를 포함합니다. 처음의 레이어 우선 골격은 위 모듈 구조로 옮겼습니다 (`src/common/database.py`).
 
 ## 예약 요청 하나가 처리되는 순서
 
@@ -132,6 +138,7 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 | 예외 처리 | 잘못된 입력, 규칙 위반, 없는 대상에 맞는 공통 형식 오류 응답 |
 | 인증과 보안 | 비밀번호 해시, OAuth2 로그인, JWT 발급, 로그아웃 토큰 차단(블랙리스트), 역할·소유 권한 확인 (계정은 시드) |
 | 공통 처리 | CORS, 요청 로그와 처리 시간 기록 |
+| 화면 | Jinja2 템플릿 화면 (담당 5). 지금 만든 화면은 운영자 화면 3개입니다 (`feat/web-pages`): 로그인 `/ui`, 내 식당 `/ui/owner/restaurants`, 식당 예약 `/ui/owner/restaurants/{id}/reservations`. 식당 목록·상세(11/2 회의 범위)는 담당 2 식당 부품이 들어온 뒤 붙입니다 |
 | 시작 데이터 | lifespan을 이용한 테이블 생성과 시연용 데이터 20건 이상, 재시작 시 중복 방지 |
 | 문서와 발표 | 실행 안내, 구조도, 동작 캡처, 팀 기록과 발표 자료 |
 
@@ -143,18 +150,95 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 - **B 후속 작업과 다운로드:** `BackgroundTasks`로 후속 로그를 처리하고 `StreamingResponse`로 CSV를 내려받습니다.
 - **C 회원가입:** 회원가입 API로 고객 계정을 만듭니다.
 
-UI(Jinja2·React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)는 범위에서 제외합니다. 실제 결제 연동과 상용 메일·SMS 발송도 제외합니다. 외부 배포는 제출 조건일 때만 합니다.
+프론트 연결(React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)는 범위에서 제외합니다. Jinja2 화면은 필수 범위에 넣었습니다 (2026-11-02). 실제 결제 연동과 상용 메일·SMS 발송도 제외합니다. 외부 배포는 제출 조건일 때만 합니다.
 
 ## 큰 진행 순서
 
-| 순서 | 할 일 | 남길 결과 |
+| 순서 | 할 일 | 남길 결과 | 지금 (11/5) |
+| --- | --- | --- | --- |
+| 1 기획 | 주제와 핵심 기능, 예약·취소 규칙을 정합니다. | 서비스 소개와 규칙표 | 완료 |
+| 2 설계 | DB 관계, 모듈 경계, API 입력·응답을 정합니다. | ERD, API 명세 | 완료 |
+| 3 기본 구현 | 환경과 모듈 4계층을 준비하고 도메인·DB·레포지토리·서비스·API를 연결합니다. | 정상 처리와 규칙 위반 차단 | **진행 중** (공용 부품 대부분, 예약 모델·취소 규칙, 슬롯 규칙, 사용자 표) |
+| 4 기능 연결 | 인증, 목록 조회, 운영자 조회, 미들웨어를 연결합니다. | 전체 사용 흐름 | 일부 (미들웨어, `require_owner`, 운영자 조회·예약 조회 코드, Jinja2 화면 틀) |
+| 5 동작 확인 | 정상·오류·인증 차단·저장 결과를 확인하고 필요한 선택 기능을 정합니다. | 결과 캡처와 문제 해결 기록 | 시작 전 |
+| 6 발표 준비 | README, 팀 노션과 발표 자료를 정리하고 시연을 연습합니다. | 실행 안내와 발표·시연 자료 | 시작 전 |
+
+## 지금 어디까지 왔나 (2026-11-05, dev 기준)
+
+### 들어온 PR
+
+| PR | 담당 | 들어온 것 | 쉽게 말하면 |
+| --- | --- | --- | --- |
+| #1 | 1 강성수 | uv 프로젝트, Docker PostgreSQL, 비동기 DB 연결 | 프로젝트를 켜고 DB에 붙을 준비 |
+| #2 | 5 최지훈 | `require_owner` | 운영자만 통과시키는 문. 안에서 쓰는 부품(`get_current_user`, 403 예외)이 아직 없어 실행은 아직 |
+| #3 | 1 강성수 | 응답 봉투 `APIResponse`, 에러 코드표, 요청 로그·CORS 미들웨어, ORM `Base`, DB 세션 `get_session`, `User` 도메인, auth·user 라우터 골격 | 모든 응답을 같은 모양으로 + 회원 기능의 뼈대 |
+| #4 | 4 김민지 | `ReservationModel`, `Reservation.create()`, `ReservationOut` | 예약 표와 예약 응답 모양 |
+| #6 | 3 이영민 | `TimeSlot` 규칙, 슬롯 에러 3개 | 자리 계산 규칙 (문법 오류는 #8에서 고침) |
+| #7 | 5 최지훈 | 운영자 식당 목록, 운영자 식당 예약 목록 창구·매니저, `container.py`의 `create_owner_service` | 운영자 조회. 식당·페이지 부품이 없어 실행은 아직 |
+| #8 | 1 강성수 | `AppError` 계열 예외(`Unauthorized`·`Forbidden`·`NotFound`·`InvalidInput`) + 공통 에러 핸들러, `get_current_user` 자리, 회원가입 서비스, 비밀번호 해시, **사용자 id UUID** | 에러를 한곳에서 봉투로 바꾸기 + 회원 규칙 |
+| #10 | 3 이영민 | 슬롯 예외에 `error_code` 붙임, `seoul_day_range`·`seoul_now`, 슬롯 테스트 | 슬롯 규칙 위반이 500이 아니라 409로 나감 |
+| #12 | 1 강성수 | 422 검증 문구 한국어, `HTTPException`도 실패 봉투로 | 입력 오류도 같은 봉투·한국어로 나감 |
+| #14 | 1 강성수 | **`get_current_user` → `get_authenticated_user`**, 돌려주는 값 `User` → **`AuthenticatedUser`**(`user_id`·`role`·`is_owner()`·`is_customer()`, `auth/domain/value_object.py`), `UserModel`, `Email` 값 객체, `create_user_service` | 로그인한 사람을 가벼운 값 하나로 받음. 이름이 바뀌어 쓰는 쪽(담당 2·4·5)도 맞춰야 함 |
+| #15 | 4 김민지 | `Reservation.cancel()`(재취소 409 `ALREADY_CANCELLED`), `reservations.user_id` UUID | 예약 취소 규칙 |
+
+### 올라갈 PR (담당 5 최지훈, 2026-11-05 기준 브랜치에 푸시됨)
+
+| 브랜치 | 들어갈 것 | 쉽게 말하면 |
 | --- | --- | --- |
-| 1 기획 | 주제와 핵심 기능, 예약·취소 규칙을 정합니다. | 서비스 소개와 규칙표 |
-| 2 설계 | DB 관계, 모듈 경계, API 입력·응답을 정합니다. | ERD, API 명세 |
-| 3 기본 구현 | 환경과 모듈 4계층을 준비하고 도메인·DB·레포지토리·서비스·API를 연결합니다. | 정상 처리와 규칙 위반 차단 |
-| 4 기능 연결 | 인증, 목록 조회, 운영자 조회, 미들웨어를 연결합니다. | 전체 사용 흐름 |
-| 5 동작 확인 | 정상·오류·인증 차단·저장 결과를 확인하고 필요한 선택 기능을 정합니다. | 결과 캡처와 문제 해결 기록 |
-| 6 발표 준비 | README, 팀 노션과 발표 자료를 정리하고 시연을 연습합니다. | 실행 안내와 발표·시연 자료 |
+| `feat/owner-reservations` | 운영자 창고 `owner/infrastructure/query_repository.py`(`list_restaurants`·`get_restaurant`·`list_reservations`, 날짜 필터는 `seoul_day_range`), owner 3파일을 `get_authenticated_user`·`AuthenticatedUser`로 맞춤 | 운영자 식당·예약 목록이 DB에서 꺼내짐. dev의 `require_owner` import 오류도 여기서 고침 |
+| `feat/reservation-queries` | `GET /users/me/reservations`(상태 필터, 이용 시각 최신순), `GET /reservations/{reservation_id}`(본인·그 식당 운영자만, 나머지 404), `reservation/` `query_repository.py`·`query_service.py`·`presentation/query_router.py`, `container.py`의 `create_reservation_query_service` | 내 예약 목록·예약 상세. `main.py` 등록은 부품이 들어온 뒤 |
+| `feat/web-pages` | Jinja2 화면 틀: `web.py`(`/ui`), `web_data.py`, `templates/`, `static/`, `pyproject.toml`(jinja2), `main.py`(`register_web`) | 운영자 화면 3개. 데이터 연결은 인증 구현 뒤 |
+| `docs/sync-with-code` | 이 문서 갱신 | 코드와 문서 이름 맞추기 |
+
+dev 테스트는 42개 모두 통과합니다. 아직 **앱을 켜서 API를 눌러 볼 수는 없습니다** (테이블과 시드가 없음).
+
+**사용자 id가 UUID로 바뀌었습니다 (#8).** 사용자 id를 받는 곳(`reservations.user_id`, `restaurants.owner_id`, `Reservation.user_id`, `ReservationOut.user_id`, `is_owned_by`)은 `int`가 아니라 `uuid.UUID`로 맞춥니다. 예약 쪽은 #15에서 맞췄고, 식당 쪽(`owner_id`, `is_owned_by`)이 남았습니다. 나머지 테이블 id는 BIGINT 그대로입니다.
+
+**로그인한 사람은 `AuthenticatedUser`로 받습니다 (#14).** `Depends(get_authenticated_user)`를 쓰고, 번호는 `.user_id`, 운영자 여부는 `.is_owner()`로 봅니다. 예전 이름 `get_current_user`·`User`·`.id`는 쓰지 않습니다.
+
+### 다음에 할 일 (이 순서대로)
+
+앞 단계 부품이 있어야 뒤 단계가 돌아갑니다. 그래서 위에서부터 채웁니다. 자세한 부품 표는 [BACKEND_PLAN 2장](docs/BACKEND_PLAN.md#공용-부품-현재-상태-2026-11-05-dev-기준)에 있습니다.
+
+**3-1 모두가 기다리는 공용 부품** — 이게 없으면 다른 사람 코드가 빨간 줄입니다.
+
+| 할 일 | 담당 | 누가 기다리나 |
+| --- | --- | --- |
+| ~~`AppError` + 예외 핸들러~~ | 1 | **완료 (#8).** 슬롯 예외도 `error_code`를 붙여 409로 나감 (#10) |
+| `Page[T]` 목록 응답 (`items`·`page`·`page_size`·`total`) | 2 | 2 · 5 (목록 API 4개) |
+| `get_authenticated_user` 실제 구현 (토큰 → `AuthenticatedUser`). 자리는 #14에 있음 (`NotImplementedError`) | 1 | 2 · 4 · 5 (로그인이 필요한 API 전부) |
+| 사용자 id `int` → `uuid.UUID` 맞추기 | 2 | 2 (`owner_id`). 4(`user_id`)는 **완료 (#15)** |
+
+**3-2 테이블과 시드** — 이게 있어야 앱을 켜고 실제로 눌러 볼 수 있습니다.
+
+| 할 일 | 담당 |
+| --- | --- |
+| ~~`UserModel`~~ **완료 (#14)**, `TokenBlacklistModel` | 1 |
+| `RestaurantModel`, `MenuModel` | 2 |
+| `ReservationSlotModel` (`reservation_slots` 표) | 3 |
+| lifespan 테이블 자동 생성 + 시드 (고객 2 · 운영자 2 · 식당 3 · 메뉴 9 · 슬롯 12개 이상) | 3 (각자 자기 표의 시드 행을 넘겨줌) |
+
+**3-3 도메인 규칙** — DB 없이 테스트할 수 있어서 위와 같이 진행해도 됩니다.
+
+| 할 일 | 담당 |
+| --- | --- |
+| ~~`TimeSlot.can_accept` · `reserve` · `release`~~ | 3 · **완료 (#6)** |
+| `Restaurant.is_owned_by` (내 식당인가) | 2 |
+| `Reservation.can_cancel` · ~~`cancel`~~ (**완료 #15**, 재취소 409) | 4 |
+
+**4 기능 연결 (API)** — 위 부품이 들어오는 대로 각자 붙입니다.
+
+| 담당 | 순서 |
+| --- | --- |
+| 1 | 로그인 → 내 정보 `/users/me` → 로그아웃(블랙리스트) |
+| 2 | 식당 상세 → 식당 목록(검색·필터·정렬) → 식당 정보 수정 |
+| 3 | 예약 가능 시간 조회 |
+| 4 | 예약 생성(행 락) → 예약 취소 |
+| 5 | 운영자 식당 목록(#7) → 운영자 식당 예약 목록(#7 창구·매니저, 창고는 `feat/owner-reservations`) → 내 예약 목록 → 예약 상세 (둘 다 `feat/reservation-queries`, 코드 완료) → Jinja2 화면(`feat/web-pages`, 운영자 화면 틀 완료 · 식당 목록·상세는 식당 부품 뒤) |
+
+**5 동작 확인** — `/docs`에서 한 번에 이어서 눌러 봅니다. 고객 A 로그인 → 식당 목록 → 상세 → 예약 가능 조회 → 예약 → 내 예약 → 취소 → 로그아웃 → 같은 토큰 401 / 운영자 A 로그인 → 내 식당 → 그 식당 예약 → 운영자 B 식당 예약 403. 각자 테스트 2개(정상 1 · 실패 1).
+
+**6 발표 준비** — README 실행 안내, 동작 캡처, 발표 자료.
 
 ## 공부와 개발 기록
 
@@ -174,6 +258,8 @@ UI(Jinja2·React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)�
    POSTGRES_PASSWORD=<로컬 비밀번호>
    POSTGRES_DB=postgres
    POSTGRES_URL=postgresql+asyncpg://postgres:<로컬 비밀번호>@localhost:5432/postgres
+   # 선택: 허용할 프론트 주소 (쉼표 구분, 기본값 http://localhost:3000)
+   CORS_ORIGINS=http://localhost:3000
    ```
 
 2. PostgreSQL을 띄우고 의존성을 설치합니다.
@@ -186,10 +272,16 @@ UI(Jinja2·React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)�
    uv sync
    ```
 
-3. 앱을 실행합니다 (`src/main.py`가 준비된 뒤). 시작할 때 테이블과 시드가 자동으로 만들어집니다.
+3. 앱을 실행합니다. 테이블과 시드를 만드는 lifespan(담당 3)이 들어오면, 시작할 때 테이블과 시드가 자동으로 만들어집니다 (2026-11-03 기준 아직 없음).
 
    ```bash
    uv run uvicorn main:app --app-dir src --reload
+   ```
+
+4. 테스트를 돌립니다 (`pyproject.toml`에 `src` 경로와 비동기 모드가 설정되어 있음).
+
+   ```bash
+   uv run pytest
    ```
 
 ORM 모델이 바뀌어 로컬 DB를 다시 만들어야 할 때는 `docker compose down -v` 후 다시 시작합니다.
