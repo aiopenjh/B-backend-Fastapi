@@ -14,3 +14,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 register_web(app)
 
+# TODO(담당1): container가 import하는 다른 모듈(reservation·restaurant·slot)이
+# dev에 들어오면 아래 두 줄의 주석을 푼다. 지금 풀면 앱이 시작되지 않는다.
+# from container import wire_dependencies
+# wire_dependencies(app)
