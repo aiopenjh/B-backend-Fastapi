@@ -1,4 +1,4 @@
-# 담당5 requre_owner: 운영자 통과문 만들기
+# 담당5 require_owner: 운영자 통과문 만들기
 from auth.presentation.dependencies import get_authenticated_user
 from fastapi import Depends
 
