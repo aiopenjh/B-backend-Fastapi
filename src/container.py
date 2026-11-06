@@ -8,7 +8,10 @@ from owner.application.service import OwnerService  # 담당 5: 운영자 매니
 from reservation.application.query_service import (
     ReservationQueryService,
 )  # 담당 5: 예약 조회 매니저
-
+from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
+from restaurant.infrastructure.repository import (
+    RestaurantRepository,
+)  # 담당 2: 식당 창고
 from user.application.service import UserService  # 담당 1: 회원 매니저
 from user.application.unit_of_work import UnitOfWork  # 담당 1: 변경 확정 약속
 from user.domain.hasher import PasswordHasher  # 담당 1: 비밀번호 암호화 약속
@@ -61,6 +64,13 @@ def create_reservation_query_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReservationQueryService:
     return ReservationQueryService(session)
+
+
+# 담당 2: 식당 매니저 공장
+def create_restaurant_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> RestaurantService:
+    return RestaurantService(repo=RestaurantRepository(session))
 
 
 def wire_dependencies(app: FastAPI) -> None:
