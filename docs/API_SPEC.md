@@ -37,7 +37,7 @@
 | `code` | 문자열 | `"OK"` | 에러 코드 표의 값 (예: `"SLOT_SOLD_OUT"`) |
 | `message` | 문자열 | 처리 결과 메시지 | 사람이 읽을 실패 이유 |
 | `errors` | 객체 또는 `null` | `null` | 필드 이름 → 메시지 목록 (예: `{"party_size": ["1 이상이어야 합니다."]}`), 특정 필드가 없으면 `{}` |
-| `data` | `T` 또는 `null` | 출력 스키마 (`UserOut`, `ReservationOut`, `Page[T]` …) | `null` |
+| `data` | `T` 또는 `null` | 출력 스키마 (`UserResponse`, `ReservationOut`, `Page[T]` …) | `null` |
 | `request_id` | 문자열 | 요청 로그 미들웨어가 만든 id (응답 헤더 `X-Request-ID`와 같은 값) | 같음 |
 | `responded_at` | 시각 | 응답 시각 | 같음 |
 
@@ -108,8 +108,11 @@
 | 상태 | code | 뜻 |
 | --- | --- | --- |
 | 401 | `UNAUTHORIZED` | 토큰 없음·만료·로그아웃한 토큰, 로그인 실패 |
-| 403 | `FORBIDDEN` | 운영자가 아님(역할), 남의 식당(소유) |
+| 400 | `DUPLICATED_USER_ERROR` | 이미 가입된 이메일 (대소문자·앞뒤 공백 무시, 동시 가입으로 commit에서 걸린 경우 포함) |
+| 400 | `INVALID_ROLE_CHANGE` | `ADMIN` 부여, `ADMIN` 계정의 역할 변경 |
+| 403 | `FORBIDDEN` | 운영자가 아님(역할), 남의 식당(소유), 관리자가 아님(`require_admin`) |
 | 404 | `NOT_FOUND` | 없는 리소스, 관련 없는 사람에게 숨긴 리소스 (예: 남의 예약) |
+| 404 | `USER_NOT_FOUND` | 없거나 탈퇴한 사용자 (역할 변경) |
 | 409 | `SLOT_SOLD_OUT` | 남은 자리 부족 |
 | 409 | `PARTY_SIZE_EXCEEDED` | 슬롯의 1회 최대 인원 초과 |
 | 409 | `SLOT_ALREADY_STARTED` | 이미 시작한 시간대 |
@@ -120,7 +123,7 @@
 | 500 | `INTERNAL_SERVER_ERROR` | 처리하지 못한 예외. 요청 로그 미들웨어가 잡아 `request_id`가 든 실패 봉투로 응답하고 스택을 로그에 남김 |
 | 503 | `SERVICE_UNAVAILABLE` | DB 연결 실패 |
 
-401·403·404·422·500·503 코드는 `common/errors.py`의 `CommonErrorCode`에 들어 있습니다 (HTTP 상태와 기본 메시지를 함께 가짐). 409 코드는 아직 코드에 없고, 쓰는 담당이 추가합니다. 새 코드가 필요하면 이 표에 먼저 추가하고 공유합니다.
+401·403·404·422·500·503 코드는 `common/errors.py`의 `CommonErrorCode`에 들어 있습니다 (HTTP 상태와 기본 메시지를 함께 가짐). 모듈 전용 코드는 각 모듈의 `domain/exceptions.py`에 있습니다: 사용자 400·404(`user`), `SLOT_SOLD_OUT`·`PARTY_SIZE_EXCEEDED`·`SLOT_ALREADY_STARTED`(`slot`), `ALREADY_CANCELLED`(`reservation`). `DUPLICATE_RESERVATION`·`CANCELLATION_NOT_ALLOWED`는 아직 코드에 없고, 쓰는 담당이 추가합니다. 새 코드가 필요하면 이 표에 먼저 추가하고 공유합니다.
 
 ### 예시 데이터
 
@@ -301,3 +304,79 @@ Authorization: Bearer <access_token>
   "responded_at": "2026-10-28T15:20:01+09:00"
 }
 ```
+
+### 회원가입
+
+| 항목 | 값 |
+| --- | --- |
+| 기능 분류 | user |
+| API Path | `/api/v1/users` |
+| http method | `POST` |
+| 담당자 | 강성수 (담당 1) |
+| 인증 | 필요 없음 |
+| 명세 작성 현황 | 완료 (코드 #18·#25. `main.py`의 `wire_dependencies(app)` 연결 전이라 지금은 500) |
+| 테스트 여부 | ☐ 정상 · ☐ 실패 (API 테스트 없음. 서비스 단위 테스트 6개만 있음) |
+
+**요청 상세**
+
+```http
+POST /api/v1/users
+Content-Type: application/json
+
+{
+  "name": "고객A",
+  "email": "customer-a@example.com",
+  "password": "pass1234!",
+  "phone": "010-1234-5678"
+}
+```
+
+| 필드 | 위치 | 타입 | 필수 | 규칙 |
+| --- | --- | --- | --- | --- |
+| `name` | body | 문자열 | O | 2~20자 |
+| `email` | body | 문자열 | O | 이메일 형식. 앞뒤 공백을 지우고 소문자로 바꿔 저장 (`Email` 값 객체) |
+| `password` | body | 문자열 | O | 8자 이상, 영문·숫자·특수문자(`@$!%*#?&`)를 각각 1개 이상. 이 밖의 문자(공백, `^` 등)는 쓸 수 없음 |
+| `phone` | body | 문자열 | O | 휴대폰 번호 `01[016789]-?\d{3,4}-?\d{4}` |
+
+**응답 상세**
+
+| 상태 | code | 언제 |
+| --- | --- | --- |
+| 201 | `OK` | 가입 성공 (역할은 항상 `CUSTOMER`) |
+| 400 | `DUPLICATED_USER_ERROR` | 이미 가입된 이메일 |
+| 422 | `VALIDATION_ERROR` | 필드 누락·형식 위반, 비밀번호 규칙 위반 (`errors.password`) |
+
+성공 응답 예시 (`APIResponse[UserResponse]`, `password_hash`는 나가지 않음):
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "message": "회원가입이 완료되었습니다.",
+  "data": {
+    "id": "6f1c2a4e-8b3d-4f5a-9c7e-1d2b3a4c5e6f",
+    "email": "customer-a@example.com",
+    "name": "고객A",
+    "phone": "010-1234-5678",
+    "role": "CUSTOMER"
+  }
+}
+```
+
+**실패 예시**
+
+```text
+[400 DUPLICATED_USER_ERROR]
+요청: POST /api/v1/users  {"name": "고객A", "email": " Customer-A@Example.com ", "password": "pass1234!", "phone": "010-1234-5678"}   (customer-a@example.com 이미 가입)
+응답: 400
+{
+  "success": false,
+  "code": "DUPLICATED_USER_ERROR",
+  "message": "중복된 회원이 등록되어 있습니다.",
+  "errors": {},
+  "data": null,
+  ...
+}
+```
+
+알려진 한계: 비밀번호 길이 상한이 없어 72바이트를 넘으면 bcrypt가 오류를 냅니다(500). `Email` 정규식이 `+`가 들어간 주소(예: `a+b@x.com`)를 422로 거부합니다.
