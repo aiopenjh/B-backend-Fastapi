@@ -31,4 +31,5 @@ def init_models() -> None:
     import user.infrastructure.models  # 회원 [담당1-강성수]
     import reservation.infrastructure.models # 예약 [담당4-김민지]
     import slot.infrastructure.models # 슬롯[담당3-이영민]
+    import restaurant.infrastructure.models # 식당 [담당2-김태양]
     """순환 import 방지를 위해 함수 안에서 import"""
