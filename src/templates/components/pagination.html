@@ -1,0 +1,19 @@
+{# [담당 5] 페이지 이동 조각: 목록 화면들이 include로 끼워 넣음 #}
+{% if result %}
+<nav class="pagination" aria-label="목록 페이지">
+  <span>전체 <strong>{{ result.total }}</strong>건 · 페이지당 {{ result.page_size }}건</span>
+  <div>
+    {% if result.page > 1 %}
+    <a class="page-button" href="{{ request.url.include_query_params(page=result.page - 1, page_size=result.page_size) }}" aria-label="이전 페이지">←</a>
+    {% else %}
+    <span class="page-button disabled" aria-disabled="true">←</span>
+    {% endif %}
+    <span class="page-current">{{ result.page }} <span>/ {{ result.pages }}</span></span>
+    {% if result.page < result.pages %}
+    <a class="page-button" href="{{ request.url.include_query_params(page=result.page + 1, page_size=result.page_size) }}" aria-label="다음 페이지">→</a>
+    {% else %}
+    <span class="page-button disabled" aria-disabled="true">→</span>
+    {% endif %}
+  </div>
+</nav>
+{% endif %}

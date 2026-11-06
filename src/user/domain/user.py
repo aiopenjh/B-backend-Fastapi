@@ -1,14 +1,21 @@
+# [담당1 - 강성수]
 import re
 import uuid
 
 from dataclasses import dataclass
 from enum import StrEnum
 from datetime import datetime, UTC
-from common.errors import InvalidInputError
-from user.domain.exceptions import InvalidOldPasswordError, SamePasswordError
-from user.domain.hasher import PasswordHasher
 
-EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+from user.domain.exceptions import (
+    InvalidOldPasswordError,
+    InvalidRoleChangeError,
+    SamePasswordError,
+)
+from user.domain.hasher import PasswordHasher
+from user.domain.value_object import Email
+
+from common.errors import InvalidInputError
+
 PASSWORD_REGEX = re.compile(
     r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$"
 )
@@ -17,11 +24,15 @@ PASSWORD_REGEX = re.compile(
 class Role(StrEnum):
     CUSTOMER = "CUSTOMER"
     OWNER = "OWNER"
+    ADMIN = "ADMIN"
+
+
+ASSIGNABLE_ROLES = frozenset({Role.CUSTOMER, Role.OWNER})
 
 
 @dataclass
 class User:
-    email: str
+    email: Email
     password_hash: str
     name: str
     phone: str
@@ -33,13 +44,12 @@ class User:
     deleted_at: datetime | None = None
 
     def __post_init__(self):
-        self._validate_email(self.email)
         self._validate_name(self.name)
 
     @classmethod
     def create(
         cls,
-        email: str,
+        email: Email,
         raw_password: str,
         name: str,
         phone: str,
@@ -50,6 +60,7 @@ class User:
         password_hash = hasher.hash(raw_password)
 
         return cls(
+            id=uuid.uuid4(),
             email=email,
             name=name,
             password_hash=password_hash,
@@ -79,12 +90,16 @@ class User:
         self.password_hash = hasher.hash(new_password)
         self.updated_at = datetime.now(UTC)
 
-    @staticmethod
-    def _validate_email(email: str) -> None:
-        if not EMAIL_REGEX.match(email):
-            raise InvalidInputError(
-                errors={"email": ["올바른 이메일 형식이 아닙니다."]}
-            )
+    def change_owner_role(self, new_role: Role) -> None:
+        """관리자가 CUSTOMER <-> OWNER 사이에서 역할을 바꾼다"""
+        if self.role is Role.ADMIN or new_role not in ASSIGNABLE_ROLES:
+            raise InvalidRoleChangeError()
+
+        if self.role is new_role:
+            return
+
+        self.role = new_role
+        self.updated_at = datetime.now(UTC)
 
     @staticmethod
     def _validate_name(name: str) -> None:

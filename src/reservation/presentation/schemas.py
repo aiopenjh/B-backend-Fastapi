@@ -1,11 +1,12 @@
-# ReservationOut 을 만든다.
+# [담당 4] 예약 응답 모양 : API로 내보내는 예약 정보
+import uuid
 from datetime import datetime
 from pydantic import BaseModel
 from reservation.domain.reservation import ReservationStatus
 
 class ReservationOut(BaseModel):
     id: int
-    user_id: int
+    user_id: uuid.UUID
     slot_id: int
     restaurant_id: int
     starts_at: datetime

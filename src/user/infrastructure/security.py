@@ -1,3 +1,5 @@
+# [담당1 - 강성수]
+
 import bcrypt
 from user.domain.hasher import PasswordHasher
 

@@ -1,6 +1,6 @@
 # 아키텍처와 API 설계
 
-상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
+상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수 · 2026-11-03 dev 코드(PR #2~#4) 기준으로 파일 이름·현재 상태 갱신 · 2026-11-02 회의: Jinja2 화면 다시 포함 · 2026-11-05 PR #12·#14·#15와 담당 5 브랜치 기준으로 이름 갱신). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
 
 ## 1. 요청 하나가 처리되는 흐름
 
@@ -24,7 +24,7 @@ flowchart LR
 | `presentation` | 요청 받기, Pydantic 입력 검증, 현재 사용자 확인, 결과를 응답 스키마로 변환 | SQL 작성, 업무 규칙 판단 | `router.py`, `schemas.py` |
 | `application` | 레포지토리로 조회 → 도메인 규칙 실행 → 저장 → `commit()` | 규칙을 직접 계산, HTTP 응답 만들기 | `service.py` |
 | `domain` | 순수 파이썬 객체(`dataclass`)와 업무 규칙, 규칙 위반 예외 | FastAPI · SQLAlchemy · Pydantic import | `<엔티티>.py`, `exceptions.py`, `repository.py`(레포지토리 인터페이스, 선택) |
-| `infrastructure` | ORM 모델, 레포지토리(조회·저장, ORM 모델 ↔ 도메인 객체 변환) | `commit()` (서비스가 함) | `models.py`, `repository.py` |
+| `infrastructure` | ORM 모델, 레포지토리(조회·저장, ORM 모델 ↔ 도메인 객체 변환) | `commit()` (서비스가 함) | `models.py`, `repository.py` (인터페이스를 구현할 때는 `repositories.py`) |
 
 **공통 실습 (D1~D3)**: 모두가 식당 상세 조회를 4계층으로 만듭니다. 라우터 → 서비스 → 레포지토리 → 도메인 `Restaurant` → 없으면 404. 처음에는 레포지토리를 메모리 리스트로 만들고, 그다음 DB 쿼리로 바꿉니다. **레포지토리만 바뀌고 다른 계층은 그대로**인 것을 직접 확인하는 것이 목표입니다.
 
@@ -44,32 +44,38 @@ src/
 ├── main.py                  # 앱 생성, lifespan(테이블 생성 + 시드), 미들웨어, 라우터 등록
 ├── container.py             # 의존성 조립: 세션 → 레포지토리 구현체 → 서비스
 ├── common/                  # 여러 모듈이 함께 쓰는 기반
-│   ├── config.py            # 환경변수(.env) 읽기
-│   ├── database.py          # 비동기 엔진, AsyncSession 의존성
+│   ├── config.py            # 환경변수(.env) 읽기 (예정. 지금은 database.py가 .env를 직접 읽음)
+│   ├── database.py          # 비동기 엔진, AsyncSession 의존성 get_session
 │   ├── model.py             # ORM 공용 Base (모든 infrastructure/models.py가 상속)
-│   ├── errors.py            # AppError 계열 예외 (순수 파이썬, 도메인에서도 사용)
+│   ├── errors.py            # 에러 코드표 ErrorCode · CommonErrorCode, AppError 계열 예외
 │   ├── schemas.py           # APIResponse[T] 응답 봉투 (성공·실패 공통)
-│   ├── error_handlers.py    # 예외 → 실패 봉투(APIResponse)로 변환
-│   ├── pagination.py        # Page[T] 목록 응답
-│   └── middleware.py        # 요청 로그 · 처리 시간, CORS
+│   ├── context.py           # 요청 id(request_id_var). 미들웨어가 넣고 APIResponse가 읽음
+│   ├── error_handlers.py    # AppError · 422 → 실패 봉투(APIResponse)로 변환
+│   ├── logger.py            # 로그 설정 (LOGGING_MODE=debug면 DEBUG)
+│   ├── pagination.py        # Page[T] 목록 응답 (예정)
+│   └── middleware.py        # 요청 id · 요청 로그 · 처리 시간, 처리 못 한 예외 → 500 봉투, CORS
 ├── auth/                    # 담당 1 (로그인 · 로그아웃 · 현재 사용자 의존성)
-│   ├── domain/
+│   ├── domain/              # value_object.py(AuthenticatedUser: user_id, role, is_owner())
 │   ├── application/
 │   ├── infrastructure/
 │   └── presentation/
 │       ├── routers/v1/router.py
 │       ├── schemas.py
-│       └── dependencies.py  # get_current_user
+│       └── dependencies.py  # get_authenticated_user → AuthenticatedUser (자리만 있음, 구현 예정)
 ├── user/                    # 담당 1 (사용자 정보)
-│   ├── domain/
+│   ├── domain/              # user.py(User, Role), value_object.py(Email), repository.py(UserRepository 인터페이스)
 │   ├── application/
-│   ├── infrastructure/
+│   ├── infrastructure/      # models.py(UserModel), repositories.py(SQLAlchemyUserRepository)
 │   └── presentation/
 │       └── routers/v1/router.py
 ├── restaurant/              # 담당 2   (아래 모듈도 모두 같은 4계층)
 ├── slot/                    # 담당 3
 ├── reservation/             # 담당 4 (생성·취소) + 담당 5 (조회)
-└── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
+├── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
+├── web.py                   # 담당 5 (Jinja2 화면 라우터 /ui. 데이터는 다른 모듈 서비스로 읽음, PR 예정)
+├── web_data.py              # 담당 5 (화면 ↔ 운영자 매니저 연결, PR 예정)
+├── templates/               # 담당 5 (HTML 템플릿, PR 예정)
+└── static/                  # 담당 5 (CSS, PR 예정)
 ```
 
 모든 모듈·계층 패키지에 `__init__.py`를 둡니다 (`routers/`, `routers/v1/` 포함).
@@ -78,7 +84,7 @@ src/
 
 | 모듈 | 담당 | 테이블 | 핵심 도메인 객체 |
 | --- | --- | --- | --- |
-| `common/`, `main.py` | `database.py`·`model.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `AppError` |
+| `common/`, `main.py` | `database.py`·`model.py`·`config.py`: 지원 작업 · 에러/페이지: 담당 2 · lifespan/시드: 담당 3 · 미들웨어: 담당 1 | — | `APIResponse`, `ErrorCode`, `AppError` |
 | `auth` | 담당 1 (강성수) | `token_blacklist` | — (토큰 발급·검증, 블랙리스트) |
 | `user` | 담당 1 (강성수) | `users` | `User` |
 | `restaurant` | 담당 2 (김태양) | `restaurants`, `menus` | `Restaurant`, `Menu` |
@@ -94,7 +100,7 @@ src/
 | `application/service.py` (생성·취소) | 담당 4 |
 | `infrastructure/models.py`, `infrastructure/repository.py` | 담당 4 |
 | `presentation/schemas.py` (`ReservationCreate`, `ReservationOut`), `presentation/router.py` | 담당 4 |
-| `application/query_service.py`, `infrastructure/query_repository.py`, `presentation/query_router.py` | 담당 5 |
+| `application/query_service.py`, `infrastructure/query_repository.py`, `presentation/query_router.py` (+ `container.py`의 `create_reservation_query_service`) | 담당 5 |
 
 `owner` 모듈은 **자기 테이블이 없는 조회·권한 모듈**입니다. 운영자 역할 검사 의존성(`require_owner`)과 운영자용 조회 API를 둡니다. `presentation`, `application`, `infrastructure`(다른 모듈 ORM 모델을 JOIN하는 조회 레포지토리)만 쓰고 `domain`은 비워 둡니다.
 
@@ -108,7 +114,7 @@ src/
 | `application`의 조회 함수 (커밋하지 않음) | 허용 | `owner` 서비스가 `restaurant`의 식당 조회 함수 호출 |
 | `infrastructure` 레포지토리 | **같은 트랜잭션이 꼭 필요할 때만**, 세션을 넘겨서 사용. 커밋은 호출한 서비스가 함 | 예약 서비스가 `slot` 레포지토리로 슬롯 행 락 |
 | `infrastructure` ORM 모델 | FK 선언과 조회용 JOIN에만 | 예약 조회의 `reservations` ⋈ `reservation_slots` |
-| `presentation` | 금지. 예외: 인증·권한 의존성 `auth.presentation.dependencies.get_current_user`, `owner.presentation.dependencies.require_owner` | 식당 수정 API가 `require_owner` 사용 |
+| `presentation` | 금지. 예외: 인증·권한 의존성 `auth.presentation.dependencies.get_authenticated_user`, `owner.presentation.dependencies.require_owner` | 식당 수정 API가 `require_owner` 사용 |
 
 ### DB 세션
 
@@ -117,7 +123,7 @@ src/
 - `commit()`은 application 서비스에서만 합니다. 레포지토리는 id가 필요할 때 `flush()`까지만 합니다.
 - 테이블은 앱 시작 시 lifespan에서 `Base.metadata.create_all`로 만듭니다 (`Base`는 `common/model.py`). `create_all` 전에 모든 모듈의 `infrastructure/models.py`가 import되어 있어야 테이블이 `Base.metadata`에 등록됩니다. Alembic은 쓰지 않습니다 (7장).
 
-> 현재 저장소에는 레이어를 먼저 나눈 골격(`src/domain/`, `src/application/` …)과 `src/infrastructure/database.py`(`AsyncConnection` 의존성)가 있습니다. 위 모듈 구조로 옮길 때 `database.py`는 `src/common/database.py`로 옮기고, ORM용 `AsyncSession` 의존성을 추가합니다.
+> `src/common/database.py`에는 ORM용 `get_session`(`AsyncSession`)과, 처음 골격에서 쓰던 `get_conn`(`AsyncConnection`, 연결 실패 시 503)이 함께 있습니다. ORM 코드는 `get_session`을 씁니다.
 
 ## 3. 데이터 모델 (ERD)
 
@@ -180,6 +186,7 @@ erDiagram
         UUID user_id FK "예약자, NOT NULL"
         BIGINT slot_id FK
         INTEGER party_size
+        VARCHAR(20) contact_phone "연락처, 선택"
         VARCHAR(16) status "CONFIRMED | CANCELLED"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
@@ -279,11 +286,23 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 
 선택 과제 API(`POST /auth/signup`)는 필수 흐름이 다 돌아간 뒤에 추가합니다.
 
+**화면 (Jinja2, 담당 5, 2026-11-02 추가)**: `/api/v1` 밖의 경로로 HTML을 돌려줍니다. 응답 봉투(`APIResponse`)는 쓰지 않습니다. 지금 만든 것은 운영자 화면 틀입니다 (`feat/web-pages`, 데이터 연결은 인증 구현 뒤). 식당 목록·상세는 담당 2 식당 부품이 들어온 뒤 붙입니다.
+
+| 화면 | 경로 | 내용 |
+| --- | --- | --- |
+| 로그인 | `GET /ui` | 로그인 폼 (지금 만듦) |
+| 내 식당 | `GET /ui/owner/restaurants` | 운영자 식당 목록 · 페이지 (지금 만듦) |
+| 식당 예약 | `GET /ui/owner/restaurants/{id}/reservations` | 날짜 필터 · 페이지 (지금 만듦) |
+| 식당 목록 | `GET /` | 검색(`q`) · 페이지(`page`, 한 쪽 20개) · 이전/다음 |
+| 식당 상세 | `GET /web/restaurants/{id}` | 식당 정보와 메뉴, 없으면 에러 화면 |
+
+데이터는 서비스(운영자 화면은 `OwnerService`, 식당 화면은 담당 2의 식당 서비스)로 읽고, 화면 라우터에 SQL을 쓰지 않습니다. 공용 파일 `main.py`(정적 파일·화면 라우터 등록)와 `pyproject.toml`(jinja2 추가)을 고치므로 팀에 먼저 알립니다.
+
 ## 6. 보안과 트랜잭션
 
 **인증**: 비밀번호는 검증된 해시 라이브러리로 저장하고 비교합니다 (README 기술 스택). 암호화 로직을 직접 만들지 않습니다. 토큰은 PyJWT로 만든 짧은 수명의 Bearer JWT입니다. `sub`=사용자 id, `exp`, `jti`를 넣습니다. 로그인은 `OAuth2PasswordRequestForm`(폼 전송)으로 받습니다. 그래서 `/docs`의 **Authorize** 버튼으로 바로 로그인해서 다른 API를 시험할 수 있습니다.
 
-**로그아웃 (블랙리스트)**: JWT는 서버가 저장하지 않습니다. 그래서 아무것도 하지 않으면 로그아웃한 토큰도 만료 전까지 그대로 쓸 수 있습니다. `POST /auth/logout`은 현재 토큰의 `jti`와 `exp`를 `token_blacklist`에 저장하고 204를 돌려줍니다. `get_current_user`는 아래 순서로 검사합니다.
+**로그아웃 (블랙리스트)**: JWT는 서버가 저장하지 않습니다. 그래서 아무것도 하지 않으면 로그아웃한 토큰도 만료 전까지 그대로 쓸 수 있습니다. `POST /auth/logout`은 현재 토큰의 `jti`와 `exp`를 `token_blacklist`에 저장하고 204를 돌려줍니다. `get_authenticated_user`는 아래 순서로 검사합니다.
 
 1. 서명·만료 검사 (DB 없이 계산만). 실패하면 401
 2. `token_jti`로 블랙리스트 조회. 있으면 401
@@ -295,7 +314,7 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 
 | 단계 | 확인 | 실패 시 | 위치 |
 | --- | --- | --- | --- |
-| 1. 역할 | `role == OWNER` | 403 | `owner/presentation/dependencies.py` — `require_owner` (모든 `/owner/*` 라우트에 적용) |
+| 1. 역할 | `user.is_owner()` (`role == OWNER`) | 403 | `owner/presentation/dependencies.py` — `require_owner` (모든 `/owner/*` 라우트에 적용) |
 | 2. 소유 | `restaurant.owner_id == 현재 사용자 id` | 403 | `restaurant/domain/restaurant.py` — `Restaurant.is_owned_by(user_id)` |
 
 FK는 "그 id의 사용자가 존재한다"만 보장하고 역할은 확인하지 않습니다. 그래서 1단계를 따로 둡니다. 운영자 식당 목록(`GET /owner/restaurants`)은 `WHERE owner_id = 나` 조건 자체가 2단계 검증입니다. 남의 식당은 404로 숨기지 않고 403을 돌려줍니다. 식당은 `GET /restaurants/{id}`로 누구나 존재를 알 수 있기 때문입니다. 반대로 남의 예약은 존재 자체가 개인 정보라서 404로 숨깁니다.
@@ -325,7 +344,8 @@ FK는 "그 id의 사용자가 존재한다"만 보장하고 역할은 확인하�
 
 | 항목 | 결정 | 대신 |
 | --- | --- | --- |
-| UI (Jinja2 화면, 프론트 연결) | 제외 (2026-10-28) | API 문서 화면(`/docs`)과 pytest로 확인 |
+| 프론트 연결 (React 등) | 제외 (2026-10-28) | API 문서 화면(`/docs`)과 pytest로 확인 |
+| Jinja2 화면 | 제외(2026-10-28) → **다시 포함 (2026-11-02, 담당 5)** | 운영자 화면 3개 틀(`/ui`) + 식당 목록·상세 화면 2개 예정 (5장) |
 | CI | 제외 (2026-10-28) | PR 전에 로컬에서 테스트, 실행 결과를 PR에 기록 |
 | Redis 캐시 | 제외 (2026-10-28) | 모든 조회를 PostgreSQL에서 바로 읽음 |
 | Alembic 마이그레이션 | 제외 (2026-10-28) | lifespan `create_all`. 스키마가 바뀌면 로컬 DB를 다시 만듦 |

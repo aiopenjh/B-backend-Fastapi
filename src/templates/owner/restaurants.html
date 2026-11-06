@@ -1,0 +1,90 @@
+{# [담당 5] 운영 식당 화면: 내 식당 카드 목록 #}
+{% extends "base.html" %}
+{% block title %}운영 식당{% endblock %}
+{% block content %}
+<div class="breadcrumb">워크스페이스 <span>/</span> 운영 식당</div>
+<div class="page-heading">
+  <div>
+    <h1>운영 식당</h1>
+    <p class="muted">내 식당의 예약을 확인하는 곳입니다.</p>
+  </div>
+  <span class="page-label">RESTAURANTS</span>
+</div>
+
+<div class="section-toolbar">
+  <h2>내 식당 <span class="number-tag">{{ total if total is not none else '—' }}</span></h2>
+  <span class="muted">식당 선택 → 예약 확인</span>
+</div>
+
+{% if restaurants is none %}
+{# 연결 전(None): 미리보기 카드 #}
+<section class="connection-strip">
+  <span class="connection-icon" aria-hidden="true">↔</span>
+  <div>
+    <strong>운영 식당 연결 준비 중</strong>
+    <p>연결되면 이 계정의 식당 목록이 표시됩니다.</p>
+  </div>
+  <span class="subtle-tag">미연결</span>
+</section>
+<div class="restaurant-grid">
+  <article class="restaurant-card placeholder-card">
+    <div class="restaurant-cover" aria-hidden="true">
+      <div class="storefront">
+        <div class="awning"></div>
+        <div class="store-windows"><span></span><span></span><span></span></div>
+      </div>
+      <span>YOUR RESTAURANT</span>
+    </div>
+    <div class="restaurant-content">
+      <span class="subtle-tag">화면 구성 미리보기</span>
+      <h3>식당 이름이 표시되는 자리</h3>
+      <p class="address">등록된 식당 주소가 함께 표시됩니다.</p>
+      <div class="card-bottom">
+        <span>예약 목록 화면</span>
+        <a class="round-link" href="{{ url_for('ui_reservations', restaurant_id=1) }}" aria-label="예약 목록 화면 미리보기">↗</a>
+      </div>
+    </div>
+  </article>
+  <div class="restaurant-guide">
+    <span class="guide-icon" aria-hidden="true">▦</span>
+    <h3>식당별로, 한눈에.</h3>
+    <p>식당을 선택하면 해당 식당의<br>방문 일시·인원·예약 상태를 확인할 수 있어요.</p>
+    <p class="form-help">왼쪽 카드는 구성 예시입니다.<br>실제 식당 정보는 아닙니다.</p>
+  </div>
+</div>
+
+{% elif not restaurants %}
+{# 연결됐지만 식당이 없음([]) #}
+<section class="panel empty-state">
+  <span class="empty-symbol" aria-hidden="true">▦</span>
+  <h3>등록된 운영 식당이 없어요</h3>
+  <p>현재 계정에 연결된 식당을 확인해 주세요.</p>
+</section>
+
+{% else %}
+<div class="restaurant-grid">
+  {% for restaurant in restaurants %}
+  <article class="restaurant-card">
+    <div class="restaurant-cover" aria-hidden="true">
+      <div class="storefront">
+        <div class="awning"></div>
+        <div class="store-windows"><span></span><span></span><span></span></div>
+      </div>
+      <span>TABLE RESTAURANT</span>
+    </div>
+    <div class="restaurant-content">
+      <span class="subtle-tag">내 식당</span>
+      <h3>{{ restaurant.name }}</h3>
+      <p class="address">{{ restaurant.address }}</p>
+      <div class="card-bottom">
+        <span>예약 확인하기</span>
+        <a class="round-link" href="{{ url_for('ui_reservations', restaurant_id=restaurant.id) }}" aria-label="{{ restaurant.name }} 예약 보기">↗</a>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% include "components/pagination.html" %}
+{% endblock %}
