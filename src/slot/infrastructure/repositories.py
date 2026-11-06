@@ -1,18 +1,18 @@
 # [담당3-영민] SQLAlchemy 구현체 - ORM 모델
 from datetime import datetime
 
-from sqlalchemy import column, select, table 
+from sqlalchemy import column, select, table
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
 from slot.infrastructure.models import ReservationSlotModel
 
-
 # [담당2-김태양] restaurant.application 조회 함수 생기면 아래 줄 삭제
 _restaurants = table("restaurants", column("id"), column("deleted_at"))
 
 
+# 외부 사용 중 — owner·reservation query_repository (#27). 이름·인자 바꾸면 담당 5와 함께
 def _to_domain(row: ReservationSlotModel) -> TimeSlot:
     return TimeSlot(
         id=row.id,
