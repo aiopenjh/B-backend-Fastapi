@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
@@ -8,15 +9,16 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Uuid,
     func,
     text,
-    Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from common.model import Base
+
+from common.model import Base, DateTimeBase
 
 
-class RestaurantModel(Base):
+class RestaurantModel(Base, DateTimeBase):
     __tablename__ = "restaurants"
 
     # BIGINT 자동 증가 기본 키
@@ -34,21 +36,8 @@ class RestaurantModel(Base):
     address: Mapped[str] = mapped_column(String(255), nullable=False)
     cuisine: Mapped[str] = mapped_column(String(50), nullable=False)
     image_url: Mapped[str | None] = mapped_column(String(500))
-    status: Mapped[str] = mapped_column(String(30), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(50))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=text("now()"),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=text("now()"),
-        onupdate=func.now(),
-        nullable=False,
-    )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    menus: Mapped[list["MenuModel"]] = relationship(
+    menus: Mapped[list[MenuModel]] = relationship(
         back_populates="restaurant",
         lazy="selectin",
         order_by="MenuModel.id",
@@ -69,8 +58,7 @@ class MenuModel(Base):
         autoincrement=True,
     )
     restaurant_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("restaurants.id"), nullable=False, index=True
+        BigInteger, ForeignKey("restaurants.id"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -87,4 +75,4 @@ class MenuModel(Base):
         nullable=False,
     )
 
-    restaurant: Mapped["RestaurantModel"] = relationship(back_populates="menus")
+    restaurant: Mapped[RestaurantModel] = relationship(back_populates="menus")
