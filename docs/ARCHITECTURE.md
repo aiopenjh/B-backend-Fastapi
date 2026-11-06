@@ -1,6 +1,6 @@
 # 아키텍처와 API 설계
 
-상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수 · 2026-11-03 dev 코드(PR #2~#4) 기준으로 파일 이름·현재 상태 갱신 · 2026-11-02 회의: Jinja2 화면 다시 포함 · 2026-11-05 PR #12·#14·#15와 담당 5 브랜치 기준으로 이름 갱신). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
+상태: 설계 확정, 구현 진행 중 (2026-10-28 개정: 5인 · 도메인 모듈 구조 · ERD 반영 · UI/CI/Redis 제외 · ERD 수정: 운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수 · 2026-11-03 dev 코드(PR #2~#4) 기준으로 파일 이름·현재 상태 갱신 · 2026-11-02 회의: Jinja2 화면 다시 포함 · 2026-11-05 PR #12·#14·#15와 담당 5 브랜치 기준으로 이름 갱신 · 2026-11-06 dev `aa03231`(PR #16~#25) 기준으로 auth·user 구조, `users` 컬럼, 회원가입·관리자 역할 반영). 함께 볼 문서: [README](../README.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md), [BACKEND_PLAN](BACKEND_PLAN.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md)
 
 ## 1. 요청 하나가 처리되는 흐름
 
@@ -52,30 +52,32 @@ src/
 │   ├── context.py           # 요청 id(request_id_var). 미들웨어가 넣고 APIResponse가 읽음
 │   ├── error_handlers.py    # AppError · 422 → 실패 봉투(APIResponse)로 변환
 │   ├── logger.py            # 로그 설정 (LOGGING_MODE=debug면 DEBUG)
-│   ├── pagination.py        # Page[T] 목록 응답 (예정)
+│   ├── pagination.py        # Page[T] 목록 응답, PageParams · page_params (#21)
 │   └── middleware.py        # 요청 id · 요청 로그 · 처리 시간, 처리 못 한 예외 → 500 봉투, CORS
 ├── auth/                    # 담당 1 (로그인 · 로그아웃 · 현재 사용자 의존성)
-│   ├── domain/              # value_object.py(AuthenticatedUser: user_id, role, is_owner())
-│   ├── application/
-│   ├── infrastructure/
+│   ├── domain/              # value_object.py(AuthRole, AuthenticatedUser: user_id, role, is_owner() · is_customer() · is_admin())
+│   ├── application/         # (예정) 로그인 · 로그아웃 서비스
+│   ├── infrastructure/      # (예정) TokenBlacklistModel, 블랙리스트 저장소, JWT 발급·검증
 │   └── presentation/
-│       ├── routers/v1/router.py
-│       ├── schemas.py
-│       └── dependencies.py  # get_authenticated_user → AuthenticatedUser (자리만 있음, 구현 예정)
-├── user/                    # 담당 1 (사용자 정보)
-│   ├── domain/              # user.py(User, Role), value_object.py(Email), repository.py(UserRepository 인터페이스)
-│   ├── application/
-│   ├── infrastructure/      # models.py(UserModel), repositories.py(SQLAlchemyUserRepository)
+│       ├── routers/v1/router.py  # POST /auth/login (본문 없음, 구현 예정)
+│       ├── schemas.py       # (비어 있음) 토큰 응답 스키마 예정
+│       └── dependencies.py  # get_authenticated_user → AuthenticatedUser (자리만 있음, 구현 예정), require_admin
+├── user/                    # 담당 1 (회원가입 · 역할 변경 · 내 정보 조회)
+│   ├── domain/              # user.py(User, Role), value_object.py(Email), repository.py(UserRepository 인터페이스), hasher.py(PasswordHasher 인터페이스), exceptions.py
+│   ├── application/         # service.py(UserService: signUp · change_role), unit_of_work.py(UnitOfWork 포트, ConflictError)
+│   ├── infrastructure/      # models.py(UserModel), repositories.py(SQLAlchemyUserRepository), unit_of_work.py(SQLAlchemyUnitOfWork), security.py(BcryptPasswordHasher)
 │   └── presentation/
-│       └── routers/v1/router.py
+│       ├── routers/v1/router.py  # POST /users 회원가입 (#25)
+│       ├── schemas.py       # SignUpUserRequest, UserResponse
+│       └── dependencies.py  # user_service · user_repository 자리 (container.wire_dependencies가 실제 구현으로 바꿔 끼움)
 ├── restaurant/              # 담당 2   (아래 모듈도 모두 같은 4계층)
 ├── slot/                    # 담당 3
 ├── reservation/             # 담당 4 (생성·취소) + 담당 5 (조회)
 ├── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
-├── web.py                   # 담당 5 (Jinja2 화면 라우터 /ui. 데이터는 다른 모듈 서비스로 읽음, PR 예정)
-├── web_data.py              # 담당 5 (화면 ↔ 운영자 매니저 연결, PR 예정)
-├── templates/               # 담당 5 (HTML 템플릿, PR 예정)
-└── static/                  # 담당 5 (CSS, PR 예정)
+├── web.py                   # 담당 5 (Jinja2 화면 라우터 /ui. 데이터는 다른 모듈 서비스로 읽음, #17)
+├── web_data.py              # 담당 5 (화면 ↔ 운영자 매니저 연결, #17. 지금은 데이터 연결 전이라 None)
+├── templates/               # 담당 5 (HTML 템플릿, components/ include 구조 #20)
+└── static/                  # 담당 5 (CSS, #17)
 ```
 
 모든 모듈·계층 패키지에 `__init__.py`를 둡니다 (`routers/`, `routers/v1/` 포함).
@@ -138,11 +140,11 @@ erDiagram
 
     users {
         UUID id PK
-        VARCHAR(254) email UK
+        VARCHAR(255) email UK
         VARCHAR(255) password_hash
-        VARCHAR(100) name
-        VARCHAR(50) phone
-        VARCHAR(16) role "CUSTOMER | OWNER"
+        VARCHAR(50) name
+        VARCHAR(20) phone
+        VARCHAR(20) role "CUSTOMER | OWNER | ADMIN"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         TIMESTAMPTZ deleted_at "탈퇴일"
@@ -203,7 +205,7 @@ erDiagram
 
 | 테이블 | 용도 | 담당 | 범위 |
 | --- | --- | --- | --- |
-| `users` | 시드 계정 (비밀번호는 해시로 저장), 역할 `CUSTOMER`/`OWNER` | 담당 1 | 필수 |
+| `users` | 시드 계정 (비밀번호는 해시로 저장), 역할 `CUSTOMER`/`OWNER`/`ADMIN` (`ADMIN`은 시드·DB 직접 입력으로만) | 담당 1 | 필수 |
 | `restaurants` | 공개 식당 정보, 운영 상태, 운영자(`owner_id`) | 담당 2 | 필수 |
 | `menus` | 식당별 메뉴와 가격 | 담당 2 | 필수 |
 | `reservation_slots` | 시간대, 수용 인원, 예약된 인원, 1회 최대 인원 | 담당 3 | 필수 |
@@ -219,7 +221,7 @@ erDiagram
 **ERD 수정 (2026-11-04)**
 
 - `users.id`를 `BIGINT`에서 `UUID`로 바꿉니다. 이 값을 참조하는 FK 3개(`restaurants.owner_id`, `reservations.user_id`, `token_blacklist.user_id`)도 `UUID`로 맞춥니다. 나머지 테이블의 PK·FK는 `BIGINT` 그대로입니다.
-- 도메인 `User.id`는 `uuid.UUID | None`입니다. `User.create()` 직후에는 `None`이고, 저장할 때 값이 정해집니다. 다른 모듈이 사용자 id를 받을 때(`Reservation.user_id`, `Restaurant.owner_id`, `is_owned_by(user_id)`, `ReservationOut.user_id` 등)도 `int`가 아니라 `uuid.UUID`로 받습니다.
+- 도메인 `User.id`는 `User.create()`가 만들 때 `uuid.uuid4()`로 정합니다 (#18). DB 기본값에 기대지 않으므로 commit 전에도 id를 쓸 수 있고, 저장소는 도메인이 정한 id·`created_at`을 그대로 저장합니다. 다른 모듈이 사용자 id를 받을 때(`Reservation.user_id`, `Restaurant.owner_id`, `is_owned_by(user_id)`, `ReservationOut.user_id` 등)도 `int`가 아니라 `uuid.UUID`로 받습니다.
 - 응답 JSON에서 사용자 id는 문자열(예: `"00000000-0000-4000-8000-000000000001"`)로 나갑니다.
 
 ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담당이 이유를 설명할 수 있어야 합니다.
@@ -284,7 +286,7 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 
 경로 접두어와 모듈은 다를 수 있습니다. 예를 들어 `/restaurants/{id}/availability`는 슬롯 규칙을 쓰므로 `slot` 모듈에 둡니다. `PATCH /owner/restaurants/{id}`는 식당 정보를 바꾸므로 `restaurant` 모듈에 둡니다.
 
-선택 과제 API(`POST /auth/signup`)는 필수 흐름이 다 돌아간 뒤에 추가합니다.
+선택 과제인 회원가입은 계획의 `POST /auth/signup` 대신 사용자 리소스 생성 `POST /users`(`user` 모듈)로 만들었습니다 (#18, #25). 성공 201 `APIResponse[UserResponse]`이고, 응답에 `password_hash`는 없습니다. `main.py`의 `wire_dependencies(app)` 호출이 아직 주석이라 지금은 500을 돌려줍니다 (`container.py`가 import하는 다른 모듈이 들어오면 연결).
 
 **화면 (Jinja2, 담당 5, 2026-11-02 추가)**: `/api/v1` 밖의 경로로 HTML을 돌려줍니다. 응답 봉투(`APIResponse`)는 쓰지 않습니다. 지금 만든 것은 운영자 화면 틀입니다 (`feat/web-pages`, 데이터 연결은 인증 구현 뒤). 식당 목록·상세는 담당 2 식당 부품이 들어온 뒤 붙입니다.
 
@@ -316,6 +318,8 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 | --- | --- | --- | --- |
 | 1. 역할 | `user.is_owner()` (`role == OWNER`) | 403 | `owner/presentation/dependencies.py` — `require_owner` (모든 `/owner/*` 라우트에 적용) |
 | 2. 소유 | `restaurant.owner_id == 현재 사용자 id` | 403 | `restaurant/domain/restaurant.py` — `Restaurant.is_owned_by(user_id)` |
+
+**관리자 역할 (#22)**: `ADMIN`은 시드·DB 직접 입력으로만 만들고, API로는 부여할 수 없습니다. `auth.presentation.dependencies.require_admin`은 `is_admin()`이 아니면 403(`FORBIDDEN`, "관리자만 사용할 수 있습니다.")을 돌려줍니다. 관리자는 `UserService.change_role`로 사용자를 `CUSTOMER` ↔ `OWNER`로만 바꿀 수 있습니다 (`ADMIN` 부여·`ADMIN` 계정 변경은 400 `INVALID_ROLE_CHANGE`). 역할 변경 HTTP API는 아직 없습니다. `require_admin`을 다른 모듈에서 쓰려면 2장 presentation import 예외 목록에 추가하는 합의가 먼저 필요합니다.
 
 FK는 "그 id의 사용자가 존재한다"만 보장하고 역할은 확인하지 않습니다. 그래서 1단계를 따로 둡니다. 운영자 식당 목록(`GET /owner/restaurants`)은 `WHERE owner_id = 나` 조건 자체가 2단계 검증입니다. 남의 식당은 404로 숨기지 않고 403을 돌려줍니다. 식당은 `GET /restaurants/{id}`로 누구나 존재를 알 수 있기 때문입니다. 반대로 남의 예약은 존재 자체가 개인 정보라서 404로 숨깁니다.
 
@@ -349,7 +353,7 @@ FK는 "그 id의 사용자가 존재한다"만 보장하고 역할은 확인하�
 | CI | 제외 (2026-10-28) | PR 전에 로컬에서 테스트, 실행 결과를 PR에 기록 |
 | Redis 캐시 | 제외 (2026-10-28) | 모든 조회를 PostgreSQL에서 바로 읽음 |
 | Alembic 마이그레이션 | 제외 (2026-10-28) | lifespan `create_all`. 스키마가 바뀌면 로컬 DB를 다시 만듦 |
-| 회원가입 | 선택 과제 (담당 1) | 시드 계정으로 로그인 |
+| 회원가입 | 선택 과제 (담당 1) → `POST /users`로 먼저 추가 (#25, 의존성 연결 전) | 필수 흐름은 시드 계정으로 로그인 |
 | 예약 요청 중복 방지 (멱등성) | 제외 — ERD에서 테이블 삭제 (2026-10-28) | 같은 슬롯 중복 예약 규칙 |
 | 한 식당을 운영자 여러 명이 공동 운영 | 제외 — `restaurant_members` 삭제 (2026-10-28) | 식당 하나에 운영자 한 명 (`owner_id`) |
 | 동시성 재현 테스트 | 선택 과제 (담당 4) | 행 락 코드 + 순차 테스트 |

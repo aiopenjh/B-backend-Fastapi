@@ -35,7 +35,7 @@
 | 인증 | OAuth2 비밀번호 폼, JWT(PyJWT), bcrypt |
 | 테스트 | pytest, pytest-asyncio, httpx(`AsyncClient`) |
 | 코드 검사 | ruff |
-| 화면 | Jinja2 템플릿 (담당 5, `feat/web-pages` PR에서 설치) |
+| 화면 | Jinja2 템플릿 (담당 5, #17에서 설치) |
 
 **비동기 DB 연결은 필수입니다.** 예약 생성에는 행 락을 넣고, 여러 요청이 같은 좌석을 동시에 예약하는 상황을 **실제로 재현해 검증하는 것은 선택 도전 기능**입니다.
 
@@ -45,7 +45,7 @@
 
 | 대상 | 모듈 | 의미 |
 | --- | --- | --- |
-| `User` | `user` | 회원 정보 (손님 `CUSTOMER` / 운영자 `OWNER`) |
+| `User` | `user` | 회원 정보 (손님 `CUSTOMER` / 운영자 `OWNER` / 관리자 `ADMIN`, 관리자는 시드로만) |
 | `TokenBlacklist` | `auth` | 로그아웃으로 사용을 막은 토큰 목록 |
 | `Restaurant`, `Menu` | `restaurant` | 가게의 이름·분류·주소·운영 상태, 운영자(`owner_id`)와 메뉴 |
 | `TimeSlot` | `slot` | 이용 시간, 총 수용 인원, 예약된 인원, 1회 최대 인원을 가진 시간대 |
@@ -97,7 +97,7 @@ src/
 ├── main.py              # 앱 생성, lifespan(테이블 생성 + 시드), 미들웨어, 라우터 등록
 ├── common/              # DB 세션, ORM Base(model.py), 설정, 공통 에러 형식, Page[T], 미들웨어
 ├── auth/                # 담당 1 강성수: 로그인 · 로그아웃 · 현재 사용자 의존성
-├── user/                # 담당 1 강성수: 사용자 정보 (내 정보 조회)
+├── user/                # 담당 1 강성수: 회원가입 · 역할 변경 · 내 정보 조회(예정)
 │   ├── domain/
 │   ├── application/
 │   ├── infrastructure/
@@ -138,7 +138,7 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 | 예외 처리 | 잘못된 입력, 규칙 위반, 없는 대상에 맞는 공통 형식 오류 응답 |
 | 인증과 보안 | 비밀번호 해시, OAuth2 로그인, JWT 발급, 로그아웃 토큰 차단(블랙리스트), 역할·소유 권한 확인 (계정은 시드) |
 | 공통 처리 | CORS, 요청 로그와 처리 시간 기록 |
-| 화면 | Jinja2 템플릿 화면 (담당 5). 지금 만든 화면은 운영자 화면 3개입니다 (`feat/web-pages`): 로그인 `/ui`, 내 식당 `/ui/owner/restaurants`, 식당 예약 `/ui/owner/restaurants/{id}/reservations`. 식당 목록·상세(11/2 회의 범위)는 담당 2 식당 부품이 들어온 뒤 붙입니다 |
+| 화면 | Jinja2 템플릿 화면 (담당 5). 지금 만든 화면은 운영자 화면 3개입니다 (#17·#20): 로그인 `/ui`, 내 식당 `/ui/owner/restaurants`, 식당 예약 `/ui/owner/restaurants/{id}/reservations`. 식당 목록·상세(11/2 회의 범위)는 담당 2 식당 부품이 들어온 뒤 붙입니다 |
 | 시작 데이터 | lifespan을 이용한 테이블 생성과 시연용 데이터 20건 이상, 재시작 시 중복 방지 |
 | 문서와 발표 | 실행 안내, 구조도, 동작 캡처, 팀 기록과 발표 자료 |
 
@@ -154,16 +154,16 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 
 ## 큰 진행 순서
 
-| 순서 | 할 일 | 남길 결과 | 지금 (11/5) |
+| 순서 | 할 일 | 남길 결과 | 지금 (11/6) |
 | --- | --- | --- | --- |
 | 1 기획 | 주제와 핵심 기능, 예약·취소 규칙을 정합니다. | 서비스 소개와 규칙표 | 완료 |
 | 2 설계 | DB 관계, 모듈 경계, API 입력·응답을 정합니다. | ERD, API 명세 | 완료 |
-| 3 기본 구현 | 환경과 모듈 4계층을 준비하고 도메인·DB·레포지토리·서비스·API를 연결합니다. | 정상 처리와 규칙 위반 차단 | **진행 중** (공용 부품 대부분, 예약 모델·취소 규칙, 슬롯 규칙, 사용자 표) |
-| 4 기능 연결 | 인증, 목록 조회, 운영자 조회, 미들웨어를 연결합니다. | 전체 사용 흐름 | 일부 (미들웨어, `require_owner`, 운영자 조회·예약 조회 코드, Jinja2 화면 틀) |
+| 3 기본 구현 | 환경과 모듈 4계층을 준비하고 도메인·DB·레포지토리·서비스·API를 연결합니다. | 정상 처리와 규칙 위반 차단 | **진행 중** (공용 부품 대부분, 예약 모델·취소 규칙·`can_cancel`, 슬롯 규칙·모델·저장소, 사용자 표·저장소·회원가입) |
+| 4 기능 연결 | 인증, 목록 조회, 운영자 조회, 미들웨어를 연결합니다. | 전체 사용 흐름 | 일부 (미들웨어, `require_owner`, `Page[T]`, 운영자 조회·예약 조회 코드, Jinja2 화면 틀. 로그인과 의존성 연결은 아직) |
 | 5 동작 확인 | 정상·오류·인증 차단·저장 결과를 확인하고 필요한 선택 기능을 정합니다. | 결과 캡처와 문제 해결 기록 | 시작 전 |
 | 6 발표 준비 | README, 팀 노션과 발표 자료를 정리하고 시연을 연습합니다. | 실행 안내와 발표·시연 자료 | 시작 전 |
 
-## 지금 어디까지 왔나 (2026-11-05, dev 기준)
+## 지금 어디까지 왔나 (2026-11-06, dev `aa03231` 기준)
 
 ### 들어온 PR
 
@@ -180,15 +180,18 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 | #12 | 1 강성수 | 422 검증 문구 한국어, `HTTPException`도 실패 봉투로 | 입력 오류도 같은 봉투·한국어로 나감 |
 | #14 | 1 강성수 | **`get_current_user` → `get_authenticated_user`**, 돌려주는 값 `User` → **`AuthenticatedUser`**(`user_id`·`role`·`is_owner()`·`is_customer()`, `auth/domain/value_object.py`), `UserModel`, `Email` 값 객체, `create_user_service` | 로그인한 사람을 가벼운 값 하나로 받음. 이름이 바뀌어 쓰는 쪽(담당 2·4·5)도 맞춰야 함 |
 | #15 | 4 김민지 | `Reservation.cancel()`(재취소 409 `ALREADY_CANCELLED`), `reservations.user_id` UUID | 예약 취소 규칙 |
+| #16 | 5 최지훈 | owner를 #14 이름(`get_authenticated_user`·`is_owner()`)에 맞춤, 운영자 창고, `GET /users/me/reservations`·`GET /reservations/{reservation_id}` 창구·매니저·창고, `create_reservation_query_service`, 문서 갱신 | 운영자 API와 내 예약 API 4개 코드. `main.py` 등록은 부품이 들어온 뒤 |
+| #17 | 5 최지훈 | Jinja2 화면 틀 `/ui`(로그인·내 식당·식당 예약), `web.py`·`web_data.py`·`templates/`·`static/`, `jinja2` 의존성 | 운영자 화면 3개. 데이터 연결은 인증 구현 뒤 |
+| #18 | 1 강성수 | `UnitOfWork` 포트·`SQLAlchemyUnitOfWork`, `SQLAlchemyUserRepository` 구현, `User.create()`에서 UUID 부여, 요청 필드 `row_password` → `password` | 회원가입이 저장 뒤 한 번 commit. 동시 가입 중복도 400으로 |
+| #19 | 5 최지훈 | 내 예약 목록 정렬에 예약 번호 추가 | 같은 시각 예약이 있어도 페이지가 흔들리지 않음 |
+| #20 | 5 최지훈 | 템플릿을 `components/`(header·sidebar·footer) include 구조로 정리 | 화면 모양은 그대로 |
+| #21 | 2 김태양 | `Page[T]`, `PageParams`, `page_params` | 목록 응답 모양 + 페이지 번호 검사 |
+| #22 | 1 강성수 | 관리자 역할 `ADMIN`, `require_admin`, `change_role`(CUSTOMER↔OWNER), 기존 사용자 저장을 갱신(merge)으로 | 관리자가 운영자 역할을 줄 수 있게 (HTTP API는 아직) |
+| #23 | 4 김민지 | `Reservation.can_cancel(user_id)`(본인·확정 상태), `cancel()`에서 `slot` 인자 제거 | 취소 버튼을 보여 줄지 판단. 시작 여부는 서비스가 확인 |
+| #24 | 3 이영민 | `ReservationSlotModel`, `SlotRepository`·`SQLAlchemySlotRepository` | 슬롯 표와 저장소. `restaurants` 표가 없어 FK는 아직 못 묶음 |
+| #25 | 1 강성수 | 회원가입 API `POST /api/v1/users`, `container.wire_dependencies(app)` | 회원가입 창구. `main.py` 연결은 주석이라 지금은 500 |
 
-### 올라갈 PR 2개 (담당 5 최지훈, 2026-11-05 기준 브랜치에 푸시됨)
-
-| PR (브랜치) | 들어갈 것 | 쉽게 말하면 |
-| --- | --- | --- |
-| ① 내 API + 문서 (`feat/owner-reservation-queries`) | 운영자 창고 `owner/infrastructure/query_repository.py`(`list_restaurants`·`get_restaurant`·`list_reservations`, 날짜 필터는 `seoul_day_range`), owner 3파일을 `get_authenticated_user`·`AuthenticatedUser`로 맞춤 · `GET /users/me/reservations`(상태 필터, 이용 시각 최신순) · `GET /reservations/{reservation_id}`(본인·그 식당 운영자만, 나머지 404) · `reservation/` `query_repository.py`·`query_service.py`·`presentation/query_router.py`, `container.py`의 `create_reservation_query_service` · 이 문서 갱신 | 운영자 API와 내 예약 API 4개 완성. dev의 `require_owner` import 오류도 여기서 고침. `main.py` 등록은 부품이 들어온 뒤 |
-| ② 화면 (`feat/web-pages`) | Jinja2 화면 틀: `web.py`(`/ui`), `web_data.py`, `templates/`, `static/`, `pyproject.toml`(jinja2), `main.py`(`register_web`) | 운영자 화면 3개. 공용 파일을 고쳐서 따로 리뷰. 데이터 연결은 인증 구현 뒤 |
-
-dev 테스트는 42개 모두 통과합니다. 아직 **앱을 켜서 API를 눌러 볼 수는 없습니다** (테이블과 시드가 없음).
+dev 테스트는 48개 모두 통과합니다. 앱은 켜지지만 등록된 API는 `POST /api/v1/auth/login`(본문 없음)과 `POST /api/v1/users`(의존성 연결 전이라 500) 두 개뿐이라, **아직 API를 실제로 눌러 볼 수는 없습니다** (로그인·테이블·시드가 없음).
 
 **사용자 id가 UUID로 바뀌었습니다 (#8).** 사용자 id를 받는 곳(`reservations.user_id`, `restaurants.owner_id`, `Reservation.user_id`, `ReservationOut.user_id`, `is_owned_by`)은 `int`가 아니라 `uuid.UUID`로 맞춥니다. 예약 쪽은 #15에서 맞췄고, 식당 쪽(`owner_id`, `is_owned_by`)이 남았습니다. 나머지 테이블 id는 BIGINT 그대로입니다.
 
@@ -196,16 +199,17 @@ dev 테스트는 42개 모두 통과합니다. 아직 **앱을 켜서 API를 눌
 
 ### 다음에 할 일 (이 순서대로)
 
-앞 단계 부품이 있어야 뒤 단계가 돌아갑니다. 그래서 위에서부터 채웁니다. 자세한 부품 표는 [BACKEND_PLAN 2장](docs/BACKEND_PLAN.md#공용-부품-현재-상태-2026-11-05-dev-기준)에 있습니다.
+앞 단계 부품이 있어야 뒤 단계가 돌아갑니다. 그래서 위에서부터 채웁니다. 자세한 부품 표는 [BACKEND_PLAN 2장](docs/BACKEND_PLAN.md#공용-부품-현재-상태-2026-11-06-dev-aa03231-기준)에 있습니다.
 
 **3-1 모두가 기다리는 공용 부품** — 이게 없으면 다른 사람 코드가 빨간 줄입니다.
 
 | 할 일 | 담당 | 누가 기다리나 |
 | --- | --- | --- |
 | ~~`AppError` + 예외 핸들러~~ | 1 | **완료 (#8).** 슬롯 예외도 `error_code`를 붙여 409로 나감 (#10) |
-| `Page[T]` 목록 응답 (`items`·`page`·`page_size`·`total`) | 2 | 2 · 5 (목록 API 4개) |
+| ~~`Page[T]` 목록 응답 (`items`·`page`·`page_size`·`total`)~~ | 2 | **완료 (#21)** |
 | `get_authenticated_user` 실제 구현 (토큰 → `AuthenticatedUser`). 자리는 #14에 있음 (`NotImplementedError`) | 1 | 2 · 4 · 5 (로그인이 필요한 API 전부) |
 | 사용자 id `int` → `uuid.UUID` 맞추기 | 2 | 2 (`owner_id`). 4(`user_id`)는 **완료 (#15)** |
+| 의존성 연결: `main.py`의 `wire_dependencies(app)` 주석 풀기 | 1 | 회원가입·운영자·내 예약 API 전부. `container.py`가 import하는 `reservation.infrastructure.repository`(4)와 식당 부품(2)이 먼저 있어야 함 |
 
 **3-2 테이블과 시드** — 이게 있어야 앱을 켜고 실제로 눌러 볼 수 있습니다.
 
@@ -213,7 +217,7 @@ dev 테스트는 42개 모두 통과합니다. 아직 **앱을 켜서 API를 눌
 | --- | --- |
 | ~~`UserModel`~~ **완료 (#14)**, `TokenBlacklistModel` | 1 |
 | `RestaurantModel`, `MenuModel` | 2 |
-| `ReservationSlotModel` (`reservation_slots` 표) | 3 |
+| ~~`ReservationSlotModel` (`reservation_slots` 표)~~ | 3 · **완료 (#24)**, `SlotRepository`도 있음 |
 | lifespan 테이블 자동 생성 + 시드 (고객 2 · 운영자 2 · 식당 3 · 메뉴 9 · 슬롯 12개 이상) | 3 (각자 자기 표의 시드 행을 넘겨줌) |
 
 **3-3 도메인 규칙** — DB 없이 테스트할 수 있어서 위와 같이 진행해도 됩니다.
@@ -222,17 +226,17 @@ dev 테스트는 42개 모두 통과합니다. 아직 **앱을 켜서 API를 눌
 | --- | --- |
 | ~~`TimeSlot.can_accept` · `reserve` · `release`~~ | 3 · **완료 (#6)** |
 | `Restaurant.is_owned_by` (내 식당인가) | 2 |
-| `Reservation.can_cancel` · ~~`cancel`~~ (**완료 #15**, 재취소 409) | 4 |
+| ~~`Reservation.can_cancel`~~ (**완료 #23**) · ~~`cancel`~~ (**완료 #15**, 재취소 409) | 4 |
 
 **4 기능 연결 (API)** — 위 부품이 들어오는 대로 각자 붙입니다.
 
 | 담당 | 순서 |
 | --- | --- |
-| 1 | 로그인 → 내 정보 `/users/me` → 로그아웃(블랙리스트) |
+| 1 | 로그인 → 내 정보 `/users/me` → 로그아웃(블랙리스트). 선택 과제 회원가입 `POST /users`는 코드 완료 (#18·#25, 연결 전) |
 | 2 | 식당 상세 → 식당 목록(검색·필터·정렬) → 식당 정보 수정 |
 | 3 | 예약 가능 시간 조회 |
 | 4 | 예약 생성(행 락) → 예약 취소 |
-| 5 | 운영자 식당 목록(#7) → 운영자 식당 예약 목록(#7 창구·매니저, 창고는 ① PR) → 내 예약 목록 → 예약 상세 (둘 다 ① PR `feat/owner-reservation-queries`, 코드 완료) → Jinja2 화면(`feat/web-pages`, 운영자 화면 틀 완료 · 식당 목록·상세는 식당 부품 뒤) |
+| 5 | 운영자 식당 목록(#7) → 운영자 식당 예약 목록(#7 창구·매니저, 창고 #16) → 내 예약 목록 → 예약 상세 (둘 다 #16, 코드 완료) → Jinja2 화면(#17·#20, 운영자 화면 틀 완료 · 식당 목록·상세는 식당 부품 뒤) |
 
 **5 동작 확인** — `/docs`에서 한 번에 이어서 눌러 봅니다. 고객 A 로그인 → 식당 목록 → 상세 → 예약 가능 조회 → 예약 → 내 예약 → 취소 → 로그아웃 → 같은 토큰 401 / 운영자 A 로그인 → 내 식당 → 그 식당 예약 → 운영자 B 식당 예약 403. 각자 테스트 2개(정상 1 · 실패 1).
 
