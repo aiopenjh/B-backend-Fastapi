@@ -1,15 +1,13 @@
 # [담당3-영민] SQLAlchemy 구현체 - ORM 모델
 from datetime import datetime
 
-from sqlalchemy import column, select, table
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from restaurant.infrastructure.repository import RestaurantRepository
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
 from slot.infrastructure.models import ReservationSlotModel
-
-# [담당2-김태양] restaurant.application 조회 함수 생기면 아래 줄 삭제
-_restaurants = table("restaurants", column("id"), column("deleted_at"))
 
 
 # 외부 사용 중 — owner·reservation query_repository (#27). 이름·인자 바꾸면 담당 5와 함께
@@ -58,9 +56,7 @@ class SQLAlchemySlotRepository(SlotRepository):
         await self.session.flush()
 
     async def restaurant_exists(self, restaurant_id: int) -> bool:
-        """ 현재, 임시. 식당 모듈 조회 기능으로 대체 [담당2-김태양]"""
-        stmt = select(_restaurants.c.id).where(
-            _restaurants.c.id == restaurant_id,
-            _restaurants.c.deleted_at.is_(None),
-        )
-        return (await self.session.execute(stmt)).first() is not None
+        """[담당2-김태양] RestaurantRepository에 위임"""
+        return await RestaurantRepository(self.session).find_by_id(restaurant_id) is not None
+        # RestaurantRepository(self.session)은 식당 모델을 조회하는 메서드를 가지고 있음
+        # find_by_id(restaurant_id)는 식당 모델을 조회하는 메서드
