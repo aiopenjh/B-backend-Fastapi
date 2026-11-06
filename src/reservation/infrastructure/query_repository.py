@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from reservation.domain.reservation import Reservation, ReservationStatus  # 담당 4: 예약
 from reservation.infrastructure.models import ReservationModel  # 담당 4: 예약 표(DB)
 from reservation.infrastructure.repositories import to_reservation # 담당4 표->예약
-from slot.infrastructure.repository import to_time_slot # 담당3: 표->슬롯
+from slot.infrastructure.repositories import _to_domain # 담당3: 표->슬롯
 from slot.domain.time_slot import TimeSlot  # 담당 3: 슬롯
-from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB) (아직 없음)
+from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB)
 from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB) (아직 없음)
 
 
@@ -37,7 +37,7 @@ class ReservationQueryRepository:
             .limit(limit)
         )
 
-        return [(to_reservation(r), to_time_slot(s)) for r, s in rows], total or 0
+        return [(to_reservation(r), _to_domain(s)) for r, s in rows], total or 0
 
     # 5단계: 예약 하나 + 슬롯 + 그 식당 주인 번호
     async def get_reservation(self, reservation_id: int) -> tuple[Reservation, TimeSlot, uuid.UUID] | None:
@@ -53,4 +53,4 @@ class ReservationQueryRepository:
             return None
 
         r, s, owner_id = row
-        return to_reservation(r), to_time_slot(s), owner_id
+        return to_reservation(r), _to_domain(s), owner_id

@@ -13,8 +13,8 @@ from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당
 from restaurant.infrastructure.repository import to_restaurant  # 담당 2: 표 → 식당
 from slot.domain.day_range import seoul_day_range  # 담당 3: 서울 기준 하루 범위
 from slot.domain.time_slot import TimeSlot  # 담당 3: 슬롯
-from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB) (아직 없음)
-from slot.infrastructure.repository import to_time_slot  # 담당 3: 표 → 슬롯 (아직 없음)
+from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB)
+from slot.infrastructure.repositories import _to_domain  # 담당 3: 표 → 슬롯
 
 
 class OwnerQueryRepository:
@@ -61,4 +61,4 @@ class OwnerQueryRepository:
             .offset(offset)
             .limit(limit)
         )
-        return [(to_reservation(r), to_time_slot(s)) for r, s in rows], total or 0
+        return [(to_reservation(r), _to_domain(s)) for r, s in rows], total or 0
