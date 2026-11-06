@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from reservation.domain.reservation import Reservation  # 담당 4: 예약
 from reservation.infrastructure.models import ReservationModel  # 담당 4: 예약 표(DB)
-from reservation.infrastructure.repository import to_reservation  # 담당 4: 표 → 예약 (아직 없음)
+from reservation.infrastructure.repositories import to_reservation  # 담당 4: 표 → 예약 (아직 없음)
 from restaurant.domain.restaurant import Restaurant  # 담당 2: 식당
 from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB)
 from restaurant.infrastructure.repository import to_restaurant  # 담당 2: 표 → 식당

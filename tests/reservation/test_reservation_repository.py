@@ -3,7 +3,7 @@ from datetime import datetime, UTC
 
 from reservation.domain.reservation import Reservation, ReservationStatus
 from reservation.infrastructure.models import ReservationModel
-from reservation.infrastructure.repository import to_reservation
+from reservation.infrastructure.repositories import to_reservation
 
 CREATE_AT_NOW = datetime(2026, 10, 3, 6, 0, tzinfo=UTC)
 UPDATE_AT_NOW = datetime(2026, 11, 3, 6, 0, tzinfo=UTC)

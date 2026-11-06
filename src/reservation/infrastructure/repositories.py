@@ -9,7 +9,7 @@ from reservation.domain.reservation import Reservation, ReservationStatus
 from reservation.infrastructure.models import ReservationModel
 
 
-def to_reservation(model):
+def to_reservation(model: ReservationModel) -> Reservation:
     return Reservation(
         id=model.id,
         user_id=model.user_id,
