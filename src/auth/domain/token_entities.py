@@ -11,7 +11,8 @@ class TokenPayload:
     exp: datetime
 
 
-@dataclass
+@dataclass(frozen=True)
 class BlackListToken:
     jti: str
+    user_id: uuid.UUID
     expired_at: datetime

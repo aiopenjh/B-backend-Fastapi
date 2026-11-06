@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+from auth.domain.token_entities import BlackListToken
+
 
 class TokenBlackListRepository(ABC):
 
     @abstractmethod
-    async def add(self, jti: str, expired_at: datetime) -> None:
+    async def add(self, token: BlackListToken) -> None:
         """블랙리스트 토큰 식별자 등록"""
         pass
 
