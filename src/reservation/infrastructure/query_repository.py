@@ -10,7 +10,7 @@ from reservation.infrastructure.repositories import to_reservation # 담당4 표
 from slot.infrastructure.repositories import _to_domain # 담당3: 표->슬롯
 from slot.domain.time_slot import TimeSlot  # 담당 3: 슬롯
 from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB)
-from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB) (아직 없음)
+from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB)
 
 
 class ReservationQueryRepository:

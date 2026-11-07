@@ -31,4 +31,15 @@ class OwnerService:
 
         # 3. 창고에 예약 목록 시키기
         return await self.query.list_reservations(restaurant_id, day, page.offset, page.page_size)
-        
+
+    async def export_restaurant_reservations(
+        self, owner: AuthenticatedUser, restaurant_id: int, day: date | None
+    ):
+        restaurant = await self.query.get_restaurant(restaurant_id)
+        if restaurant is None:
+            raise NotFoundError()       # 404
+
+        if not restaurant.is_owned_by(owner.user_id):
+            raise ForbiddenError()      # 403
+
+        return await self.query.list_all_reservations(restaurant_id, day)

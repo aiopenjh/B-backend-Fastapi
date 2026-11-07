@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 
 from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
 from auth.presentation.dependencies import get_authenticated_user  # 담당 1: 로그인 문지기
-from common.pagination import Page, PageParams, page_params  # 담당 2: 페이지 (아직 없음)
+from common.pagination import Page, PageParams, page_params  # 담당 2: 페이지
 from common.schemas import APIResponse  # 담당 1: 응답 봉투
 from container import create_reservation_query_service  # 담당 5: 매니저 공장 (곧 만듦)
 from reservation.application.query_service import ReservationQueryService  # 담당 5: 매니저
