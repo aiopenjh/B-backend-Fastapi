@@ -10,6 +10,16 @@ class ReservationErrorCode(ErrorCode):
     ALREADY_CANCELLED = (
         HTTPStatus.CONFLICT, "이미 취소된 예약입니다."
     )
+    CANCELLATION_NOT_ALLOWED = (
+        HTTPStatus.CONFLICT, "예약 시간이 시작되어 취소할 수 없습니다."
+    )
+
+
 class AlreadyCancelledError(AppError):
     """이미 취소된 예약을 또 취소하려 할 때 낸다. 공통 핸들러가 409 응답으로 바꾼다."""
     error_code = ReservationErrorCode.ALREADY_CANCELLED
+
+
+class CancellationNotAllowedError(AppError):
+    """슬롯 시작 시각이 지난 예약을 취소하려 할 때 낸다. 공통 핸들러가 409 응답으로 바꾼다."""
+    error_code = ReservationErrorCode.CANCELLATION_NOT_ALLOWED
