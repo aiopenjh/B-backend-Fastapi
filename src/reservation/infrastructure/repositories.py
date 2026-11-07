@@ -10,6 +10,7 @@ from reservation.infrastructure.models import ReservationModel
 
 
 def to_reservation(model: ReservationModel) -> Reservation:
+    """DB 표 한 줄(ReservationModel) -> 도메인 Reservation. 상태값 문자열은 ReservationStatus로 바꾼다."""
     return Reservation(
         id=model.id,
         user_id=model.user_id,
@@ -23,6 +24,7 @@ def to_reservation(model: ReservationModel) -> Reservation:
 
 
 class SQLAlchemyReservationRepository(ReservationRepository):
+    """ReservationRepository 약속을 SQLAlchemy로 구현. 세션은 밖(서비스)에서 받아 쓴다."""
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
@@ -32,7 +34,7 @@ class SQLAlchemyReservationRepository(ReservationRepository):
             .where(
                 ReservationModel.user_id == user_id,
                 ReservationModel.slot_id == slot_id,
-                ReservationModel.status == ReservationStatus.CONFIRMED.value,
+                ReservationModel.status == ReservationStatus.CONFIRMED.value, # DB에는 문자열이라 .value로 비교
             )
             .limit(1)
         )
@@ -50,6 +52,7 @@ class SQLAlchemyReservationRepository(ReservationRepository):
             cancelled_at=reservation.cancelled_at,
         )
         self.session.add(model)
+        # DB에 보내서 id를 받아 온다. 확정(commit)은 서비스가 한다.
         await self.session.flush()
         return to_reservation(model)
 
@@ -62,16 +65,16 @@ class SQLAlchemyReservationRepository(ReservationRepository):
         stmt = (
             select(ReservationModel)
             .where(ReservationModel.id == reservation_id)
-            .with_for_update()
-            .execution_options(populate_existing=True)
+            .with_for_update() # 행 자물쇠. 앞 요청이 commit/rollback할 때까지 기다림 (두 번 취소 막기)
+            .execution_options(populate_existing=True) # 세션에 옛 값이 있어도 방금 읽은 값으로 덮어씀
         )
         model = (await self.session.execute(stmt)).scalar_one_or_none()
         return to_reservation(model) if model else None
 
     async def save(self, reservation: Reservation) -> None:
-        model = await self.session.get(ReservationModel, reservation.id)
+        model = await self.session.get(ReservationModel, reservation.id) # get_for_update로 읽은 그 행을 세션에서 다시 꺼냄 (DB에 새로 묻지 않음)
         if model is None:
             raise LookupError(f"reservation {reservation.id} not loaded in this session")
         model.status = reservation.status.value
         model.cancelled_at = reservation.cancelled_at
-        await self.session.flush()
+        await self.session.flush() # 바뀐 값을 DB에 보냄. 확정(commit)은 서비스가 한다.

@@ -1,10 +1,11 @@
-# [담당 4] 예약 창고 메뉴판 : 서비스가 부를 수 있는 함수 목록
+# [담당 4] 예약 창고 메뉴판 : 예약을 저장하고 꺼내는 기능의 약속(인터페이스)
 import uuid
 from abc import ABC, abstractmethod
 
 from reservation.domain.reservation import Reservation
 
 class ReservationRepository(ABC):
+    """예약 저장소 약속. 서비스는 이것만 보고, 실제 DB구현은 infrastructure의 SQLAlchemyReservationRepository."""
 
     @abstractmethod
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
