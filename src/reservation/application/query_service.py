@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
 from common.errors import NotFoundError  # 담당 2: 404 오류
-from common.pagination import PageParams  # 담당 2: 페이지 정보 (아직 없음)
+from common.pagination import PageParams  # 담당 2: 페이지 정보
 from reservation.domain.reservation import ReservationStatus  # 담당 4: 예약 상태
 from reservation.infrastructure.query_repository import ReservationQueryRepository  # 담당 5: 창고
 
