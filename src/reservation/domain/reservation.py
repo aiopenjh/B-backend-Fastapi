@@ -1,4 +1,4 @@
-# [담당 4] 예약 도메인 : 예약 상태와 취소 규칙
+# [담당 4] 예약 도메인 : 예약 규칙 (생성, 취소, 취소 가능 여부)
 import uuid
 from enum import StrEnum
 from dataclasses import dataclass
@@ -8,11 +8,13 @@ from typing import Self
 from reservation.domain.exceptions import AlreadyCancelledError
 
 class ReservationStatus(StrEnum):
+    """예약 상태. 확정과 취소 두가지이고, DB에는 문자열로 저장한다."""
     CONFIRMED = "CONFIRMED"
     CANCELLED = "CANCELLED" 
 
 @dataclass
 class Reservation:
+    """예약 한 건. 누가(user_id) 어느 슬롯(slot_id)을 몇 명(party_size)으로 예약했는지와 상태를 가진다."""
     user_id: uuid.UUID
     slot_id: int
     party_size: int
@@ -31,7 +33,7 @@ class Reservation:
         now: datetime,
         contact_phone: str | None = None,
     ) -> Self:
-        # 새 예약은 항상 확정(CONFIRMED)으로 시작한다.
+        """새 예약을 만든다. 대기 상태 없이 항상 확정(CONFIRMED)으로 시작한다."""
         return cls(
             user_id=user_id,
             slot_id=slot_id,
@@ -42,13 +44,16 @@ class Reservation:
         )
     
     def cancel(self, now: datetime) -> None:
+        """예약을 취소 상태로 바꾸고 취소 시각을 남긴다. 이미 취소된 예약이면 AlreadyCancelledError."""
         if self.status is ReservationStatus.CANCELLED:
             raise AlreadyCancelledError()
         self.status = ReservationStatus.CANCELLED
         self.cancelled_at = now
 
-    def can_cancel(self, user_id: uuid.UUID) -> bool:
+    def can_cancel(self, user_id: uuid.UUID, slot_starts_at: datetime, now: datetime) -> bool:
+        """취소할 수 있는지 확인만 한다 (상태는 바꾸지 않음). 예약자 본인이고 확정 상태이고, 슬롯 시작 전이면 True."""
         return (
             self.user_id == user_id
             and self.status is ReservationStatus.CONFIRMED
+            and now < slot_starts_at
         )
