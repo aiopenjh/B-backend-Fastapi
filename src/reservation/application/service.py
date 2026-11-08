@@ -3,12 +3,12 @@ import uuid
 from datetime import datetime
 
 from common.errors import NotFoundError
+from common.unit_of_work import ConflictError, UnitOfWork
 from reservation.domain.exceptions import DuplicateReservationError
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
-from common.unit_of_work import ConflictError, UnitOfWork
 
 
 class ReservationService:
@@ -53,15 +53,15 @@ class ReservationService:
             now=now,
             contact_phone=contact_phone,
         )
-        saved = await self.reservation_repo.add(reservation)
+        try:
+            saved = await self.reservation_repo.add(reservation)
+        except ConflictError:
+            # 2번 확인을 지나친 중복을 DB 규칙(확정 예약은 사람·슬롯당 하나)이 막은 경우. DB는 저장(add)하는 순간 검사한다
+            raise DuplicateReservationError()
         await self.slot_repo.save(slot)
 
         # 5. 맨 끝에 한 번만 확정한다. 슬롯 잠금도 여기서 풀린다.
-        try:
-            await self.uow.commit()
-        except ConflictError:
-            # 2번 확인을 지나친 중복을 DB 규칙(확정 예약은 사람, 슬롯당 하나)이 막은 경우
-            raise DuplicateReservationError()
+        await self.uow.commit()
         return saved, slot
 
     async def cancel(

@@ -24,6 +24,7 @@ class InMemoryReservationRepository(ReservationRepository):
     def __init__(self, lock_log: list[str]) -> None:
         self.reservations: list[Reservation] = []
         self.lock_log = lock_log # 잠근 순서를 적는 기록장 (슬롯 저장소와 같이 씀)
+        self.conflict = False # True면 DB 규칙(확정 예약은 사람, 슬롯당 하나)이 막은 상황을 흉내 낸다.
 
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
         return any(
@@ -34,6 +35,8 @@ class InMemoryReservationRepository(ReservationRepository):
         )
 
     async def add(self, reservation: Reservation) -> Reservation:
+        if self.conflict:
+            raise ConflictError() # 진짜 어댑터가 flush에서 난 IntegrityError를 번역해 던지는 것과 같은 에러
         reservation.id = len(self.reservations) + 1 # DB가 번호를 붙여주는 흉내
         self.reservations.append(reservation)
         return reservation
@@ -72,15 +75,12 @@ class InMemorySlotRepository(SlotRepository):
 
 
 class FakeUnitOfWork(UnitOfWork):
-    """commit이 몇 번 불렸는지 세는 가짜 도장 담당. conflict=True면 DB가 막은 상황을 흉내 낸다."""
+    """commit이 몇 번 불렸는지 세는 가짜 도장 담당"""
 
-    def __init__(self, conflict: bool = False) -> None:
+    def __init__(self) -> None:
         self.commits = 0
-        self.conflict = conflict
 
     async def commit(self) -> None:
-        if self.conflict:
-            raise ConflictError() # 진짜 어뎁터가 IntergrityError를 번역해서 던지는 것과 같은 에러
         self.commits += 1
 
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
@@ -255,18 +255,14 @@ async def test_cancel_locks_slot_before_reservation(service, lock_log):
 
     assert lock_log == ["slot", "reservation"]
 
-async def test_create_db_conflict_raises_duplicate(reservation_repo, slot, lock_log):
-    # 서비스가 중복 확인을 지나쳤어도 DB 규칙이 막으면(ConflictError), 409 중복 예약 에러로 바꿔 준다.
-    uow = FakeUnitOfWork(conflict=True)
-    service = ReservationService(
-        reservation_repo=reservation_repo,
-        slot_repo=InMemorySlotRepository([slot], lock_log),
-        uow=uow,
-    )
+async def test_create_db_conflict_raises_duplicate(service, reservation_repo, uow):
+    # 서비스가 중복 확인을 지나쳤어도, 저장(add)할 때 DB 규칙이 막으면(ConflictError) 409 중복 예약 에러로 바꿔 준다.
+    reservation_repo.conflict = True
 
     with pytest.raises(DuplicateReservationError):
         await service.create(
             user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
         )
 
+    assert reservation_repo.reservations == []
     assert uow.commits == 0

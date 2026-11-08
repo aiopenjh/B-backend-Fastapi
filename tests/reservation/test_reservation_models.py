@@ -15,4 +15,4 @@ def test_confirmed_reservation_is_uniqu_per_user_and_slot():
 
     assert index.unique  is True
     assert "(user_id, slot_id)" in sql
-    assert "WHERE status = 'CONFIRMED" in sql
+    assert "WHERE status = 'CONFIRMED'" in sql

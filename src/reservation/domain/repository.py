@@ -14,7 +14,7 @@ class ReservationRepository(ABC):
 
     @abstractmethod
     async def add(self, reservation: Reservation) -> Reservation:
-        """예약 생성 : 새 예약을 넣고, DB가 정한 id가 채워진 예약을 돌려줌"""
+        """예약 생성 : 새 예약을 넣고, DB가 정한 id가 채워진 예약을 돌려줌. 같은 사람·슬롯의 확정 예약이 이미 있으면 ConflictError"""
         pass
     
     @abstractmethod
