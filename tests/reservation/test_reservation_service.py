@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime
 
 from common.schemas import SEOUL
-from common.unit_of_work import UnitOfWork
+from common.unit_of_work import ConflictError, UnitOfWork
 from common.errors import NotFoundError
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
@@ -72,12 +72,15 @@ class InMemorySlotRepository(SlotRepository):
 
 
 class FakeUnitOfWork(UnitOfWork):
-    """commit이 몇 번 불렸는지 세는 가짜 도장 담당"""
+    """commit이 몇 번 불렸는지 세는 가짜 도장 담당. conflict=True면 DB가 막은 상황을 흉내 낸다."""
 
-    def __init__(self) -> None:
+    def __init__(self, conflict: bool = False) -> None:
         self.commits = 0
+        self.conflict = conflict
 
     async def commit(self) -> None:
+        if self.conflict:
+            raise ConflictError() # 진짜 어뎁터가 IntergrityError를 번역해서 던지는 것과 같은 에러
         self.commits += 1
 
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
@@ -251,3 +254,19 @@ async def test_cancel_locks_slot_before_reservation(service, lock_log):
     await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
 
     assert lock_log == ["slot", "reservation"]
+
+async def test_create_db_conflict_raises_duplicate(reservation_repo, slot, lock_log):
+    # 서비스가 중복 확인을 지나쳤어도 DB 규칙이 막으면(ConflictError), 409 중복 예약 에러로 바꿔 준다.
+    uow = FakeUnitOfWork(conflict=True)
+    service = ReservationService(
+        reservation_repo=reservation_repo,
+        slot_repo=InMemorySlotRepository([slot], lock_log),
+        uow=uow,
+    )
+
+    with pytest.raises(DuplicateReservationError):
+        await service.create(
+            user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+        )
+
+    assert uow.commits == 0

@@ -8,7 +8,7 @@ from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
-from common.unit_of_work import UnitOfWork
+from common.unit_of_work import ConflictError, UnitOfWork
 
 
 class ReservationService:
@@ -57,7 +57,11 @@ class ReservationService:
         await self.slot_repo.save(slot)
 
         # 5. 맨 끝에 한 번만 확정한다. 슬롯 잠금도 여기서 풀린다.
-        await self.uow.commit()
+        try:
+            await self.uow.commit()
+        except ConflictError:
+            # 2번 확인을 지나친 중복을 DB 규칙(확정 예약은 사람, 슬롯당 하나)이 막은 경우
+            raise DuplicateReservationError()
         return saved, slot
 
     async def cancel(
