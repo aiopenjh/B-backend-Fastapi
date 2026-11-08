@@ -21,8 +21,9 @@ from slot.domain.exceptions import SlotSoldOut
 class InMemoryReservationRepository(ReservationRepository):
     """DB 대신 리스트에 예약을 보관하는 가짜 저장소"""
 
-    def __init__(self) -> None:
+    def __init__(self, lock_log: list[str]) -> None:
         self.reservations: list[Reservation] = []
+        self.lock_log = lock_log # 잠근 순서를 적는 기록장 (슬롯 저장소와 같이 씀)
 
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
         return any(
@@ -41,6 +42,8 @@ class InMemoryReservationRepository(ReservationRepository):
         return next((r for r in self.reservations if r.id == reservation_id), None)
 
     async def get_for_update(self, reservation_id: int) -> Reservation | None:
+        self.lock_log.append("reservation") # 진짜로 잠그진 않고, 잠근 순서만 기록
+
         return await self.get(reservation_id) # 메모리에는 잠글 게 없어서 그냥 꺼냄
 
     async def save(self, reservation: Reservation) -> None:
@@ -50,10 +53,12 @@ class InMemoryReservationRepository(ReservationRepository):
 class InMemorySlotRepository(SlotRepository):
     """DB 대신 리스트에 슬롯을 보관하는 가짜 저장소"""
 
-    def __init__(self, slots: list[TimeSlot]) -> None:
+    def __init__(self, slots: list[TimeSlot], lock_log: list[str]) -> None:
         self.slots = slots
+        self.lock_log = lock_log # 잠근 순서를 적는 기록장 (예약 저장소와 같이 씀)
 
     async def get_for_update(self, slot_id: int) -> TimeSlot | None:
+        self.lock_log.append("slot") # 진짜로 잠그진 않고, 잠근 순서만 기록
         return next((s for s in self.slots if s.id == slot_id), None) # 메모리에는 잠글 게 없어서 그냥 꺼냄
 
     async def save(self, slot: TimeSlot) -> None:
@@ -95,18 +100,22 @@ def slot() -> TimeSlot:
     )
 
 @pytest.fixture
-def reservation_repo() -> InMemoryReservationRepository:
-    return InMemoryReservationRepository()
+def lock_log() -> list[str]:
+    return [] # 두 가짜 저장소가 같이 쓰는 잠금 기록장
+
+@pytest.fixture
+def reservation_repo(lock_log) -> InMemoryReservationRepository:
+    return InMemoryReservationRepository(lock_log)
 
 @pytest.fixture
 def uow() -> FakeUnitOfWork:
     return FakeUnitOfWork()
 
 @pytest.fixture
-def service(reservation_repo, slot, uow) -> ReservationService:
+def service(reservation_repo, slot, uow, lock_log) -> ReservationService:
     return ReservationService(
         reservation_repo=reservation_repo,
-        slot_repo=InMemorySlotRepository([slot]),
+        slot_repo=InMemorySlotRepository([slot], lock_log),
         uow=uow,
     )
 
@@ -223,3 +232,22 @@ async def test_cancel_after_slot_started_raises_not_allowed(service, slot, uow):
     assert created.status is ReservationStatus.CONFIRMED
     assert slot.reserved_guests == 4
     assert uow.commits == 1
+
+async def test_create_locks_slot(service, lock_log):
+    # 예약을 만들 때는 슬롯만 잠근다. (예약은 아직 없으니까)
+    await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    assert lock_log == ["slot"]
+
+async def test_cancel_locks_slot_before_reservation(service, lock_log):
+    # 취소할 때는 생성과 같은 순서(슬롯 -> 예약)로 잡는다. 순서가 다르면 데드락이 생길 수 있다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    lock_log.clear() # 생성 때 적힌 기록은 지우고, 취소 때 기록만 본다
+
+    await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
+
+    assert lock_log == ["slot", "reservation"]
