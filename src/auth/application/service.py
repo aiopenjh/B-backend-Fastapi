@@ -13,7 +13,7 @@ from user.domain.value_object import Email
 
 
 @dataclass(frozen=True)
-class IssueToken:
+class IssuedToken:
     """로그인 결과, 라우터가 OAuth2 응답으로 바꾼다"""
 
     access_token: str
@@ -33,7 +33,7 @@ class AuthService:
         self.token_provider = token_provider
         self.blacklist_repo = blacklist_repo
 
-    async def login(self, email: str, password: str) -> IssueToken:
+    async def login(self, email: str, password: str) -> IssuedToken:
         try:
             user_email = Email(value=email)
         except InvalidInputError:
@@ -54,7 +54,7 @@ class AuthService:
             user_id=user.id
         )
 
-        return IssueToken(access_token=token, expires_in=expires_in)
+        return IssuedToken(access_token=token, expires_in=expires_in)
 
     async def authenticate(self, token: str) -> AuthenticatedUser:
         # 서명 만료 / 실패하면 401 에러
