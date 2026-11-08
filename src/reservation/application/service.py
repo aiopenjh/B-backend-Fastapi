@@ -59,3 +59,35 @@ class ReservationService:
         # 5. 맨 끝에 한 번만 확정한다. 슬롯 잠금도 여기서 풀린다.
         await self.uow.commit()
         return saved, slot
+
+    async def cancel(
+        self,
+        user_id: uuid.UUID,
+        reservation_id: int,
+        now: datetime,
+    ) -> tuple[Reservation, TimeSlot]:
+        """예약을 취소한다. 확인 -> 슬롯 잠금 -> 예약 잠금 -> 취소 -> 자리 반납 -> 저장 -> commit (한 묶음)"""
+        # 1. 잠그기 전에 먼저 꺼내서, 어느 슬롯인지 알아내고 내 예약인지 확인한다. 아니면 404
+        found = await self.reservation_repo.get(reservation_id)
+        if found is None or found.user_id != user_id:
+            raise NotFoundError()
+
+        # 2. 생성과 같은 순서로 잠근다: 슬롯 -> 예약 (순서가 같아야 데드락이 안 생긴다.)
+        slot = await self.slot_repo.get_for_update(found.slot_id)
+        if slot is None:
+            raise NotFoundError()
+        reservation = await self.reservation_repo.get_for_update(reservation_id)
+        if reservation is None:
+            raise NotFoundError()
+
+        # 3. 잠근 뒤 읽은 최신 상태로 취소한다. 이미 취소됨, 시작됨이면 도메인이 409 에러를 낸다.
+        reservation.cancel(slot_starts_at=slot.starts_at, now=now)
+
+        # 4. 자리를 반납하고, 바뀐 예약과 슬롯을 저장한다.
+        slot.release(reservation.party_size)
+        await self.reservation_repo.save(reservation)
+        await self.slot_repo.save(slot)
+
+        # 5. 맨 끝에 한 번만 확정한다. 두 잠금도 여기서 풀린다.
+        await self.uow.commit()
+        return reservation, slot

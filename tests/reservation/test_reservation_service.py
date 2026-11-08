@@ -6,7 +6,11 @@ from datetime import datetime
 from common.schemas import SEOUL
 from common.unit_of_work import UnitOfWork
 from common.errors import NotFoundError
-from reservation.domain.exceptions import DuplicateReservationError
+from reservation.domain.exceptions import (
+    AlreadyCancelledError,
+    CancellationNotAllowedError,
+    DuplicateReservationError,
+)
 from reservation.application.service import ReservationService
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation, ReservationStatus
@@ -72,6 +76,7 @@ class FakeUnitOfWork(UnitOfWork):
         self.commits += 1
 
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
+OTHER_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000002")
 NOW = datetime(2026, 12, 3, 17, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2026, 12, 3, 18, 0, tzinfo=SEOUL)
 ENDS_AT = datetime(2026, 12, 3, 19, 0, tzinfo=SEOUL)
@@ -156,3 +161,65 @@ async def test_create_sold_out_raises_and_keeps_seats(service, reservation_repo,
     assert reservation_repo.reservations == []
     assert slot.reserved_guests == 9
     assert uow.commits == 0
+
+async def test_cancel_releases_seats_and_commits(service, slot, uow):
+    # 내 예약을 취소하면 취소 상태가 되고, 자리가 반납되고, 한 번 더 확정한다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    cancelled, returned_slot = await service.cancel(
+        user_id=USER_ID, reservation_id=created.id, now=NOW
+    )
+
+    assert cancelled.status is ReservationStatus.CANCELLED
+    assert cancelled.cancelled_at == NOW
+    assert returned_slot is slot
+    assert slot.reserved_guests == 2
+    assert uow.commits == 2
+
+async def test_cancel_unknown_reservation_raises_not_found(service, uow):
+    # 없는 예약 번호를 취소하면 404가 나고 확정하지 않는다.
+    with pytest.raises(NotFoundError):
+        await service.cancel(user_id=USER_ID, reservation_id=999, now=NOW)
+
+    assert uow.commits == 0
+
+async def test_cancel_other_users_reservation_raises_not_found(service, slot, uow):
+    # 남의 예약을 취소하려 하면 있는지조차 숨기려고 404가 나고, 예약과 자리는 그대로다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    with pytest.raises(NotFoundError):
+        await service.cancel(user_id=OTHER_USER_ID, reservation_id=created.id, now=NOW)
+
+    assert created.status is ReservationStatus.CONFIRMED
+    assert slot.reserved_guests == 4
+    assert uow.commits == 1
+
+async def test_cancel_twice_raises_already_cancelled(service, slot, uow):
+    # 두 번 취소하면 두 번째는 409가 나고, 자리를 또 반납하지 않는다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
+
+    with pytest.raises(AlreadyCancelledError):
+        await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
+
+    assert slot.reserved_guests == 2
+    assert uow.commits == 2
+
+async def test_cancel_after_slot_started_raises_not_allowed(service, slot, uow):
+    # 슬롯이 시작된 뒤에 취소하면 409가 나고, 예약과 자리는 그대로다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    with pytest.raises(CancellationNotAllowedError):
+        await service.cancel(user_id=USER_ID, reservation_id=created.id, now=STARTS_AT)
+
+    assert created.status is ReservationStatus.CONFIRMED
+    assert slot.reserved_guests == 4
+    assert uow.commits == 1
