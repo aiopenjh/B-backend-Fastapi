@@ -5,11 +5,14 @@ from datetime import datetime
 
 from common.schemas import SEOUL
 from common.unit_of_work import UnitOfWork
+from common.errors import NotFoundError
+from reservation.domain.exceptions import DuplicateReservationError
 from reservation.application.service import ReservationService
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation, ReservationStatus
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
+from slot.domain.exceptions import SlotSoldOut
 
 class InMemoryReservationRepository(ReservationRepository):
     """DB 대신 리스트에 예약을 보관하는 가짜 저장소"""
@@ -115,3 +118,41 @@ async def test_create_saves_reservation_and_reserves_seats(service, reservation_
     assert slot.reserved_guests == 4
     # 맨 끝에 한 번만 확정한다.
     assert uow.commits == 1
+
+async def test_create_unknown_slot_raises_not_found(service, reservation_repo, uow):
+    # 없는 슬롯 번호로 예약하면 404가 나고, 아무것도 저장, 확정하지 않는다.
+    with pytest.raises(NotFoundError):
+        await service.create(
+            user_id=USER_ID, slot_id=999, party_size=2, contact_phone=None, now=NOW
+        )
+
+    assert reservation_repo.reservations == []
+    assert uow.commits == 0
+
+async def test_create_twice_raises_duplicate(service, reservation_repo, slot, uow):
+    # 같은 사람이 같은 슬롯을 두 번 예약하면, 두 번째는 409가 나고 자리도 다시 늘지 않는다.
+    await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    with pytest.raises(DuplicateReservationError):
+        await service.create(
+            user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+        )
+
+    assert len(reservation_repo.reservations) == 1
+    assert slot.reserved_guests == 4
+    assert uow.commits == 1
+
+async def test_create_sold_out_raises_and_keeps_seats(service, reservation_repo, slot, uow):
+    # 남은 자리(1명)보다 많이 예약하면 409가 나고, 자리 수는 그대로다.
+    slot.reserved_guests = 9
+
+    with pytest.raises(SlotSoldOut):
+        await service.create(
+            user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+        )
+
+    assert reservation_repo.reservations == []
+    assert slot.reserved_guests == 9
+    assert uow.commits == 0
