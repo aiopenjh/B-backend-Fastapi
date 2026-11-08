@@ -5,7 +5,7 @@ import pytest
 
 from common.errors import InvalidInputError
 from user.application.service import UserService
-from user.application.unit_of_work import ConflictError, UnitOfWork
+from common.unit_of_work import ConflictError, UnitOfWork
 from user.domain.exceptions import DuplicatedUserError
 from user.domain.repository import UserRepository
 from user.domain.user import User

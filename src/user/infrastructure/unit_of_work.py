@@ -3,7 +3,7 @@
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from user.application.unit_of_work import ConflictError, UnitOfWork
+from common.unit_of_work import ConflictError, UnitOfWork
 
 
 class SQLAlchemyUnitOfWork(UnitOfWork):

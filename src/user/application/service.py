@@ -1,7 +1,7 @@
 # [담당1 - 강성수]
 import uuid
 
-from user.application.unit_of_work import ConflictError, UnitOfWork
+from common.unit_of_work import ConflictError, UnitOfWork
 from user.domain.exceptions import DuplicatedUserError, UserNotFoundError
 from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
