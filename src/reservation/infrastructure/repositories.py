@@ -2,8 +2,10 @@
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.unit_of_work import ConflictError
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation, ReservationStatus
 from reservation.infrastructure.models import ReservationModel
@@ -53,7 +55,11 @@ class SQLAlchemyReservationRepository(ReservationRepository):
         )
         self.session.add(model)
         # DB에 보내서 id를 받아 온다. 확정(commit)은 서비스가 한다.
-        await self.session.flush()
+        try:
+            await self.session.flush()
+        except IntegrityError as e:
+            # 확정 예약 부분 unique 인덱스에 걸리면 DB 말(IntegrityError)을 포트 약속 말(ConflictError)로 번역
+            raise ConflictError() from e
         return to_reservation(model)
 
     async def get(self, reservation_id: int) -> Reservation | None:

@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Annotated
 from pydantic import BaseModel, Field
 
+from common.schemas import SEOUL
 from reservation.domain.reservation import Reservation, ReservationStatus
 from slot.domain.time_slot import TimeSlot
 
@@ -40,19 +41,21 @@ class ReservationOut(BaseModel):
         viewer_id: uuid.UUID,
         now: datetime,
     ) -> "ReservationOut":
-        """도메인 Reservation + TimeSlot -> 응답 DTO. 시각 칸은 슬롯에서, can_cancel은 도메인에 물어서 채운다."""
+        """도메인 Reservation + TimeSlot -> 응답 DTO. 시각 칸은 서울 시간으로 바꿔 넣고, can_cancel은 도메인에 물어서 채운다."""
+        # DB에서 꺼낸 시각은 UTC라서, 응답에서는 같은 순간을 서울 시계(+09:00)로 다시 읽어 내보낸다
+        cancelled_at = reservation.cancelled_at
         return cls(
             id=reservation.id,
             user_id=reservation.user_id,
             slot_id=reservation.slot_id,
             restaurant_id=slot.restaurant_id,
-            starts_at=slot.starts_at,
-            ends_at=slot.ends_at,
+            starts_at=slot.starts_at.astimezone(SEOUL),
+            ends_at=slot.ends_at.astimezone(SEOUL),
             party_size=reservation.party_size,
             contact_phone=reservation.contact_phone,
             status=reservation.status,
-            created_at=reservation.created_at,
-            cancelled_at=reservation.cancelled_at,
+            created_at=reservation.created_at.astimezone(SEOUL),
+            cancelled_at=cancelled_at.astimezone(SEOUL) if cancelled_at else None,
             can_cancel=reservation.can_cancel(
                 user_id=viewer_id,
                 slot_starts_at=slot.starts_at,

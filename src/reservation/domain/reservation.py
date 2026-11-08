@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Self
 
-from reservation.domain.exceptions import AlreadyCancelledError
+from reservation.domain.exceptions import AlreadyCancelledError, CancellationNotAllowedError
 
 class ReservationStatus(StrEnum):
     """예약 상태. 확정과 취소 두가지이고, DB에는 문자열로 저장한다."""
@@ -43,10 +43,14 @@ class Reservation:
             contact_phone=contact_phone
         )
     
-    def cancel(self, now: datetime) -> None:
-        """예약을 취소 상태로 바꾸고 취소 시각을 남긴다. 이미 취소된 예약이면 AlreadyCancelledError."""
+    def cancel(self, slot_starts_at: datetime, now: datetime) -> None:
+        """예약을 취소 상태로 바꾸고 취소 시각을 남긴다. 이미 취소된 예약이면 AlreadyCancelledError, 슬롯이 시작됐으면 CancellationNotAllowedError."""
         if self.status is ReservationStatus.CANCELLED:
             raise AlreadyCancelledError()
+
+        if now >= slot_starts_at:
+            raise CancellationNotAllowedError()
+        
         self.status = ReservationStatus.CANCELLED
         self.cancelled_at = now
 

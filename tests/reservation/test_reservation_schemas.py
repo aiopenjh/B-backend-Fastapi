@@ -1,6 +1,6 @@
 # [담당 4] 예약 응답 스키마 테스트 : API 명세 예시, from_domain 변환, can_cancel 값
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from common.schemas import SEOUL
 from reservation.domain.reservation import Reservation, ReservationStatus
@@ -133,3 +133,29 @@ def test_from_domain_can_cancel_false_after_slot_started():
     out = ReservationOut.from_domain(reservation, slot, OWNER_ID, STARTS_AT)
 
     assert out.can_cancel is False
+
+# DB에서 꺼낸 시각(UTC)을 응답에서는 서울 시간(+09:00)으로 바꿔 내보내는지
+def test_from_domain_converts_times_to_seoul():
+    slot = TimeSlot(
+        **{
+            **TIME_SLOT_EXAMPLE,
+            "starts_at": STARTS_AT.astimezone(UTC),
+            "ends_at": ENDS_AT.astimezone(UTC),
+        }
+    )
+    reservation = Reservation(
+        id=3,
+        user_id=OWNER_ID,
+        slot_id=7,
+        party_size=2,
+        status=ReservationStatus.CANCELLED,
+        created_at=CREATED_AT.astimezone(UTC),
+        cancelled_at=NOW.astimezone(UTC),
+    )
+
+    body = ReservationOut.from_domain(reservation, slot, OWNER_ID, NOW).model_dump(mode="json")
+
+    assert body["starts_at"] == "2026-12-03T18:00:00+09:00"
+    assert body["ends_at"] == "2026-12-03T19:00:00+09:00"
+    assert body["created_at"] == "2026-12-01T15:00:00+09:00"
+    assert body["cancelled_at"] == "2026-12-03T17:00:00+09:00"

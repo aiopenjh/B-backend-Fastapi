@@ -25,7 +25,7 @@ from restaurant.infrastructure.repository import (
 )  # 담당 2: 식당 창고
 
 from user.application.service import UserService  # 담당 1: 회원 매니저
-from user.application.unit_of_work import UnitOfWork  # 담당 1: 변경 확정 약속
+from common.unit_of_work import UnitOfWork  # 담당 1: 변경 확정 약속
 from user.domain.hasher import PasswordHasher  # 담당 1: 비밀번호 암호화 약속
 from user.domain.repository import UserRepository  # 담당 1: 회원 창고 약속
 from user.infrastructure.repositories import (
