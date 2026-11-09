@@ -1,7 +1,10 @@
 import uuid
 from datetime import UTC, datetime
 
+import pytest
+
 from auth.domain.value_object import AuthenticatedUser, AuthRole
+from restaurant.domain.exceptions import MenuNotFoundError
 from restaurant.domain.restaurant import Menu, Restaurant
 
 OWNER_ID = uuid.uuid4()
@@ -78,3 +81,23 @@ def test_customer_cannot_edit_restaurant():
     customer = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.CUSTOMER)
 
     assert restaurant.can_be_edited_by(customer) is False
+
+
+def test_find_menu_returns_menu_of_this_restaurant():
+    restaurant = make_restaurant(
+        menus=[
+            Menu(id=10, name="비빔밥", price=9000),
+            Menu(id=11, name="냉면", price=11000),
+        ]
+    )
+
+    menu = restaurant.find_menu(11)
+
+    assert menu.name == "냉면"
+
+
+def test_find_menu_raise_when_not_in_this_restaurant():
+    restaurant = make_restaurant(menus=[Menu(id=10, name="비빔밥", price=9000)])
+
+    with pytest.raises(MenuNotFoundError):
+        restaurant.find_menu(99)
