@@ -1,4 +1,4 @@
-# [담당 5] 운영자 API 창구: 내 식당 목록, 식당 예약 목록, 예약 CSV 내려받기
+#담당 5 운영자 API 창구 : 식당목록
 import csv
 import io
 
@@ -15,7 +15,7 @@ from restaurant.presentation.schemas import RestaurantOut # 담당 2 : 식당 �
 from reservation.presentation.schemas import ReservationOut # 담당 4 : 민지님
 from auth.domain.value_object import AuthenticatedUser # 담당 1 : 회원
 from container import create_owner_service # 담당 5: 매니저 공장
-from slot.domain.day_range import SEOUL, seoul_now # 담당3 : 서울시간대, 지금 시각
+from slot.domain.day_range import SEOUL # 담당3 : 서울시간대
 
 
 
@@ -76,10 +76,8 @@ async def list_restaurant_reservations(
     service: OwnerService = Depends(create_owner_service),
 ) -> APIResponse[Page[ReservationOut]]:
     items, total = await service.list_restaurant_reservations(owner, restaurant_id, date, page)
-    now = seoul_now()
     return APIResponse.ok(data=Page(
-        # 보는 사람 = 운영자 (운영자는 손님 예약을 취소할 수 없으니 can_cancel은 False)
-        items=[ReservationOut.from_domain(r, s, owner.user_id, now) for r, s in items],
+        items=[ReservationOut.from_domain(r, s) for r, s in items],   # 담당 4: 아직 없음
         page=page.page,
         page_size=page.page_size,
         total=total,

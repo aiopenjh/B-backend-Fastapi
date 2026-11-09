@@ -1,4 +1,5 @@
 # [담당 5 최지훈] 예약 상세 매니저 테스트: 본인,식당 운영자만 / 나머지는 404
+from common.errors import ForbiddenError
 import uuid
 from datetime import datetime, timezone
 
