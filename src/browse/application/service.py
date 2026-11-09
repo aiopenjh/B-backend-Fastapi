@@ -1,4 +1,6 @@
 # [담당 5] 손님 둘러보기 매니저: 지역(시·도 → 구)·음식 종류 목록, 지역별 식당 (읽기 전용)
+from datetime import date, datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from browse.infrastructure.query_repository import (
@@ -33,3 +35,6 @@ class BrowseService:
         page: PageParams,
     ) -> tuple[list[Restaurant], int]:
         return await self.query.list_restaurants(province, district, q, cuisine, seed, page.offset, page.page_size)
+
+    async def next_open_day(self, restaurant_id: int, after: datetime) -> date | None:
+        return await self.query.next_open_day(restaurant_id, after)

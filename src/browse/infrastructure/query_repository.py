@@ -1,10 +1,14 @@
 # [담당 5] 손님 둘러보기 창고: 지역(시·도 → 구·시·군)과 음식 종류로 식당 꺼내기 (읽기 전용)
+from datetime import date, datetime
+
 from sqlalchemy import String, case, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from restaurant.domain.restaurant import Restaurant  # 담당 2: 식당
 from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB)
 from restaurant.infrastructure.repository import to_restaurant  # 담당 2: 표 → 식당
+from slot.domain.day_range import SEOUL  # 담당 3: 서울 시간대
+from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB)
 
 # 17개 시·도 정식 이름과 주소에 쓰이는 줄임말
 PROVINCES = {
@@ -92,3 +96,14 @@ class BrowseQueryRepository:
             .limit(limit)
         )
         return [to_restaurant(m) for m in models], total or 0
+
+    async def next_open_day(self, restaurant_id: int, after: datetime) -> date | None:
+        """지금 이후 자리가 남은 가장 가까운 시간대의 날짜(서울). 없으면 None"""
+        starts_at = await self.db.scalar(
+            select(func.min(ReservationSlotModel.starts_at)).where(
+                ReservationSlotModel.restaurant_id == restaurant_id,
+                ReservationSlotModel.starts_at > after,
+                ReservationSlotModel.reserved_guests < ReservationSlotModel.capacity,
+            )
+        )
+        return starts_at.astimezone(SEOUL).date() if starts_at else None

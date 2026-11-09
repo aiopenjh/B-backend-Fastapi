@@ -291,3 +291,83 @@ body .table-scroll td:not([data-label]) {
   text-align:left;
 }
 
+
+body .slot-picker {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:8px;
+  padding:0 16px 16px;
+}
+
+body .slot-option {
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  margin:0;
+  padding:10px 4px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  cursor:pointer;
+}
+
+body .slot-option input {
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+
+body .slot-time {
+  font-size:15px;
+  font-weight:700;
+}
+
+body .slot-seats {
+  font-size:11px;
+  color:var(--muted);
+}
+
+body .slot-option:has(input:checked) {
+  border-color:var(--accent);
+  background:var(--tint);
+  color:var(--accent);
+}
+
+body .slot-option:has(input:focus-visible) {
+  outline:3px solid #3067bf;
+  outline-offset:2px;
+}
+
+body .slot-option.is-closed {
+  background:#f5f6f8;
+  color:#a2a9b4;
+  cursor:not-allowed;
+}
+
+body .booking-button {
+  width:calc(100% - 32px);
+  margin:0 16px 16px;
+}
+
+body .booking-notice {
+  margin:16px 16px 0;
+  padding:12px 14px;
+  border-radius:10px;
+  font-size:13px;
+}
+
+body .booking-done {
+  background:#eaf6ef;
+  color:#1f6b45;
+}
+
+body .booking-done p {
+  margin-top:2px;
+}
+
+body .booking-fail {
+  background:#fdecea;
+  color:#a3271b;
+}

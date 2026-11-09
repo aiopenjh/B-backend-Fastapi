@@ -6,10 +6,22 @@ from datetime import date
 from typing import Annotated, Any
 
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
+from common.database import get_session  # 공통: 요청마다 DB 연결 하나
 from container import create_owner_service  # 담당 5: 운영자 매니저 공장
 from owner.application.service import OwnerService  # 담당 5: 운영자 매니저
+from reservation.application.service import ReservationService  # 담당 4: 예약 매니저
+from reservation.infrastructure.repositories import (
+    SQLAlchemyReservationRepository,  # 담당 4: 예약 창고
+)
+from slot.infrastructure.repositories import (
+    SQLAlchemySlotRepository,  # 담당 3: 슬롯 창고
+)
+from user.infrastructure.unit_of_work import (
+    SQLAlchemyUnitOfWork,  # 담당 1: 한 번에 확정
+)
 from web_auth import UIUser  # 담당 5: 쿠키로 로그인한 사람
 
 
@@ -73,3 +85,14 @@ def get_owner_ui_queries(
     if user is None or not user.is_owner():
         return None
     return OwnerUIQueries(user, service)
+
+
+# 담당 5: 화면 예약하기용 임시 공장 (담당 4 container 공장이 들어오면 그걸로 바꿈)
+def get_reservation_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ReservationService:
+    return ReservationService(
+        reservation_repo=SQLAlchemyReservationRepository(session),
+        slot_repo=SQLAlchemySlotRepository(session),
+        uow=SQLAlchemyUnitOfWork(session),
+    )

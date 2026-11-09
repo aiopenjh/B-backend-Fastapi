@@ -29,9 +29,14 @@ from container import (
     create_admin_service,  # 담당 5: 관리자 매니저 공장
     create_auth_service,  # 담당 1: 로그인 매니저 공장
     create_browse_service,  # 담당 5: 손님 둘러보기 매니저 공장
+    create_reservation_query_service,  # 담당 5: 예약 조회 매니저 공장
     create_restaurant_service,  # 담당 2: 식당 매니저 공장
     create_slot_service,  # 담당 3: 빈자리 매니저 공장 (#44)
 )
+from reservation.application.query_service import (
+    ReservationQueryService,  # 담당 5: 예약 조회 매니저
+)
+from reservation.application.service import ReservationService  # 담당 4: 예약 매니저
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.domain.exceptions import RestaurantNotFoundError  # 담당 2: 없는 식당
 from restaurant.presentation.routers.v1.router import (
@@ -47,7 +52,12 @@ from web_auth import (  # 담당 5: 화면 로그인
     safe_next,
     to_login,
 )
-from web_data import OwnerUIQueries, PageResult, get_owner_ui_queries
+from web_data import (
+    OwnerUIQueries,
+    PageResult,
+    get_owner_ui_queries,
+    get_reservation_service,
+)
 
 SRC_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(SRC_DIR / "templates"))
@@ -82,6 +92,17 @@ Blank = BeforeValidator(lambda value: value or None)
 Auth = Annotated[AuthService, Depends(create_auth_service)]
 Admin = Annotated[AdminService, Depends(create_admin_service)]
 Browse = Annotated[BrowseService, Depends(create_browse_service)]
+Booking = Annotated[ReservationService, Depends(get_reservation_service)]
+MyReservations = Annotated[ReservationQueryService, Depends(create_reservation_query_service)]
+
+# 예약하기 실패를 손님이 읽는 문구로 (오류 코드 → 문구)
+BOOKING_ERRORS = {
+    "SLOT_SOLD_OUT": "방금 자리가 찼어요. 다른 시간을 골라 주세요.",
+    "PARTY_SIZE_EXCEEDED": "이 시간은 한 번에 예약할 수 있는 인원을 넘었어요.",
+    "SLOT_ALREADY_STARTED": "이미 시작한 시간이에요. 다른 시간을 골라 주세요.",
+    "DUPLICATE_RESERVATION": "이미 예약한 시간이에요.",
+    "NOT_THIS_RESTAURANT": "선택한 시간을 찾을 수 없어요. 다시 골라 주세요.",
+}
 
 
 def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
@@ -254,19 +275,25 @@ async def browse_page(
     )
 
 
-# 담당 5: 손님용 식당 상세 화면 (메뉴 + 날짜·인원별 빈자리, 담당 3 빈자리 매니저 #33·공장 #44 재사용)
+# 담당 5: 손님용 식당 상세 화면 (메뉴 + 날짜·인원별 시간 골라 예약하기, 담당 3 빈자리 매니저 재사용)
 @router.get("/restaurants/{restaurant_id}", response_class=HTMLResponse, name="ui_restaurant")
 async def restaurant_page(
     request: Request,
     restaurant_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
     service: Restaurants,
     slots: Slots,
+    browse: Browse,
+    my_reservations: MyReservations,
     date: Annotated[Date | None, Blank] = None,
     party_size: Annotated[int, Query(ge=1, le=20)] = 2,
+    slot_id: Annotated[int | None, Blank] = None,
+    reserved: Annotated[int | None, Blank] = None,
+    fail: Annotated[str | None, Blank] = None,
 ):
     if moved := staff_redirect(request):
         return moved
-    day = date or (seoul_now() + timedelta(days=1)).date()  # 안 고르면 내일(서울)
+    now = seoul_now()
+    day = date or (now + timedelta(days=1)).date()  # 안 고르면 내일(서울)
     try:
         restaurant = await service.get_restaurant(restaurant_id)
     except RestaurantNotFoundError:
@@ -278,15 +305,62 @@ async def restaurant_page(
             status_code=404,
         )
     availability = await slots.get_availability(restaurant_id, day, party_size)
+    # 고를 수 있는 시간이 하나도 없으면 가장 가까운 열린 날짜를 알려 줌
+    next_open = None
+    if not any(item.available for item in availability):
+        next_open = await browse.next_open_day(restaurant_id, now)
+    # 방금 예약했으면 내 예약을 꺼내 완료 안내에 씀 (내 것이 아니면 보여 주지 않음)
+    done = None
+    user = request.state.ui_user
+    if reserved and user is not None:
+        try:
+            done = await my_reservations.get_reservation(user, reserved)
+        except AppError:
+            done = None
     return templates.TemplateResponse(
         request=request,
         name="restaurants/detail.html",
         context={
             "active_page": "browse", "restaurant": restaurant,
             "availability": availability, "selected_date": day.isoformat(),
-            "party_size": party_size,
+            "party_size": party_size, "slot_id": slot_id, "now": now, "next_open": next_open,
+            "done": done, "fail": BOOKING_ERRORS.get(fail, "예약하지 못했어요. 다시 골라 주세요.") if fail else None,
+            "can_book": user is None or user.is_customer(),
         },
     )
+
+
+# 담당 5: 화면 예약하기 — 담당 4 예약 매니저(create)를 그대로 부름 (자리 잠금·중복 막기·한 번에 저장)
+@router.post("/restaurants/{restaurant_id}/reserve", name="ui_reserve")
+async def reserve_submit(
+    request: Request,
+    restaurant_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
+    slots: Slots,
+    booking: Booking,
+    slot_id: Annotated[int, Form()],
+    party_size: Annotated[int, Form(ge=1, le=20)],
+    date: Annotated[Date, Form()],
+):
+    back = request.url_for("ui_restaurant", restaurant_id=restaurant_id).include_query_params(
+        date=date.isoformat(), party_size=party_size
+    )
+    user = request.state.ui_user
+    if user is None:
+        # 로그인하면 같은 날짜·인원·시간으로 돌아오게
+        chosen = back.include_query_params(slot_id=slot_id)
+        here = f"{chosen.path}?{chosen.query}"
+        return RedirectResponse(request.url_for("ui_login").include_query_params(next=here), status_code=303)
+    if not user.is_customer():
+        return message_page(request, 403, "손님 계정으로 예약할 수 있어요", "운영자·관리자 계정으로는 예약하지 않아요.")
+    # 이 식당·이 날짜의 시간대인지 먼저 확인 (다른 식당 시간대 번호로 예약하지 못하게)
+    available = await slots.get_availability(restaurant_id, date, party_size)
+    if slot_id not in {item.slot.id for item in available}:
+        return RedirectResponse(back.include_query_params(fail="NOT_THIS_RESTAURANT"), status_code=303)
+    try:
+        reservation, _ = await booking.create(user.user_id, slot_id, party_size, None, seoul_now())
+    except AppError as error:
+        return RedirectResponse(back.include_query_params(fail=error.error_code.name, slot_id=slot_id), status_code=303)
+    return RedirectResponse(back.include_query_params(reserved=reservation.id), status_code=303)
 
 
 # 담당 5: 관리자 화면 ① 운영자 목록 + 식당 수

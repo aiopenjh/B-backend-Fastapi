@@ -1,4 +1,5 @@
 # [담당 5 최지훈] 손님용 식당 목록·상세 화면 테스트 (가짜 식당·빈자리 매니저)
+import re
 import uuid
 from datetime import datetime, timedelta
 
@@ -8,6 +9,7 @@ from fastapi import FastAPI, Request
 
 from container import (
     create_browse_service,
+    create_reservation_query_service,
     create_restaurant_service,
     create_slot_service,
 )
@@ -18,6 +20,7 @@ from slot.domain.day_range import SEOUL, seoul_now
 from slot.domain.time_slot import TimeSlot
 from web import register_web
 from web_auth import get_ui_user
+from web_data import get_reservation_service
 
 RESTAURANT = Restaurant(
     id=1,
@@ -72,6 +75,9 @@ class FakeBrowseService:
     async def list_cuisines(self):
         return ["양식", "한식"]
 
+    async def next_open_day(self, restaurant_id, after):
+        return None
+
     async def list_restaurants(self, province, district, q, cuisine, seed, page):
         self.received = (province, district, q, cuisine, page.page, page.page_size)
         self.seeds.append(seed)
@@ -110,6 +116,8 @@ def client(fakes) -> httpx.AsyncClient:
     app.dependency_overrides[create_restaurant_service] = lambda: restaurants
     app.dependency_overrides[create_slot_service] = lambda: slots
     app.dependency_overrides[create_browse_service] = lambda: browse
+    app.dependency_overrides[create_reservation_query_service] = lambda: None
+    app.dependency_overrides[get_reservation_service] = lambda: None
     app.dependency_overrides[get_ui_user] = not_logged_in  # 쿠키 로그인 없이
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
@@ -134,8 +142,10 @@ async def test_restaurant_page_shows_menus_and_slots(client, fakes):
 
     assert response.status_code == 200
     assert "비빔밥" in response.text and "9,000원" in response.text
-    assert "18:00 ~ 19:30" in response.text
-    assert "예약 가능" in response.text and "예약 불가" in response.text
+    assert "예약하기" in response.text and "빈자리" not in response.text
+    assert "18:00" in response.text and "남은 10석" in response.text  # 고를 수 있는 시간: 남은 자리
+    assert "마감" in response.text  # 꽉 찬 20:00은 이유와 함께 비활성
+    assert re.search(r'value="2" required\s+disabled', response.text)  # 꽉 찬 시간은 고를 수 없음
     assert fakes[1].received[0] == 1
     assert fakes[1].received[1].isoformat() == "2030-01-02"
     assert fakes[1].received[2] == 3
