@@ -13,6 +13,7 @@ from auth.domain.value_object import AuthRole
 from auth.infrastructure.security import JwtTokenProvider
 
 from common.errors import UnauthorizedError
+from common.unit_of_work import ConflictError, UnitOfWork
 
 from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
@@ -33,6 +34,20 @@ class FakePasswordHasher(PasswordHasher):
         return self.hash(raw_password) == hashed_password
 
 
+class FakeUnitOfWork(UnitOfWork):
+    """commit 호출 횟수를 세는 가짜 UoW. conflict=True면 commit에서 충돌을 낸다"""
+
+    def __init__(self, conflict: bool = False) -> None:
+        self.commits = 0
+        self.conflict = conflict
+
+    async def commit(self) -> None:
+        if self.conflict:
+            raise ConflictError()
+
+        self.commits += 1
+
+
 class InMemoryUserRepository(UserRepository):
     def __init__(self) -> None:
         self.users: dict[uuid.UUID, User] = {}
@@ -51,9 +66,11 @@ class InMemoryUserRepository(UserRepository):
 class InMemoryBlackListRepository(TokenBlackListRepository):
     def __init__(self) -> None:
         self.jtis: set[str] = set()
+        self.saved: list[BlackListToken] = []
 
     async def add(self, token: BlackListToken) -> None:
         self.jtis.add(token.jti)
+        self.saved.append(token)
 
     async def is_blacklisted(self, jti: str) -> bool:
         return jti in self.jtis
@@ -78,12 +95,18 @@ def blacklist() -> InMemoryBlackListRepository:
 
 
 @pytest.fixture
-def service(user_repo, hasher, blacklist) -> AuthService:
+def uow() -> FakeUnitOfWork:
+    return FakeUnitOfWork()
+
+
+@pytest.fixture
+def service(user_repo, hasher, blacklist, uow) -> AuthService:
     return AuthService(
         user_repo=user_repo,
         hasher=hasher,
         token_provider=JwtTokenProvider(secret_key=SECRET),
         blacklist_repo=blacklist,
+        uow=uow,
     )
 
 
