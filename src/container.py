@@ -92,12 +92,14 @@ def create_auth_service(
         TokenBlackListRepository, Depends(create_token_blacklist_repository)
     ],
     token_provider: Annotated[TokenProvider, Depends(get_token_provider)],
+    uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
 ) -> AuthService:
     return AuthService(
         user_repo=user_repo,
         hasher=password_hasher,
         blacklist_repo=blacklist_repo,
         token_provider=token_provider,
+        uow=uow,
     )
 
 
