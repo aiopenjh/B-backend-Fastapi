@@ -1,16 +1,16 @@
-# [담당1 - 강성수] UserService.signUp 테스트 (메모리 레포지토리 사용)
+# [담당1 - 강성수] UserService 테스트 (메모리 레포지토리 사용)
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 
 from common.errors import InvalidInputError
-from user.application.service import UserService
 from common.unit_of_work import ConflictError, UnitOfWork
+from user.application.service import UserService
+from user.domain.exceptions import DuplicatedUserError, UserNotFoundError
 from user.domain.repository import UserRepository
 from user.domain.user import User
 from user.domain.value_object import Email
-from user.domain.exceptions import DuplicatedUserError, UserNotFoundError
 
 VALID_PASSWORD = "abcd1234!"
 
