@@ -5,6 +5,7 @@
 운영자 화면은 화면 로그인(JWT를 쿠키에 담기, web_auth.py) 뒤에 실제 데이터를 보여 준다.
 """
 
+import uuid
 from datetime import date as Date
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -17,11 +18,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BeforeValidator
 
+from admin.application.service import AdminService  # 담당 5: 관리자 매니저
 from auth.application.service import AuthService  # 담당 1: 로그인 매니저
 from common.errors import AppError  # 공통 오류 (404·403 안내 화면으로 바꿈)
 from common.pagination import PageParams
 from common.schemas import SEOUL
 from container import (
+    create_admin_service,  # 담당 5: 관리자 매니저 공장
     create_auth_service,  # 담당 1: 로그인 매니저 공장
     create_restaurant_service,  # 담당 2: 식당 매니저 공장
     create_slot_service,  # 담당 3: 빈자리 매니저 공장 (#44)
@@ -74,6 +77,7 @@ PageSize = Annotated[int, Query(ge=1, le=100)]
 # 빈 칸으로 보낸 폼 값("")은 '안 고름'(None)으로 본다
 Blank = BeforeValidator(lambda value: value or None)
 Auth = Annotated[AuthService, Depends(create_auth_service)]
+Admin = Annotated[AdminService, Depends(create_admin_service)]
 
 
 def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
@@ -89,6 +93,16 @@ def deny(request: Request) -> RedirectResponse | HTMLResponse:
     if request.state.ui_user is None:
         return to_login(request)
     return message_page(request, 403, "운영자만 볼 수 있어요", "운영자 계정으로 로그인해 주세요.")
+
+
+def deny_admin(request: Request) -> RedirectResponse | HTMLResponse | None:
+    """관리자 화면 문: 로그인 안 했으면 로그인 화면, 관리자가 아니면 403 안내, 관리자면 None(통과)"""
+    user = request.state.ui_user
+    if user is None:
+        return to_login(request)
+    if not user.is_admin():
+        return message_page(request, 403, "관리자만 볼 수 있어요", "관리자 계정으로 로그인해 주세요.")
+    return None
 
 
 @router.get("", response_class=HTMLResponse, name="ui_login")
@@ -242,6 +256,63 @@ async def restaurant_page(
             "availability": availability, "selected_date": day.isoformat(),
             "party_size": party_size,
         },
+    )
+
+
+# 담당 5: 관리자 화면 ① 운영자 목록 + 식당 수
+@router.get("/admin/owners", response_class=HTMLResponse, name="ui_admin_owners")
+async def admin_owners_page(request: Request, service: Admin, page: PageNumber = 1, page_size: PageSize = 20):
+    if denied := deny_admin(request):
+        return denied
+    rows, total = await service.list_owners(PageParams(page=page, page_size=page_size))
+    return templates.TemplateResponse(
+        request=request, name="admin/owners.html",
+        context={"active_page": "admin", "owners": rows, "total": total,
+                 "result": PageResult(rows, total, page, page_size)},
+    )
+
+
+# 담당 5: 관리자 화면 ② 운영자 한 명의 식당 표
+@router.get("/admin/owners/{owner_id}/restaurants", response_class=HTMLResponse, name="ui_admin_owner_restaurants")
+async def admin_owner_restaurants_page(
+    request: Request, owner_id: uuid.UUID, service: Admin, page: PageNumber = 1, page_size: PageSize = 20
+):
+    if denied := deny_admin(request):
+        return denied
+    try:
+        owner, items, total = await service.list_owner_restaurants(owner_id, PageParams(page=page, page_size=page_size))
+    except AppError as error:
+        return message_page(request, error.error_code.status, "운영자를 찾을 수 없어요", error.message)
+    return templates.TemplateResponse(
+        request=request, name="admin/restaurants.html",
+        context={"active_page": "admin", "owner": owner, "restaurants": items, "total": total,
+                 "result": PageResult(items, total, page, page_size)},
+    )
+
+
+# 담당 5: 관리자 화면 ③ 식당 하나의 날짜별 예약 + 예약자
+@router.get("/admin/restaurants/{restaurant_id}/reservations", response_class=HTMLResponse, name="ui_admin_reservations")
+async def admin_reservations_page(
+    request: Request,
+    restaurant_id: Annotated[int, PathParam(gt=0, le=BIGINT_MAX)],
+    service: Admin,
+    date: Annotated[Date | None, Blank] = None,
+    page: PageNumber = 1,
+    page_size: PageSize = 20,
+):
+    if denied := deny_admin(request):
+        return denied
+    try:
+        restaurant, rows, total = await service.list_restaurant_reservations(
+            restaurant_id, date, PageParams(page=page, page_size=page_size)
+        )
+    except AppError as error:
+        return message_page(request, error.error_code.status, "식당을 찾을 수 없어요", error.message)
+    return templates.TemplateResponse(
+        request=request, name="admin/reservations.html",
+        context={"active_page": "admin", "restaurant": restaurant, "rows": rows, "total": total,
+                 "selected_date": date.isoformat() if date else "", "page_size": page_size,
+                 "result": PageResult(rows, total, page, page_size)},
     )
 
 

@@ -7,6 +7,9 @@
   <nav aria-label="주 메뉴">
     <a href="{{ url_for('ui_browse') }}" {% if active_page == 'browse' %}aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>식당 둘러보기</a>
     <a href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants','reservations'] %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>운영 식당</a>
+    {% if ui_user and ui_user.is_admin() %}
+    <a href="{{ url_for('ui_admin_owners') }}" {% if active_page == 'admin' %}aria-current="page"{% endif %}><span aria-hidden="true">◎</span>관리자</a>
+    {% endif %}
     {% if not ui_user %}
     <a href="{{ url_for('ui_login') }}" {% if active_page == 'login' %}aria-current="page"{% endif %}><span aria-hidden="true">↪</span>로그인</a>
     {% endif %}

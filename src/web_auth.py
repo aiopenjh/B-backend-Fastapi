@@ -45,7 +45,9 @@ def safe_next(next_url: str | None) -> str | None:
 
 
 def home_url(request: Request, user: AuthenticatedUser) -> str:
-    """로그인 뒤 첫 화면: 운영자는 운영 식당, 그 밖에는 식당 둘러보기"""
+    """로그인 뒤 첫 화면: 관리자는 운영자 목록, 운영자는 운영 식당, 그 밖에는 식당 둘러보기"""
+    if user.is_admin():
+        return str(request.url_for("ui_admin_owners"))
     if user.is_owner():
         return str(request.url_for("ui_restaurants"))
     return str(request.url_for("ui_browse"))
