@@ -1,11 +1,15 @@
 # [담당 4] 예약 도메인 규칙 테스트 : 생성, 취소, 취소 가능 여부
 import uuid
-import pytest
 from datetime import datetime
 
-from reservation.domain.reservation import Reservation, ReservationStatus
-from reservation.domain.exceptions import AlreadyCancelledError, CancellationNotAllowedError
+import pytest
+
 from common.schemas import SEOUL
+from reservation.domain.exceptions import (
+    AlreadyCancelledError,
+    CancellationNotAllowedError,
+)
+from reservation.domain.reservation import Reservation, ReservationStatus
 
 NOW = datetime(2026, 11, 3, 6, 0, tzinfo=SEOUL)
 SLOT_STARTS_AT = datetime(2026, 11, 3, 9, 0, tzinfo=SEOUL)

@@ -1,22 +1,24 @@
 # [담당 4] 예약 서비스 테스트 : 가짜 저장소로 예약 생성.취소 흐름 확인
 import uuid
-import pytest
 from datetime import datetime
 
+import pytest
+
+from common.errors import NotFoundError
 from common.schemas import SEOUL
 from common.unit_of_work import ConflictError, UnitOfWork
-from common.errors import NotFoundError
+from reservation.application.service import ReservationService
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
     CancellationNotAllowedError,
     DuplicateReservationError,
 )
-from reservation.application.service import ReservationService
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation, ReservationStatus
+from slot.domain.exceptions import SlotSoldOut
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
-from slot.domain.exceptions import SlotSoldOut
+
 
 class InMemoryReservationRepository(ReservationRepository):
     """DB 대신 리스트에 예약을 보관하는 가짜 저장소"""

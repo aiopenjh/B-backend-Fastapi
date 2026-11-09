@@ -4,6 +4,7 @@ from http import HTTPStatus
 
 from common.errors import AppError, ErrorCode
 
+
 @unique
 class ReservationErrorCode(ErrorCode):
     """예약 에러 코드 목록. (HTTP 상태, 사용자에게 보여 줄 메시지) 짝으로 정한다."""

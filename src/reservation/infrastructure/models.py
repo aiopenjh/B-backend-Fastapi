@@ -1,8 +1,20 @@
 # [담당 4] 예약 창고 : reservations 테이블 정의
 import uuid
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Uuid, BigInteger, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, func, text
 from datetime import datetime
+
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Uuid,
+    func,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column
 
 from common.model import Base
 

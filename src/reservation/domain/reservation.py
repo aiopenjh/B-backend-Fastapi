@@ -1,11 +1,15 @@
 # [담당 4] 예약 도메인 : 예약 규칙 (생성, 취소, 취소 가능 여부)
 import uuid
-from enum import StrEnum
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Self
 
-from reservation.domain.exceptions import AlreadyCancelledError, CancellationNotAllowedError
+from reservation.domain.exceptions import (
+    AlreadyCancelledError,
+    CancellationNotAllowedError,
+)
+
 
 class ReservationStatus(StrEnum):
     """예약 상태. 확정과 취소 두가지이고, DB에는 문자열로 저장한다."""

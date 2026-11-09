@@ -4,6 +4,7 @@ from sqlalchemy.schema import CreateIndex
 
 from reservation.infrastructure.models import ReservationModel
 
+
 def test_confirmed_reservation_is_uniqu_per_user_and_slot():
     # 같은 사람, 같은 슬롯의 확정 예약은 하나만 (취소된 예약은 여러개여도 된다.)
     index = next(

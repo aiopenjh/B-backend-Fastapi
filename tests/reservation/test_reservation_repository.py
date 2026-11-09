@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from reservation.domain.reservation import Reservation, ReservationStatus
 from reservation.infrastructure.models import ReservationModel
