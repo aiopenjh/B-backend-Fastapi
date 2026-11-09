@@ -21,6 +21,8 @@ from restaurant.presentation.schemas import (
 BIGINT_MAX = 9223372036854775807
 
 router = APIRouter(prefix="/restaurants", tags=["식당"])
+# 식당·메뉴 수정용 (관리자 또는 본인 식당 운영자). 권한은 서비스의 can_be_edited_by로 확인
+owner_router = APIRouter(prefix="/owner/restaurants", tags=["식당 관리"])
 
 
 @router.get(
@@ -59,7 +61,7 @@ async def get_restaurant(
     return APIResponse.ok(data=RestaurantDetail.model_validate(restaurant))
 
 
-@router.patch(
+@owner_router.patch(
     "/{restaurant_id}",
     response_model=APIResponse[RestaurantDetail],
     summary="식당 수정 (관리자 또는 본인 식당 운영자)",
@@ -76,7 +78,7 @@ async def update_restaurant(
     return APIResponse.ok(data=RestaurantDetail.model_validate(restaurant))
 
 
-@router.post(
+@owner_router.post(
     "/{restaurant_id}/menus",
     status_code=status.HTTP_201_CREATED,
     response_model=APIResponse[MenuOut],
@@ -92,7 +94,7 @@ async def add_menu(
     return APIResponse.ok(data=MenuOut.model_validate(menu))
 
 
-@router.patch(
+@owner_router.patch(
     "/{restaurant_id}/menus/{menu_id}",
     response_model=APIResponse[MenuOut],
     summary="메뉴 수정 (관리자 또는 본인 식당 운영자)",
@@ -110,7 +112,7 @@ async def update_menu(
     return APIResponse.ok(data=MenuOut.model_validate(menu))
 
 
-@router.delete(
+@owner_router.delete(
     "/{restaurant_id}/menus/{menu_id}",
     response_model=APIResponse[None],
     summary="메뉴 삭제 (관리자 또는 본인 식당 운영자)",
