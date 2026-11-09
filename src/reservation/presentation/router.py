@@ -26,7 +26,7 @@ router = APIRouter(prefix="/reservations", tags=["예약"])
         404: {"model": APIResponse[None], "description": "없는 슬롯"},
         409: {
             "model": APIResponse[None],
-            "description": "슬롯이 이미 시작됨, 한 팀 최대 인원 초과, 자리 부족, 예약한 시간대",
+            "description": "슬롯이 이미 시작됨, 한 팀 최대 인원 초과, 자리 부족, 이미 예약한 시간대",
         },
     },
     summary="예약 생성",

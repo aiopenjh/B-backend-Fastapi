@@ -1,4 +1,4 @@
-# [담당 4] 예약 창구 테스트 : 가짜 매니저로 예약 취소 API의 요청.응답 확인
+# [담당 4] 예약 창구 테스트 : 가짜 매니저로 예약 생성.취소 API의 요청.응답 확인
 import uuid
 from datetime import datetime
 
@@ -159,6 +159,7 @@ async def test_create_returns_201_with_reservation():
 
     # 201과 함께 만든 예약이 응답 모양으로 온다.
     assert response.status_code == 201
+    assert response.json()["message"] == "예약이 완료되었습니다."
     data = response.json()["data"]
     assert data["id"] == 15
     assert data["status"] == "CONFIRMED"

@@ -1,4 +1,4 @@
-# [담당 4] 예약 응답 모양 : API로 내보내는 예약 정보(모양)
+# [담당 4] 예약 요청.응답 모양 : 손님이 보내는 예약 신청서와 API로 내보내는 예약 정보
 import uuid
 from datetime import datetime
 from typing import Annotated
