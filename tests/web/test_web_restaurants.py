@@ -6,14 +6,13 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from container import create_restaurant_service
+from container import create_restaurant_service, create_slot_service
 from restaurant.domain.exceptions import RestaurantNotFoundError
 from restaurant.domain.restaurant import Menu, Restaurant
 from slot.application.service import SlotAvailability
 from slot.domain.day_range import SEOUL, seoul_now
 from slot.domain.time_slot import TimeSlot
 from web import register_web
-from web_data import get_slot_service
 
 RESTAURANT = Restaurant(
     id=1,
@@ -75,7 +74,7 @@ def client(fakes) -> httpx.AsyncClient:
     app = FastAPI()
     register_web(app)
     app.dependency_overrides[create_restaurant_service] = lambda: restaurants
-    app.dependency_overrides[get_slot_service] = lambda: slots
+    app.dependency_overrides[create_slot_service] = lambda: slots
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
 

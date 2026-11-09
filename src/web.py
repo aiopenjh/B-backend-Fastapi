@@ -17,12 +17,13 @@ from pydantic import BeforeValidator
 from common.pagination import PageParams
 from common.schemas import SEOUL
 from container import create_restaurant_service  # 담당 2: 식당 매니저 공장
+from container import create_slot_service  # 담당 3: 빈자리 매니저 공장 (#44)
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.domain.exceptions import RestaurantNotFoundError  # 담당 2: 없는 식당
 from restaurant.presentation.routers.v1.router import BIGINT_MAX  # 담당 2: 식당 번호 상한
 from slot.application.service import SlotService  # 담당 3: 빈자리 매니저
 from slot.domain.day_range import seoul_now  # 담당 3: 서울 지금 시각
-from web_data import OwnerUIQueries, PageResult, get_owner_ui_queries, get_slot_service
+from web_data import OwnerUIQueries, PageResult, get_owner_ui_queries
 
 SRC_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(SRC_DIR / "templates"))
@@ -48,7 +49,7 @@ templates.env.filters["seoul_datetime"] = seoul_datetime
 templates.env.filters["seoul_time"] = seoul_time
 OwnerQueries = Annotated[OwnerUIQueries | None, Depends(get_owner_ui_queries)]
 Restaurants = Annotated[RestaurantService, Depends(create_restaurant_service)]
-Slots = Annotated[SlotService, Depends(get_slot_service)]
+Slots = Annotated[SlotService, Depends(create_slot_service)]
 PageNumber = Annotated[int, Query(ge=1)]
 PageSize = Annotated[int, Query(ge=1, le=100)]
 # 빈 칸으로 보낸 폼 값("")은 '안 고름'(None)으로 본다
@@ -134,7 +135,7 @@ async def browse_page(
     )
 
 
-# 담당 5: 손님용 식당 상세 화면 (메뉴 + 날짜·인원별 빈자리, 담당 3 빈자리 매니저 #33 재사용)
+# 담당 5: 손님용 식당 상세 화면 (메뉴 + 날짜·인원별 빈자리, 담당 3 빈자리 매니저 #33·공장 #44 재사용)
 @router.get("/restaurants/{restaurant_id}", response_class=HTMLResponse, name="ui_restaurant")
 async def restaurant_page(
     request: Request,
