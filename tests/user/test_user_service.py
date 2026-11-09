@@ -1,15 +1,16 @@
 # [담당1 - 강성수] UserService.signUp 테스트 (메모리 레포지토리 사용)
 import uuid
+from datetime import datetime, UTC
 
 import pytest
 
 from common.errors import InvalidInputError
 from user.application.service import UserService
 from common.unit_of_work import ConflictError, UnitOfWork
-from user.domain.exceptions import DuplicatedUserError
 from user.domain.repository import UserRepository
 from user.domain.user import User
 from user.domain.value_object import Email
+from user.domain.exceptions import DuplicatedUserError, UserNotFoundError
 
 VALID_PASSWORD = "abcd1234!"
 
@@ -109,3 +110,25 @@ async def test_conflict_at_commit_becomes_duplicated_user(repo, hasher):
         await service.signUp("test@test.org", VALID_PASSWORD, "고길동", "010-1234-5678")
 
 
+async def test_get_user_success_returns_saved_user(service, repo):
+    saved = await service.signUp(
+        "alice@example.com", VALID_PASSWORD, "고길동", "010-1234-5678"
+    )
+
+    assert await service.get_user(saved.id) is saved
+
+
+async def test_get_user_fail_unknown_id(service):
+    with pytest.raises(UserNotFoundError):
+        await service.get_user(uuid.uuid4())
+
+
+async def test_get_user_fail_deleted_user(service):
+    saved = await service.signUp(
+        "alice@example.com", VALID_PASSWORD, "고길동", "010-1234-5678"
+    )
+
+    saved.deleted_at = datetime.now(UTC)
+
+    with pytest.raises(UserNotFoundError):
+        await service.get_user(saved.id)
