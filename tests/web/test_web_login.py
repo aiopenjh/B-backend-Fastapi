@@ -9,7 +9,11 @@ from auth.application.service import IssuedToken  # 담당1 로그인 결과
 from auth.domain.exceptions import InvalidCredentialsError  # 담당1 로그인 실패
 from auth.domain.value_object import AuthenticatedUser, AuthRole  # 담당1 로그인한 사람
 from common.errors import ForbiddenError  # 공통 403
-from container import create_auth_service, create_owner_service
+from container import (
+    create_auth_service,
+    create_owner_service,
+    create_restaurant_service,
+)
 from restaurant.domain.restaurant import Restaurant  # 담당2 식당
 from web import register_web
 from web_auth import COOKIE_NAME
@@ -136,3 +140,47 @@ async def test_broken_cookie_counts_as_not_logged_in(client):
         response = await client.get("/ui/owner/restaurants")
 
     assert response.status_code == 303  # 위조·만료 토큰 → 로그인 화면으로
+
+
+class FakeRestaurantService:
+    """가짜 식당 매니저: 손님 화면이 열리는지만 보려고"""
+
+    async def list_restaurants(self, q, cuisine, sort, page):
+        return [], 0
+
+
+async def test_owner_is_sent_from_customer_pages_to_own_space(client):
+    client.cookies.set(COOKIE_NAME, "owner-token")
+    async with client:
+        browse = await client.get("/ui/restaurants")
+        detail = await client.get("/ui/restaurants/1")
+
+    assert browse.status_code == 303 and browse.headers["location"].endswith("/ui/owner/restaurants")
+    assert detail.status_code == 303 and detail.headers["location"].endswith("/ui/owner/restaurants")
+
+
+async def test_menus_are_split_by_role():
+    app = FastAPI()
+    register_web(app)
+    app.dependency_overrides[create_auth_service] = FakeAuthService
+    app.dependency_overrides[create_owner_service] = FakeOwnerService
+    app.dependency_overrides[create_restaurant_service] = FakeRestaurantService
+    owner = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", cookies={COOKIE_NAME: "owner-token"})
+    customer = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", cookies={COOKIE_NAME: "customer-token"})
+    async with owner, customer:
+        owner_page = await owner.get("/ui/owner/restaurants")
+        customer_page = await customer.get("/ui/restaurants")
+
+    assert "운영 식당" in owner_page.text and "식당 둘러보기</a>" not in owner_page.text
+    assert "운영자 워크스페이스" in owner_page.text
+    assert "식당 둘러보기" in customer_page.text and "운영 식당</a>" not in customer_page.text
+    assert "손님 화면" in customer_page.text
+
+
+async def test_forbidden_page_button_goes_to_own_home(client):
+    client.cookies.set(COOKIE_NAME, "customer-token")
+    async with client:
+        response = await client.get("/ui/owner/restaurants")
+
+    assert response.status_code == 403
+    assert 'href="http://test/ui/restaurants">첫 화면으로' in response.text  # 손님의 첫 화면

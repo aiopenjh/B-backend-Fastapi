@@ -153,3 +153,14 @@ async def test_empty_date_means_all_days_and_unknown_restaurant_is_404(client, a
     assert day_after_all is None
     assert missing.status_code == 404
     assert "식당을 찾을 수 없어요" in missing.text
+
+
+async def test_admin_is_sent_from_customer_pages_and_sees_admin_menu_only(client):
+    client.cookies.set(COOKIE_NAME, "admin-token")
+    async with client:
+        browse = await client.get("/ui/restaurants")
+        owners = await client.get("/ui/admin/owners")
+
+    assert browse.status_code == 303 and browse.headers["location"].endswith("/ui/admin/owners")
+    assert "관리자 백오피스" in owners.text
+    assert "식당 둘러보기</a>" not in owners.text and "운영 식당</a>" not in owners.text

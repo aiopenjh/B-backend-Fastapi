@@ -1,5 +1,6 @@
-{# [담당 5] 위쪽 머리 조각: base.html이 include로 끼워 넣음 #}
+{# [담당 5] 위쪽 머리 조각: base.html이 include로 끼워 넣음. 지금 있는 공간 이름을 보여 줌 #}
+{% set ui_user = request.state.ui_user if request.state.ui_user is defined else none %}
 <header class="topbar">
-  <span>{% if active_page == 'browse' %}손님 화면{% else %}운영자 워크스페이스{% endif %}</span>
+  <span>{% if active_page == 'login' %}로그인{% elif ui_user is not none and ui_user.is_admin() %}관리자 백오피스{% elif ui_user is not none and ui_user.is_owner() %}운영자 워크스페이스{% else %}손님 화면{% endif %}</span>
   <span class="preview-chip">PREVIEW</span>
 </header>

@@ -81,11 +81,21 @@ Admin = Annotated[AdminService, Depends(create_admin_service)]
 
 
 def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
-    """오류를 JSON 대신 안내 화면으로 (403·404)"""
+    """오류를 JSON 대신 안내 화면으로 (403·404). 버튼은 그 사람의 첫 화면으로"""
+    user = request.state.ui_user
+    home = home_url(request, user) if user else str(request.url_for("ui_browse"))
     return templates.TemplateResponse(
         request=request, name="message.html", status_code=status_code,
-        context={"active_page": "", "title": title, "text": text},
+        context={"active_page": "", "title": title, "text": text, "home": home},
     )
+
+
+def staff_redirect(request: Request) -> RedirectResponse | None:
+    """손님 공간 문: 운영자·관리자는 손님 화면 대신 자기 공간(운영 식당·관리자)으로 돌려보낸다"""
+    user = request.state.ui_user
+    if user is not None and (user.is_owner() or user.is_admin()):
+        return RedirectResponse(home_url(request, user), status_code=303)
+    return None
 
 
 def deny(request: Request) -> RedirectResponse | HTMLResponse:
@@ -212,6 +222,8 @@ async def browse_page(
     page: PageNumber = 1,
     page_size: PageSize = 12,
 ):
+    if moved := staff_redirect(request):
+        return moved
     items, total = await service.list_restaurants(
         q, cuisine, sort, PageParams(page=page, page_size=page_size)
     )
@@ -236,6 +248,8 @@ async def restaurant_page(
     date: Annotated[Date | None, Blank] = None,
     party_size: Annotated[int, Query(ge=1, le=20)] = 2,
 ):
+    if moved := staff_redirect(request):
+        return moved
     day = date or (seoul_now() + timedelta(days=1)).date()  # 안 고르면 내일(서울)
     try:
         restaurant = await service.get_restaurant(restaurant_id)
