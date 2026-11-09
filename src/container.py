@@ -18,6 +18,12 @@ from owner.application.service import OwnerService  # 담당 5: 운영자 매니
 from reservation.application.query_service import (
     ReservationQueryService,
 )  # 담당 5: 예약 조회 매니저
+from reservation.application.service import ReservationService # 담당 4 : 예약 매니저
+from reservation.infrastructure.repositories import (
+    SQLAlchemyReservationRepository,
+) # 담당 4 : 예약 창고
+
+from slot.infrastructure.repositories import SQLAlchemySlotRepository # 담당 3 : 슬롯 창고
 
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.infrastructure.repository import (
@@ -103,6 +109,18 @@ def create_reservation_query_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ReservationQueryService:
     return ReservationQueryService(session)
+
+
+# 담당 4 : 예약 매니저 공장 (생성, 취소)
+def create_reservation_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
+) -> ReservationService:
+    return ReservationService(
+        reservation_repo=SQLAlchemyReservationRepository(session),
+        slot_repo=SQLAlchemySlotRepository(session),
+        uow=uow,
+)
 
 
 # 담당 2: 식당 매니저 공장
