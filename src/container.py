@@ -108,8 +108,9 @@ def create_reservation_query_service(
 # 담당 2: 식당 매니저 공장
 def create_restaurant_service(
     session: Annotated[AsyncSession, Depends(get_session)],
+    uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
 ) -> RestaurantService:
-    return RestaurantService(repo=RestaurantRepository(session))
+    return RestaurantService(repo=RestaurantRepository(session), uow=uow)
 
 
 def wire_dependencies(app: FastAPI) -> None:

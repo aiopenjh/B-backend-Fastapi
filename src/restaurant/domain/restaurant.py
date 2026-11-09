@@ -9,6 +9,8 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from auth.domain.value_object import AuthenticatedUser
+
 
 @dataclass
 class Menu:
@@ -64,3 +66,7 @@ class Restaurant:
     def is_active(self) -> bool:
         """삭제되지 않은 식당인지 확인"""
         return self.deleted_at is None
+
+    def can_be_edited_by(self, user: AuthenticatedUser) -> bool:
+        """관리자는 모든 식당, 운영자는 본인 식당만 수정 가능"""
+        return user.is_admin() or (user.is_owner() and self.is_owned_by(user.user_id))
