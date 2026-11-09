@@ -1,6 +1,42 @@
-{# [담당 5] 위쪽 머리 조각: base.html이 include로 끼워 넣음. 지금 있는 공간 이름을 보여 줌 #}
+{# [담당 5] 앱 상단 바 조각: base.html이 include로 끼워 넣음 #}
 {% set ui_user = request.state.ui_user if request.state.ui_user is defined else none %}
+{% set is_owner = ui_user is not none and ui_user.is_owner() %}
+{% set is_admin = ui_user is not none and ui_user.is_admin() %}
+{% set role_names = {'ADMIN': '관리자', 'OWNER': '운영자', 'CUSTOMER': '손님'} %}
+
+{% if is_admin %}
+  {% set home = url_for('ui_admin_owners') %}
+{% elif is_owner %}
+  {% set home = url_for('ui_restaurants') %}
+{% else %}
+  {% set home = url_for('ui_browse') %}
+{% endif %}
+
 <header class="topbar">
-  <span>{% if active_page == 'login' %}로그인{% elif ui_user is not none and ui_user.is_admin() and active_page == 'admin' %}관리자 백오피스{% elif ui_user is not none and ui_user.is_owner() %}운영자 워크스페이스{% else %}손님 화면{% endif %}</span>
-  <span class="preview-chip">PREVIEW</span>
+  <a class="brand" href="{{ home }}" aria-label="TABLE 첫 화면">
+    <span class="brand-symbol">t</span>TABLE
+    {% if is_admin %}
+      <span class="owner-label">ADMIN</span>
+    {% elif is_owner %}
+      <span class="owner-label">OWNER</span>
+    {% endif %}
+  </a>
+
+  <span class="topbar-title">
+    {% if active_page == 'login' %}
+      로그인
+    {% elif is_admin and active_page == 'admin' %}
+      관리자 백오피스
+    {% elif is_owner %}
+      운영자 워크스페이스
+    {% else %}
+      손님 화면
+    {% endif %}
+  </span>
+
+  {% if ui_user %}
+    <span class="preview-chip">{{ role_names.get(ui_user.role, ui_user.role) }}로 로그인</span>
+  {% else %}
+    <span class="preview-chip">로그인 전</span>
+  {% endif %}
 </header>

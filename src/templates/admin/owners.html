@@ -31,10 +31,10 @@
       <tbody>
         {% for owner, restaurant_count in owners %}
         <tr>
-          <td><strong>{{ owner.name }}</strong></td>
-          <td>{{ owner.email.value }}</td>
-          <td>{{ owner.phone }}</td>
-          <td><strong>{{ restaurant_count }}</strong>곳</td>
+          <td data-label="이름"><strong>{{ owner.name }}</strong></td>
+          <td data-label="이메일">{{ owner.email.value }}</td>
+          <td data-label="연락처">{{ owner.phone }}</td>
+          <td data-label="식당 수"><strong>{{ restaurant_count }}</strong>곳</td>
           <td><a class="text-link" href="{{ url_for('ui_admin_owner_restaurants', owner_id=owner.id) }}">식당 보기</a></td>
         </tr>
         {% else %}

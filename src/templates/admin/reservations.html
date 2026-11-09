@@ -50,13 +50,13 @@
       <tbody>
         {% for reservation, slot, guest in rows %}
         <tr>
-          <td><span class="reservation-id">#{{ reservation.id }}</span></td>
-          <td><time datetime="{{ slot.starts_at.isoformat() }}">{{ slot.starts_at|seoul_datetime }}</time></td>
-          <td><strong>{{ reservation.party_size }}</strong>명</td>
-          <td><strong>{{ guest.name }}</strong></td>
-          <td>{{ guest.email }}</td>
-          <td>{{ reservation.contact_phone or guest.phone }}</td>
-          <td>
+          <td data-label="예약 번호"><span class="reservation-id">#{{ reservation.id }}</span></td>
+          <td data-label="방문 일시"><time datetime="{{ slot.starts_at.isoformat() }}">{{ slot.starts_at|seoul_datetime }}</time></td>
+          <td data-label="인원"><strong>{{ reservation.party_size }}</strong>명</td>
+          <td data-label="예약자"><strong>{{ guest.name }}</strong></td>
+          <td data-label="예약자 이메일">{{ guest.email }}</td>
+          <td data-label="연락처">{{ reservation.contact_phone or guest.phone }}</td>
+          <td data-label="상태">
             {% if reservation.status == 'CONFIRMED' %}<span class="badge badge-confirmed"><span></span>예약 확정</span>
             {% elif reservation.status == 'CANCELLED' %}<span class="badge"><span></span>취소</span>
             {% else %}{{ reservation.status }}{% endif %}
