@@ -4,7 +4,7 @@
 
 가게 예약 서비스 예시를 통해 **요청 받기 → 업무 규칙 확인 → DB 저장 → 결과 응답**의 흐름을 배우고 구현합니다.
 
-> 현재는 **3 기본 구현** 단계입니다 (2026-11-05 dev 기준). 지금까지 들어온 것과 다음에 할 일은 [지금 어디까지 왔나](#지금-어디까지-왔나-2026-11-05-dev-기준)를 봅니다. 세부 설계는 [docs/](docs/)를 봅니다.
+> 현재는 **4 기능 연결** 단계입니다 (2026-11-09, PR #37까지). 지금까지 들어온 것과 다음에 할 일은 [지금 어디까지 왔나](#지금-어디까지-왔나-2026-11-09-pr-37까지)를 봅니다. 세부 설계는 [docs/](docs/)를 봅니다.
 
 | 문서 | 내용 |
 | --- | --- |
@@ -106,10 +106,10 @@ src/
 ├── slot/                # 담당 3 이영민: 예약 시간대 · 예약 가능 조회 · 시드
 ├── reservation/         # 담당 4 김민지: 예약 생성·취소 / 담당 5 최지훈: 예약 조회
 ├── owner/               # 담당 5 최지훈: 운영자 권한 검사 · 운영자 조회 (자기 테이블 없음)
-├── web.py               # 담당 5 최지훈: Jinja2 화면 라우터 /ui (PR 예정)
-├── web_data.py          # 담당 5 최지훈: 화면 ↔ 운영자 매니저 연결 (PR 예정)
-├── templates/           # 담당 5 최지훈: HTML 템플릿 (PR 예정)
-└── static/              # 담당 5 최지훈: CSS (PR 예정)
+├── web.py               # 담당 5 최지훈: Jinja2 화면 라우터 /ui (#17)
+├── web_data.py          # 담당 5 최지훈: 화면 ↔ 운영자 매니저 연결 자리 (#17, 데이터 연결 전)
+├── templates/           # 담당 5 최지훈: HTML 템플릿 (#17·#20)
+└── static/              # 담당 5 최지훈: CSS (#17)
 ```
 
 각 모듈·계층 패키지에 `__init__.py`를 포함합니다. 처음의 레이어 우선 골격은 위 모듈 구조로 옮겼습니다 (`src/common/database.py`).
@@ -138,7 +138,7 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 | 예외 처리 | 잘못된 입력, 규칙 위반, 없는 대상에 맞는 공통 형식 오류 응답 |
 | 인증과 보안 | 비밀번호 해시, OAuth2 로그인, JWT 발급, 로그아웃 토큰 차단(블랙리스트), 역할·소유 권한 확인 (계정은 시드) |
 | 공통 처리 | CORS, 요청 로그와 처리 시간 기록 |
-| 화면 | Jinja2 템플릿 화면 (담당 5). 지금 만든 화면은 운영자 화면 3개입니다 (#17·#20): 로그인 `/ui`, 내 식당 `/ui/owner/restaurants`, 식당 예약 `/ui/owner/restaurants/{id}/reservations`. 식당 목록·상세(11/2 회의 범위)는 담당 2 식당 부품이 들어온 뒤 붙입니다 |
+| 화면 | Jinja2 템플릿 화면 (담당 5). 지금 만든 화면은 운영자 화면 3개입니다 (#17·#20): 로그인 `/ui`, 내 식당 `/ui/owner/restaurants`, 식당 예약 `/ui/owner/restaurants/{id}/reservations`. 식당 목록·상세(11/2 회의 범위)는 식당 API(#32)를 그대로 불러 쓰도록 만드는 중입니다. 운영자 화면 데이터 연결은 화면 로그인 방식(쿠키)을 정한 뒤 붙입니다 |
 | 시작 데이터 | lifespan을 이용한 테이블 생성과 시연용 데이터 20건 이상, 재시작 시 중복 방지 |
 | 문서와 발표 | 실행 안내, 구조도, 동작 캡처, 팀 기록과 발표 자료 |
 
@@ -146,24 +146,24 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 
 필수 기능을 완성한 뒤 팀에서 선택합니다.
 
-- **A 동시성 제어 검증:** 동시에 요청이 몰리는 상황을 독립 DB 세션으로 재현하고, 행 락이 초과 예약을 막는지 확인합니다.
-- **B 후속 작업과 다운로드:** `BackgroundTasks`로 후속 로그를 처리하고 `StreamingResponse`로 CSV를 내려받습니다.
+- **A 동시성 제어 검증:** 동시에 요청이 몰리는 상황을 독립 DB 세션으로 재현하고, 행 락이 초과 예약을 막는지 확인합니다. 예약 생성·취소 매니저에 행 락은 들어갔고(#37), 동시 요청 재현은 아직입니다.
+- **B 후속 작업과 다운로드:** `BackgroundTasks`로 후속 로그를 처리하고 `StreamingResponse`로 CSV를 내려받습니다. **완료 (#34)**: 운영자 식당 예약 CSV 내려받기 + 응답 뒤 로그.
 - **C 회원가입:** 회원가입 API로 고객 계정을 만듭니다.
 
 프론트 연결(React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)는 범위에서 제외합니다. Jinja2 화면은 필수 범위에 넣었습니다 (2026-11-02). 실제 결제 연동과 상용 메일·SMS 발송도 제외합니다. 외부 배포는 제출 조건일 때만 합니다.
 
 ## 큰 진행 순서
 
-| 순서 | 할 일 | 남길 결과 | 지금 (11/6) |
+| 순서 | 할 일 | 남길 결과 | 지금 (11/9) |
 | --- | --- | --- | --- |
 | 1 기획 | 주제와 핵심 기능, 예약·취소 규칙을 정합니다. | 서비스 소개와 규칙표 | 완료 |
 | 2 설계 | DB 관계, 모듈 경계, API 입력·응답을 정합니다. | ERD, API 명세 | 완료 |
-| 3 기본 구현 | 환경과 모듈 4계층을 준비하고 도메인·DB·레포지토리·서비스·API를 연결합니다. | 정상 처리와 규칙 위반 차단 | **진행 중** (공용 부품 대부분, 예약 모델·취소 규칙·`can_cancel`, 슬롯 규칙·모델·저장소, 사용자 표·저장소·회원가입) |
-| 4 기능 연결 | 인증, 목록 조회, 운영자 조회, 미들웨어를 연결합니다. | 전체 사용 흐름 | 일부 (미들웨어, `require_owner`, `Page[T]`, 운영자 조회·예약 조회 코드, Jinja2 화면 틀. 로그인과 의존성 연결은 아직) |
-| 5 동작 확인 | 정상·오류·인증 차단·저장 결과를 확인하고 필요한 선택 기능을 정합니다. | 결과 캡처와 문제 해결 기록 | 시작 전 |
-| 6 발표 준비 | README, 팀 노션과 발표 자료를 정리하고 시연을 연습합니다. | 실행 안내와 발표·시연 자료 | 시작 전 |
+| 3 기본 구현 | 환경과 모듈 4계층을 준비하고 도메인·DB·레포지토리·서비스·API를 연결합니다. | 정상 처리와 규칙 위반 차단 | 거의 완료 (모든 모듈의 도메인 규칙·표·창고, 예약 생성·취소 매니저 #37) |
+| 4 기능 연결 | 인증, 목록 조회, 운영자 조회, 미들웨어를 연결합니다. | 전체 사용 흐름 | **진행 중** (로그인 #36, 식당 목록·상세 #32, 운영자·내 예약 API 등록, CSV #34. 남은 것: 예약 창구, 빈자리 창구, 로그아웃·내 정보, 식당 수정, 화면 데이터) |
+| 5 동작 확인 | 정상·오류·인증 차단·저장 결과를 확인하고 필요한 선택 기능을 정합니다. | 결과 캡처와 문제 해결 기록 | 시작 전 (시드 필요) |
+| 6 발표 준비 | README, 팀 노션과 발표 자료를 정리하고 시연을 연습합니다. | 실행 안내와 발표·시연 자료 | 시작 전 (11/10 README·발표 자료, 11/11 오후 발표) |
 
-## 지금 어디까지 왔나 (2026-11-06, dev `aa03231` 기준)
+## 지금 어디까지 왔나 (2026-11-09, PR #37까지)
 
 ### 들어온 PR
 
@@ -189,58 +189,43 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
 | #22 | 1 강성수 | 관리자 역할 `ADMIN`, `require_admin`, `change_role`(CUSTOMER↔OWNER), 기존 사용자 저장을 갱신(merge)으로 | 관리자가 운영자 역할을 줄 수 있게 (HTTP API는 아직) |
 | #23 | 4 김민지 | `Reservation.can_cancel(user_id)`(본인·확정 상태), `cancel()`에서 `slot` 인자 제거 | 취소 버튼을 보여 줄지 판단. 시작 여부는 서비스가 확인 |
 | #24 | 3 이영민 | `ReservationSlotModel`, `SlotRepository`·`SQLAlchemySlotRepository` | 슬롯 표와 저장소. `restaurants` 표가 없어 FK는 아직 못 묶음 |
-| #25 | 1 강성수 | 회원가입 API `POST /api/v1/users`, `container.wire_dependencies(app)` | 회원가입 창구. `main.py` 연결은 주석이라 지금은 500 |
+| #25 | 1 강성수 | 회원가입 API `POST /api/v1/users`, `container.wire_dependencies(app)` | 회원가입 창구 |
+| #26 | 1 강성수 | dev 통합본(#14~#25)을 main에 반영 | main 갱신 |
+| #27 | 5 최지훈 | 운영자·내 예약 창고의 슬롯 변환을 #24 이름 `_to_domain`에 맞춤, 낡은 주석 정리 | 이름 맞추기 |
+| #28 | 1 강성수 | 문서에 #16~#25 반영 (main) | 문서 최신화 |
+| #29 | 4 김민지 | `ReservationRepository`·`SQLAlchemyReservationRepository`(`exists_confirmed`·`add`·`get_for_update`·`save`), `to_reservation` | 예약 창고. 담당 5 조회 창고도 `to_reservation`을 씀 |
+| #30 | 2 김태양 | `Restaurant`·`Menu` 도메인(`is_owned_by`, `owner_id` UUID), `RestaurantModel`·`MenuModel`, `to_restaurant` | 식당 표와 "내 식당인가" 규칙 |
+| #31 | 1 강성수 | `JwtTokenProvider`(HS512, 토큰 만들기·읽기), 로그아웃 명단 표·창고, `main.py`의 `wire_dependencies` 연결 | 출입증 부품. 회원가입이 실제로 동작 |
+| #32 | 2 김태양 | 식당 목록 `GET /restaurants`(검색 `q`·음식 종류 `cuisine`·정렬·페이지)·상세 `GET /restaurants/{id}`, `RestaurantService`, `RestaurantOut` | 로그인 없이 보는 식당 API |
+| #33 | 3 이영민 | `SlotService.get_availability`, `SlotOut`·`AvailabilityOut` | 빈자리 조회 매니저와 응답 모양 (창구는 아직) |
+| #34 | 5 최지훈 | 운영자 식당 예약 CSV 내려받기(`StreamingResponse`·`BackgroundTasks`, 선택 B), 담당 5 테스트 10개 | 엑셀로 여는 예약 목록 + 403·404 판단 테스트 |
+| #35 | 4 김민지 | `ReservationOut.from_domain(reservation, slot, viewer_id, now)`, `can_cancel`에 "시작 전" 조건 | 예약 응답을 만드는 곳 하나 |
+| #36 | 1 강성수 | 로그인 `POST /auth/login`(봉투 없는 OAuth2 토큰 응답), `AuthService`, `get_authenticated_user` 진짜 구현 | **로그인이 실제로 동작.** `/docs` Authorize 가능 |
+| #37 | 4 김민지 | `ReservationService.create`·`cancel`(슬롯 → 예약 순서로 행 락, 끝에 commit 한 번), 확정 예약 중복을 막는 부분 unique 인덱스, 시작한 예약 취소 409, `UnitOfWork`를 `common`으로 옮김 | 예약하기·취소 매니저 (창구는 아직) |
+| 이번 PR | 5 최지훈 | `main.py`에 운영자·내 예약 창구 등록, 창구 3곳을 `from_domain` 새 모양으로, 응답 테스트 2개 | `/docs`에 담당 5 API 5개 |
 
-dev 테스트는 48개 모두 통과합니다. 앱은 켜지지만 등록된 API는 `POST /api/v1/auth/login`(본문 없음)과 `POST /api/v1/users`(의존성 연결 전이라 500) 두 개뿐이라, **아직 API를 실제로 눌러 볼 수는 없습니다** (로그인·테이블·시드가 없음).
+이번 PR까지 테스트 120개가 모두 통과합니다. 앱을 켜면 `/docs`에 API 9개가 보입니다: 로그인, 회원가입, 식당 목록·상세, 운영자 식당 목록·예약 목록·CSV, 내 예약 목록·상세. **로그인(#36)이 들어와서 `/docs`의 Authorize로 실제로 눌러 볼 수 있습니다.** 다만 시드가 아직 없어서 테이블이 비어 있습니다 (lifespan은 테이블만 만듦).
 
-**사용자 id가 UUID로 바뀌었습니다 (#8).** 사용자 id를 받는 곳(`reservations.user_id`, `restaurants.owner_id`, `Reservation.user_id`, `ReservationOut.user_id`, `is_owned_by`)은 `int`가 아니라 `uuid.UUID`로 맞춥니다. 예약 쪽은 #15에서 맞췄고, 식당 쪽(`owner_id`, `is_owned_by`)이 남았습니다. 나머지 테이블 id는 BIGINT 그대로입니다.
+**사용자 id는 UUID입니다 (#8).** 사용자 id를 받는 곳(`reservations.user_id`, `restaurants.owner_id`, `Reservation.user_id`, `ReservationOut.user_id`, `is_owned_by`)은 `int`가 아니라 `uuid.UUID`입니다. 예약 쪽은 #15, 식당 쪽은 #30에서 맞췄습니다. 나머지 테이블 id는 BIGINT 그대로입니다.
 
 **로그인한 사람은 `AuthenticatedUser`로 받습니다 (#14).** `Depends(get_authenticated_user)`를 쓰고, 번호는 `.user_id`, 운영자 여부는 `.is_owner()`로 봅니다. 예전 이름 `get_current_user`·`User`·`.id`는 쓰지 않습니다.
 
-### 다음에 할 일 (이 순서대로)
+### 다음에 할 일 (2026-11-09 기준)
 
-앞 단계 부품이 있어야 뒤 단계가 돌아갑니다. 그래서 위에서부터 채웁니다. 자세한 부품 표는 [BACKEND_PLAN 2장](docs/BACKEND_PLAN.md#공용-부품-현재-상태-2026-11-06-dev-aa03231-기준)에 있습니다.
+**부품은 모두 들어왔습니다.** 공용 부품(에러 #8, 페이지 #21, 로그인 #36, 사용자 id UUID #15·#30, 의존성 연결 #31), 표(회원 #14, 로그아웃 명단 #31, 식당·메뉴 #30, 슬롯 #24, 예약 #4), 도메인 규칙(자리 계산 #6, 취소 #15·#23·#35·#37, 내 식당인가 #30)이 dev에 있습니다. 남은 건 **창구 연결, 시드, 동작 확인**입니다.
 
-**3-1 모두가 기다리는 공용 부품** — 이게 없으면 다른 사람 코드가 빨간 줄입니다.
-
-| 할 일 | 담당 | 누가 기다리나 |
+| 할 일 | 담당 | 쓰는 곳 |
 | --- | --- | --- |
-| ~~`AppError` + 예외 핸들러~~ | 1 | **완료 (#8).** 슬롯 예외도 `error_code`를 붙여 409로 나감 (#10) |
-| ~~`Page[T]` 목록 응답 (`items`·`page`·`page_size`·`total`)~~ | 2 | **완료 (#21)** |
-| `get_authenticated_user` 실제 구현 (토큰 → `AuthenticatedUser`). 자리는 #14에 있음 (`NotImplementedError`) | 1 | 2 · 4 · 5 (로그인이 필요한 API 전부) |
-| 사용자 id `int` → `uuid.UUID` 맞추기 | 2 | 2 (`owner_id`). 4(`user_id`)는 **완료 (#15)** |
-| 의존성 연결: `main.py`의 `wire_dependencies(app)` 주석 풀기 | 1 | 회원가입·운영자·내 예약 API 전부. `container.py`가 import하는 `reservation.infrastructure.repository`(4)와 식당 부품(2)이 먼저 있어야 함 |
-
-**3-2 테이블과 시드** — 이게 있어야 앱을 켜고 실제로 눌러 볼 수 있습니다.
-
-| 할 일 | 담당 |
-| --- | --- |
-| ~~`UserModel`~~ **완료 (#14)**, `TokenBlacklistModel` | 1 |
-| `RestaurantModel`, `MenuModel` | 2 |
-| ~~`ReservationSlotModel` (`reservation_slots` 표)~~ | 3 · **완료 (#24)**, `SlotRepository`도 있음 |
-| lifespan 테이블 자동 생성 + 시드 (고객 2 · 운영자 2 · 식당 3 · 메뉴 9 · 슬롯 12개 이상) | 3 (각자 자기 표의 시드 행을 넘겨줌) |
-
-**3-3 도메인 규칙** — DB 없이 테스트할 수 있어서 위와 같이 진행해도 됩니다.
-
-| 할 일 | 담당 |
-| --- | --- |
-| ~~`TimeSlot.can_accept` · `reserve` · `release`~~ | 3 · **완료 (#6)** |
-| `Restaurant.is_owned_by` (내 식당인가) | 2 |
-| ~~`Reservation.can_cancel`~~ (**완료 #23**) · ~~`cancel`~~ (**완료 #15**, 재취소 409) | 4 |
-
-**4 기능 연결 (API)** — 위 부품이 들어오는 대로 각자 붙입니다.
-
-| 담당 | 순서 |
-| --- | --- |
-| 1 | 로그인 → 내 정보 `/users/me` → 로그아웃(블랙리스트). 선택 과제 회원가입 `POST /users`는 코드 완료 (#18·#25, 연결 전) |
-| 2 | 식당 상세 → 식당 목록(검색·필터·정렬) → 식당 정보 수정 |
-| 3 | 예약 가능 시간 조회 |
-| 4 | 예약 생성(행 락) → 예약 취소 |
-| 5 | 운영자 식당 목록(#7) → 운영자 식당 예약 목록(#7 창구·매니저, 창고 #16) → 내 예약 목록 → 예약 상세 (둘 다 #16, 코드 완료) → Jinja2 화면(#17·#20, 운영자 화면 틀 완료 · 식당 목록·상세는 식당 부품 뒤) |
+| 예약하기 `POST /reservations`·취소 창구 + 공장 (매니저는 #37) | 4 | 발표 흐름의 예약·취소 |
+| 시드 (고객 2 · 운영자 2 · 식당 3 · 메뉴 9 · 슬롯 12개 이상 · 예약 몇 건), 재시작 시 중복 방지 | 3 (각자 자기 표의 시드 행을 넘겨줌) | 모든 시연 |
+| 빈자리 조회 창구 `GET /restaurants/{id}/availability` (매니저는 #33) | 3 | 발표 흐름의 빈자리 보기 |
+| 로그아웃 `POST /auth/logout`(블랙리스트) → 내 정보 `GET /users/me` | 1 | 발표 흐름의 "로그아웃한 토큰 401" |
+| 식당 정보 수정 `PATCH` | 2 | 운영자 흐름 |
+| Jinja2 식당 목록·상세 화면, 운영자 화면 데이터 연결 | 5 | 필수 "화면" |
 
 **5 동작 확인** — `/docs`에서 한 번에 이어서 눌러 봅니다. 고객 A 로그인 → 식당 목록 → 상세 → 예약 가능 조회 → 예약 → 내 예약 → 취소 → 로그아웃 → 같은 토큰 401 / 운영자 A 로그인 → 내 식당 → 그 식당 예약 → 운영자 B 식당 예약 403. 각자 테스트 2개(정상 1 · 실패 1).
 
-**6 발표 준비** — README 실행 안내, 동작 캡처, 발표 자료.
+**6 발표 준비** — README 실행 안내, 동작 캡처(`/docs`·Jinja2 화면, 200·400·401·403·404), 발표 자료 7~10장. 발표는 11/11(수) 오후입니다.
 
 ## 공부와 개발 기록
 
@@ -260,6 +245,8 @@ dev 테스트는 48개 모두 통과합니다. 앱은 켜지지만 등록된 API
    POSTGRES_PASSWORD=<로컬 비밀번호>
    POSTGRES_DB=postgres
    POSTGRES_URL=postgresql+asyncpg://postgres:<로컬 비밀번호>@localhost:5432/postgres
+   # 로그인 토큰 서명 열쇠 (#31). 없거나 64바이트보다 짧으면 로그인 때 에러
+   JWT_SECRET_KEY=<64바이트 이상 무작위 문자열>
    # 선택: 허용할 프론트 주소 (쉼표 구분, 기본값 http://localhost:3000)
    CORS_ORIGINS=http://localhost:3000
    ```
@@ -274,7 +261,13 @@ dev 테스트는 48개 모두 통과합니다. 앱은 켜지지만 등록된 API
    uv sync
    ```
 
-3. 앱을 실행합니다. 테이블과 시드를 만드는 lifespan(담당 3)이 들어오면, 시작할 때 테이블과 시드가 자동으로 만들어집니다 (2026-11-03 기준 아직 없음).
+   설치가 끝나면 아래 명령으로 `JWT_SECRET_KEY` 값을 만들어 `.env`에 넣습니다.
+
+   ```bash
+   uv run python -c "import secrets; print(secrets.token_urlsafe(64))"
+   ```
+
+3. 앱을 실행합니다. 시작할 때 lifespan이 테이블을 자동으로 만듭니다. 시드(담당 3)는 아직 없습니다 (2026-11-09 기준).
 
    ```bash
    uv run uvicorn main:app --app-dir src --reload
