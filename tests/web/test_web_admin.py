@@ -172,8 +172,14 @@ async def test_admin_can_open_customer_browse(client):
     from container import create_browse_service, create_restaurant_service
 
     class FakeBrowseService:
-        async def list_regions(self):
+        def list_provinces(self):
             return []
+
+        async def list_cuisines(self):
+            return []
+
+        async def list_restaurants(self, province, district, q, cuisine, seed, page):
+            return [], 0
 
     class FakeRestaurantService:
         async def list_restaurants(self, q, cuisine, sort, page):

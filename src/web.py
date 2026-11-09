@@ -5,11 +5,12 @@
 운영자 화면은 화면 로그인(JWT를 쿠키에 담기, web_auth.py) 뒤에 실제 데이터를 보여 준다.
 """
 
+import secrets
 import uuid
 from datetime import date as Date
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, Form, Query, Request
 from fastapi import Path as PathParam
@@ -218,37 +219,37 @@ async def reservations_page(
     )
 
 
-# 담당 5: 손님용 식당 목록 화면 (로그인 필요 없음). 지역 칩을 누르면 그 지역(구) 식당만 10개씩
+# 담당 5: 손님용 식당 목록 화면 (로그인 필요 없음). 식당 이름·음식 종류·지역(시·도 → 구)으로 찾고 10개씩
 @router.get("/restaurants", response_class=HTMLResponse, name="ui_browse")
 async def browse_page(
     request: Request,
-    service: Restaurants,
     browse: Browse,
-    region: Annotated[str | None, Blank] = None,
     q: Annotated[str | None, Blank] = None,
     cuisine: Annotated[str | None, Blank] = None,
-    sort: Literal["id", "name"] = "id",
+    region: Annotated[str | None, Blank] = None,
+    district: Annotated[str | None, Blank] = None,
     page: PageNumber = 1,
     page_size: PageSize = 10,
 ):
     if moved := staff_redirect(request):
         return moved
-    params = PageParams(page=page, page_size=page_size)
-    regions = await browse.list_regions()
-    if region:
-        # 지역을 고르면 담당 5 둘러보기 창고 (주소의 구로 거름)
-        items, total = await browse.list_region_restaurants(region, q, cuisine, sort, params)
-    else:
-        # 전체는 담당 2 식당 매니저(#32) 그대로
-        items, total = await service.list_restaurants(q, cuisine, sort, params)
+    # 열 때마다(새로고침 포함) 새로 섞음
+    seed = secrets.token_hex(4)
+    if not region:
+        district = None
+    districts = await browse.list_districts(region) if region else []
+    items, total = await browse.list_restaurants(
+        region, district, q, cuisine, seed, PageParams(page=page, page_size=page_size)
+    )
     return templates.TemplateResponse(
         request=request,
         name="restaurants/list.html",
         context={
-            "active_page": "browse", "restaurants": items, "total": total,
+            "active_page": "browse", "restaurants": items,
             "result": PageResult(items, total, page, page_size),
-            "regions": regions, "region": region or "",
-            "q": q or "", "cuisine": cuisine or "", "sort": sort,
+            "cuisines": await browse.list_cuisines(), "provinces": browse.list_provinces(),
+            "districts": districts,
+            "q": q or "", "cuisine": cuisine or "", "region": region or "", "district": district or "",
         },
     )
 
