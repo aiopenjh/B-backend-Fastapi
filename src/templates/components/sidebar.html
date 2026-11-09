@@ -1,12 +1,22 @@
-{# [담당 5] 왼쪽 메뉴 조각: base.html이 include로 끼워 넣음 #}
+{# [담당 5] 왼쪽 메뉴 조각: base.html이 include로 끼워 넣음. 로그인 상태는 쿠키 문지기(get_ui_user)가 request.state에 넣어 둠 #}
+{% set ui_user = request.state.ui_user if request.state.ui_user is defined else none %}
+{% set role_names = {'ADMIN': '관리자', 'OWNER': '운영자', 'CUSTOMER': '손님'} %}
 <aside class="sidebar">
   <a class="brand" href="{{ url_for('ui_login') }}" aria-label="TABLE 첫 화면"><span class="brand-symbol">t</span>TABLE<span class="owner-label">OWNER</span></a>
   <p class="nav-label">WORKSPACE</p>
   <nav aria-label="주 메뉴">
     <a href="{{ url_for('ui_browse') }}" {% if active_page == 'browse' %}aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>식당 둘러보기</a>
     <a href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants','reservations'] %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>운영 식당</a>
+    {% if not ui_user %}
     <a href="{{ url_for('ui_login') }}" {% if active_page == 'login' %}aria-current="page"{% endif %}><span aria-hidden="true">↪</span>로그인</a>
+    {% endif %}
   </nav>
-  <div class="sidebar-note"><span class="status-dot"></span>화면 미리보기<p>실제 계정·예약 연결 전</p></div>
+  {% if ui_user %}
+  <div class="sidebar-note"><span class="status-dot"></span>{{ role_names.get(ui_user.role, ui_user.role) }}로 로그인
+    <form method="post" action="{{ url_for('ui_logout') }}"><button class="text-link logout-button" type="submit">로그아웃</button></form>
+  </div>
+  {% else %}
+  <div class="sidebar-note"><span class="status-dot"></span>로그인 전<p>식당 둘러보기는 로그인 없이 볼 수 있어요</p></div>
+  {% endif %}
   <div class="sidebar-footer">KANT PROJECT<span>가게 예약 서비스</span></div>
 </aside>

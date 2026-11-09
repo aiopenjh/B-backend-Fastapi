@@ -1,33 +1,52 @@
 # [담당 5] Jinja2 화면 창구: /ui 주소로 HTML 돌려주기
 """기존 조회 흐름을 위한 HTML 화면.
 
-손님용 식당 목록·상세는 실제 데이터와 연결됨 (로그인 필요 없음).
-운영자 화면은 화면용 로그인(쿠키)이 붙은 뒤 연결한다.
+손님용 식당 목록·상세는 로그인 없이 실제 데이터를 보여 준다.
+운영자 화면은 화면 로그인(JWT를 쿠키에 담기, web_auth.py) 뒤에 실제 데이터를 보여 준다.
 """
 
-from datetime import date as Date, datetime, timedelta
+from datetime import date as Date
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, FastAPI, Path as PathParam, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, FastAPI, Form, Query, Request
+from fastapi import Path as PathParam
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BeforeValidator
+
+from auth.application.service import AuthService  # 담당 1: 로그인 매니저
+from common.errors import AppError  # 공통 오류 (404·403 안내 화면으로 바꿈)
 from common.pagination import PageParams
 from common.schemas import SEOUL
-from container import create_restaurant_service  # 담당 2: 식당 매니저 공장
-from container import create_slot_service  # 담당 3: 빈자리 매니저 공장 (#44)
+from container import (
+    create_auth_service,  # 담당 1: 로그인 매니저 공장
+    create_restaurant_service,  # 담당 2: 식당 매니저 공장
+    create_slot_service,  # 담당 3: 빈자리 매니저 공장 (#44)
+)
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.domain.exceptions import RestaurantNotFoundError  # 담당 2: 없는 식당
-from restaurant.presentation.routers.v1.router import BIGINT_MAX  # 담당 2: 식당 번호 상한
+from restaurant.presentation.routers.v1.router import (
+    BIGINT_MAX,  # 담당 2: 식당 번호 상한
+)
 from slot.application.service import SlotService  # 담당 3: 빈자리 매니저
 from slot.domain.day_range import seoul_now  # 담당 3: 서울 지금 시각
+from web_auth import (  # 담당 5: 화면 로그인
+    COOKIE_NAME,
+    COOKIE_PATH,
+    get_ui_user,
+    home_url,
+    safe_next,
+    to_login,
+)
 from web_data import OwnerUIQueries, PageResult, get_owner_ui_queries
 
 SRC_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(SRC_DIR / "templates"))
-router = APIRouter(prefix="/ui", include_in_schema=False)
+# 모든 화면에서 쿠키 로그인 상태를 먼저 읽어 둔다 (사이드바가 씀). 로그인 안 해도 화면은 열림
+router = APIRouter(prefix="/ui", include_in_schema=False, dependencies=[Depends(get_ui_user)])
 
 
 def seoul_datetime(value):
@@ -54,21 +73,74 @@ PageNumber = Annotated[int, Query(ge=1)]
 PageSize = Annotated[int, Query(ge=1, le=100)]
 # 빈 칸으로 보낸 폼 값("")은 '안 고름'(None)으로 본다
 Blank = BeforeValidator(lambda value: value or None)
+Auth = Annotated[AuthService, Depends(create_auth_service)]
+
+
+def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
+    """오류를 JSON 대신 안내 화면으로 (403·404)"""
+    return templates.TemplateResponse(
+        request=request, name="message.html", status_code=status_code,
+        context={"active_page": "", "title": title, "text": text},
+    )
+
+
+def deny(request: Request) -> RedirectResponse | HTMLResponse:
+    """운영자 화면 문: 로그인 안 했으면 로그인 화면으로, 로그인했는데 운영자가 아니면 403 안내"""
+    if request.state.ui_user is None:
+        return to_login(request)
+    return message_page(request, 403, "운영자만 볼 수 있어요", "운영자 계정으로 로그인해 주세요.")
 
 
 @router.get("", response_class=HTMLResponse, name="ui_login")
-async def login_page(request: Request):
+async def login_page(request: Request, next: str | None = None):
     return templates.TemplateResponse(
-        request=request, name="login.html", context={"active_page": "login"}
+        request=request, name="login.html",
+        context={"active_page": "login", "next": safe_next(next) or "", "email": "", "error": None},
     )
+
+
+# 담당 5: 화면 로그인 — 담당 1 login으로 JWT를 받아 HttpOnly 쿠키에 담는다
+@router.post("/login", name="ui_login_submit")
+async def login_submit(
+    request: Request,
+    auth: Auth,
+    username: Annotated[str, Form()] = "",
+    password: Annotated[str, Form()] = "",
+    next: Annotated[str, Form()] = "",
+):
+    try:
+        issued = await auth.login(email=username, password=password)
+        user = await auth.authenticate(token=issued.access_token)
+    except AppError:
+        # 이메일·비밀번호가 틀리면 같은 화면에 문구를 띄움 (어느 쪽이 틀렸는지는 알려 주지 않음)
+        return templates.TemplateResponse(
+            request=request, name="login.html", status_code=401,
+            context={"active_page": "login", "next": safe_next(next) or "", "email": username,
+                     "error": "이메일 또는 비밀번호가 올바르지 않습니다."},
+        )
+    response = RedirectResponse(safe_next(next) or home_url(request, user), status_code=303)
+    response.set_cookie(
+        COOKIE_NAME, issued.access_token, max_age=issued.expires_in,
+        httponly=True, samesite="lax", path=COOKIE_PATH,  # 자바스크립트로 못 읽고, 화면 주소에만 보냄
+    )
+    return response
+
+
+# 담당 5: 화면 로그아웃 — 쿠키를 지운다 (서버 쪽 토큰 폐기는 담당 1 로그아웃 API가 생기면 연결)
+@router.post("/logout", name="ui_logout")
+async def logout_submit(request: Request):
+    response = RedirectResponse(request.url_for("ui_login"), status_code=303)
+    response.delete_cookie(COOKIE_NAME, path=COOKIE_PATH)
+    return response
 
 
 @router.get("/owner/restaurants", response_class=HTMLResponse, name="ui_restaurants")
 async def restaurants_page(
     request: Request, source: OwnerQueries, page: PageNumber = 1, page_size: PageSize = 20
 ):
-    result = await source.restaurants(page, page_size) if source else None
-    # None은 미연결이다. 실제 조회 결과가 없을 때만 []를 전달한다.
+    if source is None:
+        return deny(request)
+    result = await source.restaurants(page, page_size)
     return templates.TemplateResponse(
         request=request,
         name="owner/restaurants.html",
@@ -87,14 +159,19 @@ async def restaurants_page(
 )
 async def reservations_page(
     request: Request,
-    restaurant_id: Annotated[int, PathParam(gt=0)],
+    restaurant_id: Annotated[int, PathParam(gt=0, le=BIGINT_MAX)],
     source: OwnerQueries,
     date: Annotated[Date | None, BeforeValidator(lambda value: value or None)] = None,
     page: PageNumber = 1,
     page_size: PageSize = 20,
 ):
-    result = await source.reservations(restaurant_id, date, page, page_size) if source else None
-    # 실제 데이터를 넣기 전에 require_owner와 서비스의 소유권 검사를 연결한다.
+    if source is None:
+        return deny(request)
+    try:
+        # 매니저가 없는 식당 404, 남의 식당 403을 판단한다 (운영자 API와 같은 규칙)
+        result = await source.reservations(restaurant_id, date, page, page_size)
+    except AppError as error:
+        return message_page(request, error.error_code.status, "예약을 볼 수 없어요", error.message)
     return templates.TemplateResponse(
         request=request,
         name="owner/reservations.html",

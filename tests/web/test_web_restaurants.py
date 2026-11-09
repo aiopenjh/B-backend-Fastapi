@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from container import create_restaurant_service, create_slot_service
 from restaurant.domain.exceptions import RestaurantNotFoundError
@@ -13,6 +13,7 @@ from slot.application.service import SlotAvailability
 from slot.domain.day_range import SEOUL, seoul_now
 from slot.domain.time_slot import TimeSlot
 from web import register_web
+from web_auth import get_ui_user
 
 RESTAURANT = Restaurant(
     id=1,
@@ -63,6 +64,11 @@ class FakeSlotService:
         ]
 
 
+def not_logged_in(request: Request):
+    """가짜 화면 문지기: 로그인 안 한 상태"""
+    request.state.ui_user = None
+
+
 @pytest.fixture
 def fakes():
     return FakeRestaurantService(), FakeSlotService()
@@ -75,6 +81,7 @@ def client(fakes) -> httpx.AsyncClient:
     register_web(app)
     app.dependency_overrides[create_restaurant_service] = lambda: restaurants
     app.dependency_overrides[create_slot_service] = lambda: slots
+    app.dependency_overrides[get_ui_user] = not_logged_in  # 쿠키 로그인 없이
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
 

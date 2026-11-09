@@ -1,0 +1,11 @@
+{# [담당 5] 안내 화면: 403·404 같은 오류를 JSON 대신 사람이 읽는 문구로 #}
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="panel empty-state">
+  <span class="empty-symbol" aria-hidden="true">!</span>
+  <h3>{{ title }}</h3>
+  <p>{{ text }}</p>
+  <p><a class="button button-outline" href="{{ url_for('ui_browse') }}">식당 둘러보기</a></p>
+</section>
+{% endblock %}
