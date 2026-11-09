@@ -15,6 +15,12 @@ from auth.presentation.dependencies import auth_service
 
 from owner.application.service import OwnerService  # 담당 5: 운영자 매니저
 
+from slot.application.service import SlotService  # 담당 3: 슬롯(예약 시간대) 매니저
+from slot.domain.repository import SlotRepository  # 담당 3: 슬롯 창고 약속
+from slot.infrastructure.repositories import (
+    SQLAlchemySlotRepository,
+)  # 담당 3: 슬롯 창고
+
 from reservation.application.query_service import (
     ReservationQueryService,
 )  # 담당 5: 예약 조회 매니저
@@ -89,6 +95,20 @@ def create_auth_service(
         blacklist_repo=blacklist_repo,
         token_provider=token_provider,
     )
+
+
+# 담당 3: 슬롯 창고 공장 (예약 공장도 이것을 받는다 — 같은 요청이면 같은 세션)
+def create_slot_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> SlotRepository:
+    return SQLAlchemySlotRepository(session)
+
+
+# 담당 3: 슬롯 매니저 공장
+def create_slot_service(
+    repo: Annotated[SlotRepository, Depends(create_slot_repository)],
+) -> SlotService:
+    return SlotService(repo)
 
 
 # 담당 5: 운영자 매니저 공장
