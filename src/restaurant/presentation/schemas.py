@@ -51,5 +51,29 @@ class RestaurantUpdate(BaseModel):
         return self
 
 
+class MenuCreate(BaseModel):
+    """메뉴 등록 입력"""
+
+    name: str = Field(min_length=1, max_length=150)
+    price: int = Field(ge=0)
+    description: str | None = None
+
+
+class MenuUpdate(BaseModel):
+    """메뉴 수정 입력. 보낸 필드만 바꿈(모두 선택)"""
+
+    # name, price는 DB에서 비울 수 없는 칸이라 null이면 422
+    name: str = Field(None, min_length=1, max_length=150)
+    price: int = Field(None, ge=0)
+    description: str | None = None
+
+    @model_validator(mode="after")
+    def check_not_empty(self):
+        """빈 본문({})이면 422"""
+        if not self.model_fields_set:
+            raise ValueError("수정할 항목을 하나 이상 보내야 합니다.")
+        return self
+
+
 # 담당5(owner)가 쓰는 이름. 팀에서 이름을 정하면 정리
 RestaurantOut = RestaurantSummary

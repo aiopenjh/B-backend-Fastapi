@@ -92,3 +92,29 @@ class RestaurantRepository:
             setattr(model, key, value)
         await self.session.flush()
         return to_restaurant(model)
+
+    async def add_menu(self, restaurant_id: int, fields: dict) -> Menu:
+        """메뉴 하나 추가. id는 DB가 만들어줌 (flush까지)"""
+        model = MenuModel(
+            restaurant_id=restaurant_id,
+            name=fields["name"],
+            price=fields["price"],
+            description=fields["description"],
+        )
+        self.session.add(model)
+        await self.session.flush()
+        return to_menu(model)
+
+    async def update_menu(self, menu_id: int, changes: dict) -> Menu:
+        """메뉴의 보낸 칸만 바꿈 (flush)"""
+        model = await self.session.get(MenuModel, menu_id)
+        for key, value in changes.items():
+            setattr(model, key, value)
+        await self.session.flush()
+        return to_menu(model)
+
+    async def delete_menu(self, menu_id: int) -> None:
+        """메뉴 삭제. 소프트 삭제가 아니라 실제로 지움 (flush)"""
+        model = await self.session.get(MenuModel, menu_id)
+        await self.session.delete(model)
+        await self.session.flush()
