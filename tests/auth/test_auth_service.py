@@ -201,3 +201,70 @@ async def test_authenticate_fail_unknown_user(service, user, user_repo):
 
     with pytest.raises(UnauthorizedError):
         await service.authenticate(issued.access_token)
+
+
+async def test_logout_success_blocks_the_token(service, user, blacklist, uow):
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    await service.logout(issued.access_token)
+
+    with pytest.raises(UnauthorizedError):
+        await service.authenticate(issued.access_token)
+
+    assert uow.commits == 1
+    assert blacklist.saved[0].user_id == user.id
+
+
+async def test_logout_success_keeps_other_tokens_valid(service, user):
+    first = await service.login("owner@example.com", PASSWORD)
+    second = await service.login("owner@example.com", PASSWORD)
+
+    await service.logout(first.access_token)
+
+    assert (await service.authenticate(second.access_token)).user_id == user.id
+
+
+async def test_login_again_after_logout_issues_working_token(service, user):
+    first = await service.login("owner@example.com", PASSWORD)
+    await service.logout(first.access_token)
+
+    second = await service.login("owner@example.com", PASSWORD)
+
+    assert (await service.authenticate(second.access_token)).user_id == user.id
+    with pytest.raises(UnauthorizedError):
+        await service.authenticate(first.access_token)
+
+
+async def test_logout_fail_already_logged_out(service, user, uow):
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    await service.logout(issued.access_token)
+
+    with pytest.raises(UnauthorizedError):
+        await service.logout(issued.access_token)
+    assert uow.commits == 1
+
+
+async def test_logout_fail_invalid_token(service, blacklist, uow):
+    with pytest.raises(UnauthorizedError):
+        await service.logout("not-a-jwt")
+
+    assert blacklist.saved == []
+    assert uow.commits == 0
+
+
+async def test_logout_conflict_at_commit_becomes_unauthorized(
+    user_repo, hasher, blacklist, user
+):
+    service = AuthService(
+        user_repo=user_repo,
+        hasher=hasher,
+        token_provider=JwtTokenProvider(secret_key=SECRET),
+        blacklist_repo=blacklist,
+        uow=FakeUnitOfWork(conflict=True),
+    )
+
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    with pytest.raises(UnauthorizedError):
+        await service.logout(issued.access_token)
