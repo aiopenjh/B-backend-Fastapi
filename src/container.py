@@ -15,6 +15,12 @@ from auth.presentation.dependencies import auth_service
 
 from owner.application.service import OwnerService  # 담당 5: 운영자 매니저
 
+from slot.application.service import SlotService  # 담당 3: 슬롯(예약 시간대) 매니저
+from slot.domain.repository import SlotRepository  # 담당 3: 슬롯 창고 약속
+from slot.infrastructure.repositories import (
+    SQLAlchemySlotRepository,
+)  # 담당 3: 슬롯 창고
+
 from reservation.application.query_service import (
     ReservationQueryService,
 )  # 담당 5: 예약 조회 매니저
@@ -22,8 +28,6 @@ from reservation.application.service import ReservationService # 담당 4 : 예�
 from reservation.infrastructure.repositories import (
     SQLAlchemyReservationRepository,
 ) # 담당 4 : 예약 창고
-
-from slot.infrastructure.repositories import SQLAlchemySlotRepository # 담당 3 : 슬롯 창고
 
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.infrastructure.repository import (
@@ -97,6 +101,20 @@ def create_auth_service(
     )
 
 
+# 담당 3: 슬롯 창고 공장 (예약 공장도 이것을 받는다 — 같은 요청이면 같은 세션)
+def create_slot_repository(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> SlotRepository:
+    return SQLAlchemySlotRepository(session)
+
+
+# 담당 3: 슬롯 매니저 공장
+def create_slot_service(
+    repo: Annotated[SlotRepository, Depends(create_slot_repository)],
+) -> SlotService:
+    return SlotService(repo)
+
+
 # 담당 5: 운영자 매니저 공장
 def create_owner_service(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -114,13 +132,14 @@ def create_reservation_query_service(
 # 담당 4 : 예약 매니저 공장 (생성, 취소)
 def create_reservation_service(
     session: Annotated[AsyncSession, Depends(get_session)],
+    slot_repo: Annotated[SlotRepository, Depends(create_slot_repository)],
     uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
 ) -> ReservationService:
     return ReservationService(
         reservation_repo=SQLAlchemyReservationRepository(session),
-        slot_repo=SQLAlchemySlotRepository(session),
+        slot_repo=slot_repo,
         uow=uow,
-)
+    )
 
 
 # 담당 2: 식당 매니저 공장

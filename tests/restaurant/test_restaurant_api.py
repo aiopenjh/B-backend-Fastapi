@@ -9,11 +9,12 @@ from auth.presentation.dependencies import get_authenticated_user
 from common.error_handlers import register_error_handlers
 from container import create_restaurant_service
 from restaurant.domain.exceptions import (
+    MenuNotFoundError,
     NotRestaurantOwnerError,
     RestaurantNotFoundError,
 )
 from restaurant.domain.restaurant import Menu, Restaurant
-from restaurant.presentation.routers.v1.router import router
+from restaurant.presentation.routers.v1.router import owner_router, router
 
 RESTAURANT = Restaurant(
     id=1,
@@ -46,12 +47,31 @@ class FakeRestaurantService:
             raise NotRestaurantOwnerError()
         return RESTAURANT
 
+    async def add_menu(self, user, restaurant_id, fields):
+        FakeRestaurantService.received = (user, restaurant_id, fields)
+        return Menu(
+            id=31,
+            name=fields["name"],
+            price=fields["price"],
+            description=fields["description"],
+        )
+
+    async def update_menu(self, user, restaurant_id, menu_id, changes):
+        FakeRestaurantService.received = (user, restaurant_id, menu_id, changes)
+        return Menu(id=1, name="비빔밥", price=9500)
+
+    async def delete_menu(self, user, restaurant_id, menu_id):
+        if menu_id != 1:
+            raise MenuNotFoundError()
+        FakeRestaurantService.received = (user, restaurant_id, menu_id)
+
 
 @pytest.fixture
 def client() -> httpx.AsyncClient:
     app = FastAPI()
     register_error_handlers(app)
     app.include_router(router, prefix="/api/v1")
+    app.include_router(owner_router, prefix="/api/v1")
     app.dependency_overrides[create_restaurant_service] = FakeRestaurantService
     app.dependency_overrides[get_authenticated_user] = lambda: LOGIN_USER
 
@@ -105,7 +125,9 @@ async def test_unknown_sort_returns_422(client):
 
 async def test_update_restaurant_sends_only_given_fields(client):
     async with client:
-        response = await client.patch("/api/v1/restaurants/1", json={"name": "새 이름"})
+        response = await client.patch(
+            "/api/v1/owner/restaurants/1", json={"name": "새 이름"}
+        )
 
     assert response.status_code == 200
     assert FakeRestaurantService.received == (LOGIN_USER, 1, {"name": "새 이름"})
@@ -113,7 +135,7 @@ async def test_update_restaurant_sends_only_given_fields(client):
 
 async def test_update_with_empty_body_returns_422(client):
     async with client:
-        response = await client.patch("/api/v1/restaurants/1", json={})
+        response = await client.patch("/api/v1/owner/restaurants/1", json={})
 
         assert response.status_code == 422
         assert response.json()["errors"] == {
@@ -123,7 +145,9 @@ async def test_update_with_empty_body_returns_422(client):
 
 async def test_update_name_to_null_returns_422(client):
     async with client:
-        response = await client.patch("/api/v1/restaurants/1", json={"name": None})
+        response = await client.patch(
+            "/api/v1/owner/restaurants/1", json={"name": None}
+        )
 
     assert response.status_code == 422
     assert "name" in response.json()["errors"]
@@ -131,7 +155,9 @@ async def test_update_name_to_null_returns_422(client):
 
 async def test_update_other_restaurant_returns_403(client):
     async with client:
-        response = await client.patch("/api/v1/restaurants/2", json={"name": "새 이름"})
+        response = await client.patch(
+            "/api/v1/owner/restaurants/2", json={"name": "새 이름"}
+        )
 
     assert response.status_code == 403
     assert response.json()["code"] == "NOT_RESTAURANT_OWNER"
@@ -141,12 +167,66 @@ async def test_update_without_login_returns_401():
     app = FastAPI()
     register_error_handlers(app)
     app.include_router(router, prefix="/api/v1")
+    app.include_router(owner_router, prefix="/api/v1")
     app.dependency_overrides[create_restaurant_service] = FakeRestaurantService
     # get_authenticated_user는 바꾸지 않음 -> 진짜 토큰 검사가 돌아감
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as client:
-        response = await client.patch("/api/v1/restaurants/1", json={"name": "새 이름"})
+        response = await client.patch(
+            "/api/v1/owner/restaurants/1", json={"name": "새 이름"}
+        )
 
     assert response.status_code == 401
+
+
+async def test_add_menu_returns_201(client):
+    async with client:
+        response = await client.post(
+            "/api/v1/owner/restaurants/1/menus", json={"name": "냉면", "price": 10000}
+        )
+
+    assert response.status_code == 201
+    assert response.json()["data"] == {
+        "id": 31,
+        "name": "냉면",
+        "description": None,
+        "price": 10000,
+    }
+
+
+async def test_add_menu_with_negative_price_returns_422(client):
+    async with client:
+        response = await client.post(
+            "/api/v1/owner/restaurants/1/menus", json={"name": "냉면", "price": -1000}
+        )
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == {"price": ["0 이상이어야 합니다."]}
+
+
+async def test_update_menu_sends_only_given_fields(client):
+    async with client:
+        response = await client.patch(
+            "/api/v1/owner/restaurants/1/menus/1", json={"price": 9500}
+        )
+
+    assert response.status_code == 200
+    assert FakeRestaurantService.received == (LOGIN_USER, 1, 1, {"price": 9500})
+
+
+async def test_delete_menu_returns_null_data(client):
+    async with client:
+        response = await client.delete("/api/v1/owner/restaurants/1/menus/1")
+
+    assert response.status_code == 200
+    assert response.json()["data"] is None
+
+
+async def test_delete_missing_menu_returns_404(client):
+    async with client:
+        response = await client.delete("/api/v1/owner/restaurants/1/menus/99")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "MENU_NOT_FOUND"

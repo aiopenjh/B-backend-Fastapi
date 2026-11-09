@@ -6,10 +6,11 @@ from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.pagination import PageParams
 from restaurant.application.service import RestaurantService
 from restaurant.domain.exceptions import (
+    MenuNotFoundError,
     NotRestaurantOwnerError,
     RestaurantNotFoundError,
 )
-from restaurant.domain.restaurant import Restaurant
+from restaurant.domain.restaurant import Menu, Restaurant
 
 RESTAURANT = Restaurant(
     id=1,
@@ -17,7 +18,10 @@ RESTAURANT = Restaurant(
     name="테스트 식당",
     address="서울시 중구",
     cuisine="KOREAN",
+    menus=[Menu(id=10, name="비빔밥", price=9000)],
 )
+
+NEW_MENU = Menu(id=11, name="냉면", price=10000)
 
 
 class FakeRestaurantRepository:
@@ -26,6 +30,7 @@ class FakeRestaurantRepository:
     def __init__(self):
         self.received = None  # 서비스가 넘겨준 값을 여기에 적어 둠
         self.updated = None  # update에 뭘 받았는지 기록
+        self.menu_changed = None  # 메뉴에 무슨 일을 했는지 기록
 
     async def find_all(self, q, cuisine, sort, offset, limit):
         self.received = (q, cuisine, sort, offset, limit)
@@ -39,6 +44,17 @@ class FakeRestaurantRepository:
     async def update(self, restaurant_id, changes):
         self.updated = (restaurant_id, changes)
         return RESTAURANT
+
+    async def add_menu(self, restaurant_id, fields):
+        self.menu_changed = ("add", restaurant_id, fields)
+        return NEW_MENU
+
+    async def update_menu(self, menu_id, changes):
+        self.menu_changed = ("update", menu_id, changes)
+        return RESTAURANT.menus[0]
+
+    async def delete_menu(self, menu_id):
+        self.menu_changed = ("delete", menu_id)
 
 
 class FakeUniOfWork:
@@ -105,4 +121,73 @@ async def test_other_owner_cannot_update_restaurant():
         await service.update_restaurant(other_owner, 1, {"name": "새 이름"})
 
     assert repo.updated is None
+    assert uow.committed is False
+
+
+async def test_owner_adds_menus():
+    repo = FakeRestaurantRepository()
+    uow = FakeUniOfWork()
+    service = RestaurantService(repo=repo, uow=uow)
+
+    menu = await service.add_menu(OWNER, 1, {"name": "냉면", "price": 10000})
+
+    assert menu == NEW_MENU
+    assert repo.menu_changed == ("add", 1, {"name": "냉면", "price": 10000})
+    assert uow.committed is True
+
+
+async def test_other_owner_cannot_add_menu():
+    repo = FakeRestaurantRepository()
+    uow = FakeUniOfWork()
+    service = RestaurantService(repo=repo, uow=uow)
+    other_owner = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.OWNER)
+
+    with pytest.raises(NotRestaurantOwnerError):
+        await service.add_menu(other_owner, 1, {"name": "냉면", "price": 10000})
+
+    assert repo.menu_changed is None
+    assert uow.committed is False
+
+
+async def test_owner_updates_menus():
+    repo = FakeRestaurantRepository()
+    uow = FakeUniOfWork()
+    service = RestaurantService(repo=repo, uow=uow)
+
+    await service.update_menu(OWNER, 1, 10, {"price": 9500})
+
+    assert repo.menu_changed == ("update", 10, {"price": 9500})
+    assert uow.committed is True
+
+
+async def test_update_missing_menu_raises_not_found():
+    repo = FakeRestaurantRepository()
+    uow = FakeUniOfWork()
+    service = RestaurantService(repo=repo, uow=uow)
+
+    with pytest.raises(MenuNotFoundError):
+        await service.update_menu(OWNER, 1, 99, {"price": 9500})
+
+    assert repo.menu_changed is None
+    assert uow.committed is False
+
+
+async def test_owner_deletes_menu():
+    repo = FakeRestaurantRepository()
+    uow = FakeUniOfWork()
+    service = RestaurantService(repo=repo, uow=uow)
+
+    await service.delete_menu(OWNER, 1, 10)
+
+    assert repo.menu_changed == ("delete", 10)
+    assert uow.committed is True
+
+
+async def test_delete_menu_of_missing_restaurant_raises_not_found():
+    uow = FakeUniOfWork()
+    service = RestaurantService(repo=FakeRestaurantRepository(), uow=uow)
+
+    with pytest.raises(RestaurantNotFoundError):
+        await service.delete_menu(OWNER, 999, 10)
+
     assert uow.committed is False
