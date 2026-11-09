@@ -1,5 +1,5 @@
 {# [담당 5] 위쪽 머리 조각: base.html이 include로 끼워 넣음 #}
 <header class="topbar">
-  <span>운영자 워크스페이스</span>
+  <span>{% if active_page == 'browse' %}손님 화면{% else %}운영자 워크스페이스{% endif %}</span>
   <span class="preview-chip">PREVIEW</span>
 </header>

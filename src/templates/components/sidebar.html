@@ -3,6 +3,7 @@
   <a class="brand" href="{{ url_for('ui_login') }}" aria-label="TABLE 첫 화면"><span class="brand-symbol">t</span>TABLE<span class="owner-label">OWNER</span></a>
   <p class="nav-label">WORKSPACE</p>
   <nav aria-label="주 메뉴">
+    <a href="{{ url_for('ui_browse') }}" {% if active_page == 'browse' %}aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>식당 둘러보기</a>
     <a href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants','reservations'] %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>운영 식당</a>
     <a href="{{ url_for('ui_login') }}" {% if active_page == 'login' %}aria-current="page"{% endif %}><span aria-hidden="true">↪</span>로그인</a>
   </nav>

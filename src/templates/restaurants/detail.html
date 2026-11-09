@@ -1,0 +1,98 @@
+{# [담당 5] 손님용 식당 상세 화면: 식당 정보 + 메뉴 + 날짜·인원별 빈자리 #}
+{% extends "base.html" %}
+{% block title %}{{ restaurant.name if restaurant else '식당을 찾을 수 없음' }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{{ url_for('ui_browse') }}">식당 둘러보기</a><span>/</span>{{ restaurant.name if restaurant else '없는 식당' }}</div>
+
+{% if restaurant is none %}
+{# 없거나 지운 식당 → 404 안내 #}
+<section class="panel empty-state">
+  <span class="empty-symbol" aria-hidden="true">?</span>
+  <h3>식당을 찾을 수 없어요</h3>
+  <p>없거나 더 이상 운영하지 않는 식당입니다.</p>
+  <p><a class="button button-outline" href="{{ url_for('ui_browse') }}">← 식당 목록</a></p>
+</section>
+
+{% else %}
+<div class="page-heading">
+  <div>
+    <span class="subtle-tag">{{ restaurant.cuisine }}</span>
+    <h1 class="detail-title">{{ restaurant.name }}</h1>
+    <p class="muted">{{ restaurant.address }}{% if restaurant.phone %}<span class="separator">·</span>{{ restaurant.phone }}{% endif %}</p>
+  </div>
+  <a class="button button-outline" href="{{ url_for('ui_browse') }}">← 식당 목록</a>
+</div>
+{% if restaurant.description %}<p class="detail-description">{{ restaurant.description }}</p>{% endif %}
+
+<div class="detail-grid">
+  {# 메뉴 #}
+  <section class="panel" aria-labelledby="menu-title">
+    <div class="panel-heading">
+      <h2 id="menu-title">메뉴 <span class="number-tag">{{ restaurant.menus|length }}</span></h2>
+    </div>
+    {% if restaurant.menus %}
+    <ul class="menu-list">
+      {% for menu in restaurant.menus %}
+      <li>
+        <div>
+          <strong>{{ menu.name }}</strong>
+          {% if menu.description %}<p>{{ menu.description }}</p>{% endif %}
+        </div>
+        <span class="menu-price">{{ "{:,}".format(menu.price) }}원</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state"><h3>등록된 메뉴가 없어요</h3></div>
+    {% endif %}
+  </section>
+
+  {# 빈자리: 날짜·인원을 고르면 다시 부름 #}
+  <section class="panel" aria-labelledby="slot-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="slot-title">빈자리</h2>
+        <p class="muted">{{ selected_date }}<span class="separator">·</span>{{ party_size }}명<span class="separator">·</span>한국 시간 기준</p>
+      </div>
+    </div>
+    <form class="filter-form" method="get" action="{{ url_for('ui_restaurant', restaurant_id=restaurant.id) }}">
+      <div>
+        <label for="visit-date">방문 날짜</label>
+        <input id="visit-date" type="date" name="date" value="{{ selected_date }}">
+      </div>
+      <div>
+        <label for="party-size">인원</label>
+        <select id="party-size" name="party_size">
+          {% for n in range(1, 9) %}
+          <option value="{{ n }}" {% if party_size == n %}selected{% endif %}>{{ n }}명</option>
+          {% endfor %}
+          {% if party_size > 8 %}<option value="{{ party_size }}" selected>{{ party_size }}명</option>{% endif %}
+        </select>
+      </div>
+      <button class="button button-primary" type="submit">빈자리 보기</button>
+    </form>
+    <p class="filter-help">날짜를 비우면 내일 기준으로 보여 줘요.</p>
+
+    {% if not availability %}
+    <div class="empty-state">
+      <span class="empty-symbol" aria-hidden="true">◷</span>
+      <h3>이 날은 열린 시간대가 없어요</h3>
+      <p>다른 날짜를 골라 주세요.</p>
+    </div>
+    {% else %}
+    <ul class="slot-list">
+      {% for item in availability %}
+      <li class="{{ 'slot-open' if item.available else 'slot-closed' }}">
+        <time datetime="{{ item.slot.starts_at.isoformat() }}">{{ item.slot.starts_at|seoul_time }} ~ {{ item.slot.ends_at|seoul_time }}</time>
+        <span>남은 자리 {{ item.slot.remaining }}명 · 1회 최대 {{ item.slot.max_party_size }}명</span>
+        {% if item.available %}<span class="badge badge-confirmed"><span></span>예약 가능</span>
+        {% else %}<span class="badge"><span></span>예약 불가</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+</div>
+<div class="page-note"><span aria-hidden="true">ⓘ</span>예약하기는 예약 기능이 연결되면 이 화면에서 바로 할 수 있어요.</div>
+{% endif %}
+{% endblock %}

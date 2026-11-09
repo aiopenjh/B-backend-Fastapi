@@ -3,11 +3,20 @@
 
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Annotated, Any
+
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from common.database import get_session  # 공통: 요청마다 DB 연결 하나
+from slot.application.service import SlotService  # 담당 3: 빈자리 매니저
+from slot.infrastructure.repositories import (
+    SQLAlchemySlotRepository,  # 담당 3: 슬롯 창고
+)
 
 if TYPE_CHECKING:
-    from owner.application.service import OwnerService
     from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
+    from owner.application.service import OwnerService
 
 
 @dataclass
@@ -69,3 +78,14 @@ def get_owner_ui_queries() -> OwnerUIQueries | None:
     현재 None은 미연결이며, 빈 조회 결과나 인증 성공을 뜻하지 않는다.
     """
     return None
+
+
+# 담당 5: 식당 상세 화면의 빈자리 보기용 공장
+def get_slot_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> SlotService:
+    """빈자리 매니저(담당 3, #33)를 화면에서 쓰려고 만든다.
+
+    container에 슬롯 공장이 생기면 그걸 쓰도록 바꾼다.
+    """
+    return SlotService(SQLAlchemySlotRepository(session))
