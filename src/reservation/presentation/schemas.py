@@ -3,11 +3,42 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from common.schemas import SEOUL
 from reservation.domain.reservation import Reservation, ReservationStatus
 from slot.domain.time_slot import TimeSlot
+
+# BIGINT 최댓값. 이보다 큰 id는 DB 오류(500) 대신 422로 막음
+BIGINT_MAX = 9223372036854775807
+
+
+class ReservationCreate(BaseModel):
+    """예약 생성 요청 스키마 (손님이 보내는 본문)"""
+
+    slot_id: Annotated[
+        int, Field(ge=1, le=BIGINT_MAX, examples=[7], description="예약할 슬롯 ID")
+    ]
+    party_size: Annotated[
+        int, Field(ge=1, examples=[2], description="예약 인원 (1명 이상)")
+    ]
+    contact_phone: Annotated[
+        str | None,
+        Field(
+            max_length=20,
+            examples=["010-1234-5678"],
+            description="연락처(선택, 20자 이하)",
+        ),
+    ] = None
+
+    @field_validator("contact_phone", mode="before")
+    @classmethod
+    def strip_contact_phone(cls, value: object) -> object:
+        # 앞뒤 공백을 지우고, 공백만 남으면 안 보낸 것(None)으로 본다
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
 
 
 class ReservationOut(BaseModel):
@@ -29,10 +60,14 @@ class ReservationOut(BaseModel):
         Field(description="예약 상태 (CONFIRMED: 확정, CANCELLED: 취소)"),
     ]
     created_at: Annotated[datetime, Field(description="예약한 시각")]
-    cancelled_at: Annotated[datetime | None, Field(description="취소한 시각 (취소 전에는 null)")]
+    cancelled_at: Annotated[
+        datetime | None, Field(description="취소한 시각 (취소 전에는 null)")
+    ]
     can_cancel: Annotated[
         bool,
-        Field(description="취소 가능 여부. 요청한 사람이 예약자이고, 확정 상태이고, 슬롯 시작 전이면 true"),
+        Field(
+            description="취소 가능 여부. 요청한 사람이 예약자이고, 확정 상태이고, 슬롯 시작 전이면 true"
+        ),
     ]
 
     @classmethod
@@ -64,4 +99,3 @@ class ReservationOut(BaseModel):
                 now=now,
             ),
         )
-    
