@@ -155,12 +155,30 @@ async def test_empty_date_means_all_days_and_unknown_restaurant_is_404(client, a
     assert "식당을 찾을 수 없어요" in missing.text
 
 
-async def test_admin_is_sent_from_customer_pages_and_sees_admin_menu_only(client):
+async def test_admin_sees_both_customer_pages_and_admin_pages(client):
+    client.cookies.set(COOKIE_NAME, "admin-token")
+    async with client:
+        owners = await client.get("/ui/admin/owners")
+        owner_space = await client.get("/ui/owner/restaurants")
+
+    assert "관리자 백오피스" in owners.text
+    assert "관리자</a>" in owners.text and "식당 둘러보기</a>" in owners.text  # 둘 다 보임
+    assert "운영 식당</a>" not in owners.text
+    # 운영자 화면은 "본인 식당"만이라, 관리자는 관리자 화면(모든 운영자)으로 보냄
+    assert owner_space.status_code == 303 and owner_space.headers["location"].endswith("/ui/admin/owners")
+
+
+async def test_admin_can_open_customer_browse(client):
+    from container import create_restaurant_service
+
+    class FakeRestaurantService:
+        async def list_restaurants(self, q, cuisine, sort, page):
+            return [], 0
+
+    client._transport.app.dependency_overrides[create_restaurant_service] = FakeRestaurantService
     client.cookies.set(COOKIE_NAME, "admin-token")
     async with client:
         browse = await client.get("/ui/restaurants")
-        owners = await client.get("/ui/admin/owners")
 
-    assert browse.status_code == 303 and browse.headers["location"].endswith("/ui/admin/owners")
-    assert "관리자 백오피스" in owners.text
-    assert "식당 둘러보기</a>" not in owners.text and "운영 식당</a>" not in owners.text
+    assert browse.status_code == 200  # 손님 화면에서 돌려보내지 않음
+    assert "손님 화면" in browse.text

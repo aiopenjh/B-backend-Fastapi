@@ -1,5 +1,5 @@
 {# [담당 5] 왼쪽 메뉴 조각: base.html이 include로 끼워 넣음. 로그인 상태는 쿠키 문지기(get_ui_user)가 request.state에 넣어 둠 #}
-{# 역할마다 자기 공간 메뉴만 보인다: 손님(로그인 안 함 포함) = 식당 둘러보기, 운영자 = 운영 식당, 관리자 = 관리자 #}
+{# 역할마다 메뉴가 다르다: 손님(로그인 안 함 포함) = 식당 둘러보기, 운영자 = 운영 식당, 관리자 = 관리자 + 식당 둘러보기(둘 다 봄) #}
 {% set ui_user = request.state.ui_user if request.state.ui_user is defined else none %}
 {% set is_owner = ui_user is not none and ui_user.is_owner() %}
 {% set is_admin = ui_user is not none and ui_user.is_admin() %}
@@ -11,6 +11,7 @@
   <nav aria-label="주 메뉴">
     {% if is_admin %}
     <a href="{{ url_for('ui_admin_owners') }}" {% if active_page == 'admin' %}aria-current="page"{% endif %}><span aria-hidden="true">◎</span>관리자</a>
+    <a href="{{ url_for('ui_browse') }}" {% if active_page == 'browse' %}aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>식당 둘러보기</a>
     {% elif is_owner %}
     <a href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants','reservations'] %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>운영 식당</a>
     {% else %}

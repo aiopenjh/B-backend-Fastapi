@@ -91,17 +91,21 @@ def message_page(request: Request, status_code: int, title: str, text: str) -> H
 
 
 def staff_redirect(request: Request) -> RedirectResponse | None:
-    """손님 공간 문: 운영자·관리자는 손님 화면 대신 자기 공간(운영 식당·관리자)으로 돌려보낸다"""
+    """손님 공간 문: 운영자는 손님 화면 대신 자기 공간(운영 식당)으로 돌려보낸다. 관리자는 손님 화면도 볼 수 있음"""
     user = request.state.ui_user
-    if user is not None and (user.is_owner() or user.is_admin()):
+    if user is not None and user.is_owner():
         return RedirectResponse(home_url(request, user), status_code=303)
     return None
 
 
 def deny(request: Request) -> RedirectResponse | HTMLResponse:
     """운영자 화면 문: 로그인 안 했으면 로그인 화면으로, 로그인했는데 운영자가 아니면 403 안내"""
-    if request.state.ui_user is None:
+    user = request.state.ui_user
+    if user is None:
         return to_login(request)
+    if user.is_admin():
+        # 관리자는 모든 운영자의 식당을 관리자 화면에서 본다 (운영자 화면은 "로그인한 운영자 본인" 것만 보여 줌)
+        return RedirectResponse(request.url_for("ui_admin_owners"), status_code=303)
     return message_page(request, 403, "운영자만 볼 수 있어요", "운영자 계정으로 로그인해 주세요.")
 
 
