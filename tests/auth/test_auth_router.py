@@ -14,6 +14,7 @@ from common.error_handlers import register_error_handlers
 from common.errors import UnauthorizedError
 
 LOGIN_URL = "/api/v1/auth/login"
+LOGOUT_URL = "/api/v1/auth/logout"
 EMAIL = "owner@example.com"
 PASSWORD = "abcd1234!"
 VALID_TOKEN = "valid-token"
@@ -34,6 +35,10 @@ class StubAuthService:
             return AuthenticatedUser(user_id=USER_ID, role=AuthRole.OWNER)
 
         raise UnauthorizedError()
+
+    async def logout(self, token: str) -> None:
+        if token != VALID_TOKEN:
+            raise UnauthorizedError()
 
 
 @pytest.fixture
@@ -103,6 +108,31 @@ async def test_authenticated_user_fail_without_token(client):
 async def test_authenticated_user_fail_with_invalid_toke(client):
     response = await client.get(
         "/protected", headers={"Authorization": "Bearer not-a-valid-token"}
+    )
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+
+
+async def test_logout_success_returns_204_without_body(client):
+    response = await client.post(
+        LOGOUT_URL, headers={"Authorization": f"Bearer {VALID_TOKEN}"}
+    )
+
+    assert response.status_code == 204
+    assert response.content == b""
+
+
+async def test_logout_fail_without_token_returns_401(client):
+    response = await client.post(LOGOUT_URL)
+
+    assert response.status_code == 401
+    assert response.json()["code"] == "UNAUTHORIZED"
+
+
+async def test_logout_fail_with_invalid_token_returns_401(client):
+    response = await client.post(
+        LOGOUT_URL, headers={"Authorization": "Bearer not-a-valid-token"}
     )
 
     assert response.status_code == 401
