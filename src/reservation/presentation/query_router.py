@@ -5,10 +5,11 @@ from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한
 from auth.presentation.dependencies import get_authenticated_user  # 담당 1: 로그인 문지기
 from common.pagination import Page, PageParams, page_params  # 담당 2: 페이지
 from common.schemas import APIResponse  # 담당 1: 응답 봉투
-from container import create_reservation_query_service  # 담당 5: 매니저 공장 (곧 만듦)
+from container import create_reservation_query_service  # 담당 5: 매니저 공장
 from reservation.application.query_service import ReservationQueryService  # 담당 5: 매니저
 from reservation.domain.reservation import ReservationStatus  # 담당 4: 예약 상태
 from reservation.presentation.schemas import ReservationOut  # 담당 4: 예약 응답 모양
+from slot.domain.day_range import seoul_now  # 담당 3: 지금 시각 (서울)
 
 router = APIRouter(tags=["내 예약"])
 
@@ -22,8 +23,9 @@ async def list_my_reservations(
 ) -> APIResponse[Page[ReservationOut]]:
     # 매니저에게 "내 예약 꺼내 와" 시키기
     items, total = await service.list_my_reservations(me, status, page)
+    now = seoul_now()
     return APIResponse.ok(data=Page(
-        items=[ReservationOut.from_domain(r, s) for r, s in items],  # 담당 4: 아직 없음
+        items=[ReservationOut.from_domain(r, s, me.user_id, now) for r, s in items],  # 보는 사람 = 나
         page=page.page,
         page_size=page.page_size,
         total=total,
@@ -39,4 +41,5 @@ async def get_reservation(
 ) -> APIResponse[ReservationOut]:
     # 매니저에게 "이 예약 보여 줘도 되는지 보고 꺼내 와" 시키기
     reservation, slot = await service.get_reservation(me, reservation_id)
-    return APIResponse.ok(data=ReservationOut.from_domain(reservation, slot))
+    # 보는 사람 = 나 (내 예약이면 취소 가능, 운영자로 보면 False)
+    return APIResponse.ok(data=ReservationOut.from_domain(reservation, slot, me.user_id, seoul_now()))
