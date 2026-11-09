@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
+from auth.domain.value_object import AuthenticatedUser, AuthRole
 from restaurant.domain.restaurant import Menu, Restaurant
 
 OWNER_ID = uuid.uuid4()
@@ -49,3 +50,31 @@ def test_menus_are_not_shared_between_restaurants():
     first.menus.append(Menu(id=1, name="비빔밥", price=9000))
 
     assert second.menus == []
+
+
+def test_admin_can_edit_any_restaurant():
+    restaurant = make_restaurant()
+    admin = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
+
+    assert restaurant.can_be_edited_by(admin) is True
+
+
+def test_owner_can_edit_own_restaurant():
+    restaurant = make_restaurant()
+    owner = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)
+
+    assert restaurant.can_be_edited_by(owner) is True
+
+
+def test_owner_cannot_edit_other_restaurant():
+    restaurant = make_restaurant()
+    other_owner = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.OWNER)
+
+    assert restaurant.can_be_edited_by(other_owner) is False
+
+
+def test_customer_cannot_edit_restaurant():
+    restaurant = make_restaurant()
+    customer = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.CUSTOMER)
+
+    assert restaurant.can_be_edited_by(customer) is False
