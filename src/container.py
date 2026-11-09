@@ -24,10 +24,10 @@ from slot.infrastructure.repositories import (
 from reservation.application.query_service import (
     ReservationQueryService,
 )  # 담당 5: 예약 조회 매니저
-from reservation.application.service import ReservationService # 담당 4 : 예약 매니저
+from reservation.application.service import ReservationService  # 담당 4 : 예약 매니저
 from reservation.infrastructure.repositories import (
     SQLAlchemyReservationRepository,
-) # 담당 4 : 예약 창고
+)  # 담당 4 : 예약 창고
 
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.infrastructure.repository import (
