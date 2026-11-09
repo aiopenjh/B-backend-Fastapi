@@ -1,3 +1,4 @@
+# [담당3-영민] 스키마 정의
 from datetime import date, datetime
 from typing import Annotated
 
@@ -6,7 +7,6 @@ from pydantic import BaseModel, Field
 
 class SlotOut(BaseModel):
     """시간대 단위 출력 모델"""
-
     id: Annotated[int, Field(description="예약 슬롯 고유 ID")]
     starts_at: Annotated[
         datetime,
@@ -14,7 +14,7 @@ class SlotOut(BaseModel):
     ]
     ends_at: Annotated[
         datetime,
-        Field(description="슬롯 종료 시간(서울시간"),
+        Field(description="슬롯 종료 시간(서울시간)"),
     ]
     remaining: Annotated[
         int,
