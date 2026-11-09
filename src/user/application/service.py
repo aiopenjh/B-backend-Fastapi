@@ -50,3 +50,10 @@ class UserService:
         saved = await self.repo.save(user)
         await self.uow.commit()
         return saved
+
+    async def get_user(self, user_id: uuid.UUID) -> User:
+        user = await self.repo.find_by_id(user_id)
+        if user is None or not user.is_active():
+            raise UserNotFoundError()
+
+        return user
