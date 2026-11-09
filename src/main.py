@@ -14,6 +14,7 @@ from user.presentation.routers.v1.router import router as user_router
 from web import register_web
 from owner.presentation.router import router as owner_router
 from reservation.presentation.query_router import router as reservation_query_router
+from reservation.presentation.router import router as reservation_router
 from slot.presentation.router import router as slot_router
 
 logger = get_logger(__name__)
@@ -43,6 +44,7 @@ app.include_router(restaurant_router, prefix="/api/v1")
 app.include_router(restaurant_owner_router, prefix="/api/v1")
 app.include_router(owner_router, prefix="/api/v1")
 app.include_router(reservation_query_router, prefix="/api/v1")
+app.include_router(reservation_router, prefix="/api/v1")
 app.include_router(slot_router, prefix="/api/v1")
 register_web(app)
 
