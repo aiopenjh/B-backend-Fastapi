@@ -84,3 +84,11 @@ class RestaurantRepository:
         )
         models = (await self.session.scalars(stmt)).all()
         return [to_restaurant(model) for model in models], total or 0
+
+    async def update(self, restaurant_id: int, changes: dict) -> Restaurant:
+        """보낸 칸만 바꿈. commit은 서비스에서 하고, 여기서는 flush까지"""
+        model = await self.session.get(RestaurantModel, restaurant_id)
+        for key, value in changes.items():
+            setattr(model, key, value)
+        await self.session.flush()
+        return to_restaurant(model)
