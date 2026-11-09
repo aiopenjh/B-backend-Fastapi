@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, status
 
 from auth.domain.value_object import AuthenticatedUser
 from auth.presentation.dependencies import get_authenticated_user
@@ -9,6 +9,9 @@ from common.schemas import APIResponse
 from container import create_restaurant_service
 from restaurant.application.service import RestaurantService
 from restaurant.presentation.schemas import (
+    MenuCreate,
+    MenuOut,
+    MenuUpdate,
     RestaurantDetail,
     RestaurantSummary,
     RestaurantUpdate,
@@ -71,3 +74,52 @@ async def update_restaurant(
         user, restaurant_id, body.model_dump(exclude_unset=True)
     )
     return APIResponse.ok(data=RestaurantDetail.model_validate(restaurant))
+
+
+@router.post(
+    "/{restaurant_id}/menus",
+    status_code=status.HTTP_201_CREATED,
+    response_model=APIResponse[MenuOut],
+    summary="메뉴 등록 (관리자 또는 본인 식당 운영자)",
+)
+async def add_menu(
+    restaurant_id: Annotated[int, Path(ge=1, le=BIGINT_MAX, description="식당 id")],
+    body: MenuCreate,
+    user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    service: Annotated[RestaurantService, Depends(create_restaurant_service)],
+) -> APIResponse[MenuOut]:
+    menu = await service.add_menu(user, restaurant_id, body.model_dump())
+    return APIResponse.ok(data=MenuOut.model_validate(menu))
+
+
+@router.patch(
+    "/{restaurant_id}/menus/{menu_id}",
+    response_model=APIResponse[MenuOut],
+    summary="메뉴 수정 (관리자 또는 본인 식당 운영자)",
+)
+async def update_menu(
+    restaurant_id: Annotated[int, Path(ge=1, le=BIGINT_MAX, description="식당 id")],
+    menu_id: Annotated[int, Path(ge=1, le=BIGINT_MAX, description="메뉴 id")],
+    body: MenuUpdate,
+    user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    service: Annotated[RestaurantService, Depends(create_restaurant_service)],
+) -> APIResponse[MenuOut]:
+    menu = await service.update_menu(
+        user, restaurant_id, menu_id, body.model_dump(exclude_unset=True)
+    )
+    return APIResponse.ok(data=MenuOut.model_validate(menu))
+
+
+@router.delete(
+    "/{restaurant_id}/menus/{menu_id}",
+    response_model=APIResponse[None],
+    summary="메뉴 삭제 (관리자 또는 본인 식당 운영자)",
+)
+async def delete_menu(
+    restaurant_id: Annotated[int, Path(ge=1, le=BIGINT_MAX, description="식당 id")],
+    menu_id: Annotated[int, Path(ge=1, le=BIGINT_MAX, description="메뉴 id")],
+    user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    service: Annotated[RestaurantService, Depends(create_restaurant_service)],
+) -> APIResponse[None]:
+    await service.delete_menu(user, restaurant_id, menu_id)
+    return APIResponse.ok()

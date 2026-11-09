@@ -9,6 +9,7 @@ from auth.presentation.dependencies import get_authenticated_user
 from common.error_handlers import register_error_handlers
 from container import create_restaurant_service
 from restaurant.domain.exceptions import (
+    MenuNotFoundError,
     NotRestaurantOwnerError,
     RestaurantNotFoundError,
 )
@@ -45,6 +46,24 @@ class FakeRestaurantService:
         if restaurant_id == 2:
             raise NotRestaurantOwnerError()
         return RESTAURANT
+
+    async def add_menu(self, user, restaurant_id, fields):
+        FakeRestaurantService.received = (user, restaurant_id, fields)
+        return Menu(
+            id=31,
+            name=fields["name"],
+            price=fields["price"],
+            description=fields["description"],
+        )
+
+    async def update_menu(self, user, restaurant_id, menu_id, changes):
+        FakeRestaurantService.received = (user, restaurant_id, menu_id, changes)
+        return Menu(id=1, name="비빔밥", price=9500)
+
+    async def delete_menu(self, user, restaurant_id, menu_id):
+        if menu_id != 1:
+            raise MenuNotFoundError()
+        FakeRestaurantService.received = (user, restaurant_id, menu_id)
 
 
 @pytest.fixture
@@ -150,3 +169,54 @@ async def test_update_without_login_returns_401():
         response = await client.patch("/api/v1/restaurants/1", json={"name": "새 이름"})
 
     assert response.status_code == 401
+
+
+async def test_add_menu_returns_201(client):
+    async with client:
+        response = await client.post(
+            "/api/v1/restaurants/1/menus", json={"name": "냉면", "price": 10000}
+        )
+
+    assert response.status_code == 201
+    assert response.json()["data"] == {
+        "id": 31,
+        "name": "냉면",
+        "description": None,
+        "price": 10000,
+    }
+
+
+async def test_add_menu_with_negative_price_returns_422(client):
+    async with client:
+        response = await client.post(
+            "/api/v1/restaurants/1/menus", json={"name": "냉면", "price": -1000}
+        )
+
+    assert response.status_code == 422
+    assert response.json()["errors"] == {"price": ["0 이상이어야 합니다."]}
+
+
+async def test_update_menu_sends_only_given_fields(client):
+    async with client:
+        response = await client.patch(
+            "/api/v1/restaurants/1/menus/1", json={"price": 9500}
+        )
+
+    assert response.status_code == 200
+    assert FakeRestaurantService.received == (LOGIN_USER, 1, 1, {"price": 9500})
+
+
+async def test_delete_menu_returns_null_data(client):
+    async with client:
+        response = await client.delete("/api/v1/restaurants/1/menus/1")
+
+    assert response.status_code == 200
+    assert response.json()["data"] is None
+
+
+async def test_delete_missing_menu_returns_404(client):
+    async with client:
+        response = await client.delete("/api/v1/restaurants/1/menus/99")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "MENU_NOT_FOUND"
