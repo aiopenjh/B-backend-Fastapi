@@ -11,6 +11,7 @@ from auth.domain.value_object import AuthenticatedUser, AuthRole  # 담당1 로�
 from common.errors import ForbiddenError  # 공통 403
 from container import (
     create_auth_service,
+    create_browse_service,
     create_owner_service,
     create_restaurant_service,
 )
@@ -142,6 +143,13 @@ async def test_broken_cookie_counts_as_not_logged_in(client):
     assert response.status_code == 303  # 위조·만료 토큰 → 로그인 화면으로
 
 
+class FakeBrowseService:
+    """가짜 둘러보기 매니저: 지역 칩 없음"""
+
+    async def list_regions(self):
+        return []
+
+
 class FakeRestaurantService:
     """가짜 식당 매니저: 손님 화면이 열리는지만 보려고"""
 
@@ -165,6 +173,7 @@ async def test_menus_are_split_by_role():
     app.dependency_overrides[create_auth_service] = FakeAuthService
     app.dependency_overrides[create_owner_service] = FakeOwnerService
     app.dependency_overrides[create_restaurant_service] = FakeRestaurantService
+    app.dependency_overrides[create_browse_service] = FakeBrowseService
     owner = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", cookies={COOKIE_NAME: "owner-token"})
     customer = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", cookies={COOKIE_NAME: "customer-token"})
     async with owner, customer:

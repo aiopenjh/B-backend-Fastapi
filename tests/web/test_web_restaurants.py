@@ -1,4 +1,5 @@
 # [담당 5 최지훈] 손님용 식당 목록·상세 화면 테스트 (가짜 식당·빈자리 매니저)
+import re
 import uuid
 from datetime import datetime, timedelta
 
@@ -6,7 +7,11 @@ import httpx
 import pytest
 from fastapi import FastAPI, Request
 
-from container import create_restaurant_service, create_slot_service
+from container import (
+    create_browse_service,
+    create_restaurant_service,
+    create_slot_service,
+)
 from restaurant.domain.exceptions import RestaurantNotFoundError
 from restaurant.domain.restaurant import Menu, Restaurant
 from slot.application.service import SlotAvailability
@@ -50,6 +55,20 @@ class FakeRestaurantService:
         return RESTAURANT
 
 
+class FakeBrowseService:
+    """가짜 둘러보기 매니저: 지역 칩 2개, 받은 지역·페이지를 적어 둠"""
+
+    def __init__(self):
+        self.received = None
+
+    async def list_regions(self):
+        return [("관악구", 12), ("중구", 3)]
+
+    async def list_region_restaurants(self, region, q, cuisine, sort, page):
+        self.received = (region, q, cuisine, sort, page.page, page.page_size)
+        return [RESTAURANT], 12
+
+
 class FakeSlotService:
     """받은 날짜·인원을 적어 두고 시간대 2개(가능 1, 마감 1)를 돌려주는 가짜"""
 
@@ -71,16 +90,17 @@ def not_logged_in(request: Request):
 
 @pytest.fixture
 def fakes():
-    return FakeRestaurantService(), FakeSlotService()
+    return FakeRestaurantService(), FakeSlotService(), FakeBrowseService()
 
 
 @pytest.fixture
 def client(fakes) -> httpx.AsyncClient:
-    restaurants, slots = fakes
+    restaurants, slots, browse = fakes
     app = FastAPI()
     register_web(app)
     app.dependency_overrides[create_restaurant_service] = lambda: restaurants
     app.dependency_overrides[create_slot_service] = lambda: slots
+    app.dependency_overrides[create_browse_service] = lambda: browse
     app.dependency_overrides[get_ui_user] = not_logged_in  # 쿠키 로그인 없이
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
@@ -92,8 +112,9 @@ async def test_browse_page_shows_restaurants_and_passes_filters(client, fakes):
     assert response.status_code == 200
     assert "테스트 식당" in response.text
     assert "/ui/restaurants/1" in response.text  # 상세로 가는 링크
-    # 빈 칸(cuisine=)은 '안 고름'(None)으로, 한 페이지 기본 12개
-    assert fakes[0].received == ("테스트", None, "name", 2, 12)
+    # 빈 칸(cuisine=)은 '안 고름'(None)으로, 한 페이지 기본 10개
+    assert fakes[0].received == ("테스트", None, "name", 2, 10)
+    assert "관악구" in response.text and "/ui/restaurants?region=" in response.text  # 지역 칩
 
 
 async def test_restaurant_page_shows_menus_and_slots(client, fakes):
@@ -126,3 +147,15 @@ async def test_missing_restaurant_page_returns_404_screen(client, fakes):
     assert response.status_code == 404
     assert "식당을 찾을 수 없어요" in response.text
     assert fakes[1].received is None  # 없는 식당이면 빈자리는 안 부름
+
+
+async def test_region_chip_shows_that_region_10_at_a_time(client, fakes):
+    async with client:
+        response = await client.get("/ui/restaurants?region=관악구&page=2")
+
+    assert response.status_code == 200
+    assert fakes[2].received == ("관악구", None, None, "id", 2, 10)  # 관악구만, 2페이지, 10개씩
+    assert fakes[0].received is None  # 지역을 고르면 전체 목록 매니저는 안 부름
+    assert "관악구 식당" in response.text
+    chips = re.findall(r'<a class="chip"[^>]*aria-current="page"[^>]*>\s*([^<\s]+)', response.text)
+    assert chips == ["관악구"]  # 고른 칩만 표시

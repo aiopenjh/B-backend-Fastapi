@@ -169,13 +169,18 @@ async def test_admin_sees_both_customer_pages_and_admin_pages(client):
 
 
 async def test_admin_can_open_customer_browse(client):
-    from container import create_restaurant_service
+    from container import create_browse_service, create_restaurant_service
+
+    class FakeBrowseService:
+        async def list_regions(self):
+            return []
 
     class FakeRestaurantService:
         async def list_restaurants(self, q, cuisine, sort, page):
             return [], 0
 
     client._transport.app.dependency_overrides[create_restaurant_service] = FakeRestaurantService
+    client._transport.app.dependency_overrides[create_browse_service] = FakeBrowseService
     client.cookies.set(COOKIE_NAME, "admin-token")
     async with client:
         browse = await client.get("/ui/restaurants")

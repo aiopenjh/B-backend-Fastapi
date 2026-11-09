@@ -1,4 +1,4 @@
-{# [담당 5] 손님용 식당 목록 화면: 검색·음식 종류·정렬 + 식당 카드 #}
+{# [담당 5] 손님용 식당 목록 화면: 지역 칩 + 검색·음식 종류·정렬 + 식당 카드 (10개씩) #}
 {% extends "base.html" %}
 {% block title %}식당 둘러보기{% endblock %}
 {% block content %}
@@ -11,14 +11,23 @@
   <span class="page-label">RESTAURANTS</span>
 </div>
 
+<nav class="region-chips" aria-label="지역">
+  <a class="chip" href="{{ url_for('ui_browse') }}" {% if not region %}aria-current="page"{% endif %}>전체</a>
+  {% for name, count in regions %}
+    <a class="chip" href="{{ url_for('ui_browse').include_query_params(region=name) }}" {% if region == name %}aria-current="page"{% endif %}>
+      {{ name }} <span class="chip-count">{{ count }}</span></a>
+  {% endfor %}
+</nav>
+
 <section class="panel" aria-labelledby="browse-title">
   <div class="panel-heading">
-    <h2 id="browse-title">식당 <span class="number-tag">{{ total }}</span></h2>
+    <h2 id="browse-title">{{ region or '전체' }} 식당 <span class="number-tag">{{ total }}</span></h2>
     <span class="subtle-tag">로그인 없이 볼 수 있어요</span>
   </div>
 
   {# 검색 조건 (GET 쿼리로 다시 부름) #}
   <form class="filter-form" method="get" action="{{ url_for('ui_browse') }}">
+    <input type="hidden" name="region" value="{{ region }}">
     <div>
       <label for="q">식당 이름</label>
       <input id="q" type="search" name="q" value="{{ q }}" placeholder="이름으로 찾기">
@@ -35,7 +44,7 @@
       </select>
     </div>
     <button class="button button-primary" type="submit">검색</button>
-    <a class="text-link" href="{{ url_for('ui_browse') }}">초기화</a>
+    <a class="text-link" href="{{ url_for('ui_browse').include_query_params(region=region) if region else url_for('ui_browse') }}">초기화</a>
   </form>
   <p class="filter-help">음식 종류는 정확히 같은 값만 찾아요.</p>
 

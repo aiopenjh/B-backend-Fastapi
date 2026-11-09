@@ -20,12 +20,14 @@ from pydantic import BeforeValidator
 
 from admin.application.service import AdminService  # 담당 5: 관리자 매니저
 from auth.application.service import AuthService  # 담당 1: 로그인 매니저
+from browse.application.service import BrowseService  # 담당 5: 손님 둘러보기 매니저
 from common.errors import AppError  # 공통 오류 (404·403 안내 화면으로 바꿈)
 from common.pagination import PageParams
 from common.schemas import SEOUL
 from container import (
     create_admin_service,  # 담당 5: 관리자 매니저 공장
     create_auth_service,  # 담당 1: 로그인 매니저 공장
+    create_browse_service,  # 담당 5: 손님 둘러보기 매니저 공장
     create_restaurant_service,  # 담당 2: 식당 매니저 공장
     create_slot_service,  # 담당 3: 빈자리 매니저 공장 (#44)
 )
@@ -78,6 +80,7 @@ PageSize = Annotated[int, Query(ge=1, le=100)]
 Blank = BeforeValidator(lambda value: value or None)
 Auth = Annotated[AuthService, Depends(create_auth_service)]
 Admin = Annotated[AdminService, Depends(create_admin_service)]
+Browse = Annotated[BrowseService, Depends(create_browse_service)]
 
 
 def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
@@ -215,28 +218,36 @@ async def reservations_page(
     )
 
 
-# 담당 5: 손님용 식당 목록 화면 (로그인 필요 없음, 담당 2 식당 매니저 #32 재사용)
+# 담당 5: 손님용 식당 목록 화면 (로그인 필요 없음). 지역 칩을 누르면 그 지역(구) 식당만 10개씩
 @router.get("/restaurants", response_class=HTMLResponse, name="ui_browse")
 async def browse_page(
     request: Request,
     service: Restaurants,
+    browse: Browse,
+    region: Annotated[str | None, Blank] = None,
     q: Annotated[str | None, Blank] = None,
     cuisine: Annotated[str | None, Blank] = None,
     sort: Literal["id", "name"] = "id",
     page: PageNumber = 1,
-    page_size: PageSize = 12,
+    page_size: PageSize = 10,
 ):
     if moved := staff_redirect(request):
         return moved
-    items, total = await service.list_restaurants(
-        q, cuisine, sort, PageParams(page=page, page_size=page_size)
-    )
+    params = PageParams(page=page, page_size=page_size)
+    regions = await browse.list_regions()
+    if region:
+        # 지역을 고르면 담당 5 둘러보기 창고 (주소의 구로 거름)
+        items, total = await browse.list_region_restaurants(region, q, cuisine, sort, params)
+    else:
+        # 전체는 담당 2 식당 매니저(#32) 그대로
+        items, total = await service.list_restaurants(q, cuisine, sort, params)
     return templates.TemplateResponse(
         request=request,
         name="restaurants/list.html",
         context={
             "active_page": "browse", "restaurants": items, "total": total,
             "result": PageResult(items, total, page, page_size),
+            "regions": regions, "region": region or "",
             "q": q or "", "cuisine": cuisine or "", "sort": sort,
         },
     )
