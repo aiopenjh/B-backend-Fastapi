@@ -80,14 +80,14 @@ async def test_owner_can_download_csv(): # 운영자 CSV 내려받기 확인 통
     assert "예약번호" in response.text
 
 
-async def test_owner_sees_reservation_list(): # 운영자 예약 목록 확인 200, 손님 예약은 취소 불가
+async def test_owner_sees_reservation_list(): # 운영자 예약 목록 확인 200, 내 식당 손님 예약은 취소 가능
     async with make_client(fake_login_owner) as client:
         response = await client.get("/api/v1/owner/restaurants/1/reservations")
 
     assert response.status_code == 200
     item = response.json()["data"]["items"][0]        # 응답 봉투 → data → 목록 → 첫 번째
     assert item["id"] == 100                          # 100번 예약이 왔나
-    assert item["can_cancel"] is False                # 남(손님)의 예약 → 운영자는 취소 불가
+    assert item["can_cancel"] is True                 # 내 식당 손님 예약 + 시작 전 → 운영자도 취소 가능 (담당 4)
 
 
 async def test_too_big_restaurant_id_is_422(): # DB 번호 칸보다 큰 식당 번호 확인 422 (500 아님)

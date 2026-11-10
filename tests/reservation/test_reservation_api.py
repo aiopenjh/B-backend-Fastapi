@@ -82,9 +82,9 @@ class FakeReservationService:
         return CONFIRMED, SLOT
 
     async def cancel(
-        self, user_id: uuid.UUID, reservation_id: int, now: datetime
+        self, user: AuthenticatedUser, reservation_id: int, now: datetime
     ) -> tuple[Reservation, TimeSlot]:
-        self.cancel_calls.append((user_id, reservation_id))
+        self.cancel_calls.append((user.user_id, reservation_id))
         if self.error:
             raise self.error  # 진짜 서비스가 도메인 규칙에 걸려 에러를 던지는 흉내
         return CANCELLED, SLOT
@@ -217,3 +217,16 @@ async def test_cancel_with_too_big_id_returns_422():
     # DB(BIGINT)에 못 담는 번호면 DB 오류(500) 대신 422로 막힌다.
     assert response.status_code == 422
     assert fake.cancel_calls == []
+
+
+async def test_create_with_true_slot_id_returns_422():
+    fake = FakeReservationService()
+
+    async with make_client(fake) as client:
+        response = await client.post(
+            "/api/v1/reservations", json={"slot_id": True, "party_size": 2}
+        )
+
+    # true를 1번 슬롯으로 바꾸지 않고, 매니저까지 가기 전에 422로 막힌다.
+    assert response.status_code == 422
+    assert fake.create_calls == []

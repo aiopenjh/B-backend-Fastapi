@@ -19,6 +19,11 @@ class ReservationQueryService:
 
     # 5단계: 예약 상세. 본인이나 그 식당 운영자만, 나머지는 404로 숨기기
     async def get_reservation(self, me: AuthenticatedUser, reservation_id: int):
+        reservation, slot, _ = await self.get_reservation_with_owner(me, reservation_id)
+        return reservation, slot
+
+    # 예약 상세 + 식당 주인 id (담당 4: 상세 화면의 can_cancel이 운영자 버튼을 판단할 때 씀)
+    async def get_reservation_with_owner(self, me: AuthenticatedUser, reservation_id: int):
         # 1. 창고에서 꺼내기. 없으면 404
         found = await self.query.get_reservation(reservation_id)
         if found is None:
@@ -30,8 +35,8 @@ class ReservationQueryService:
         is_mine = reservation.user_id == me.user_id
         is_my_restaurant = owner_id == me.user_id
 
-        # 3. 둘 다 아니면 404 (403 아님: 있는지조차 숨기기)
-        if not (is_mine or is_my_restaurant):
+        # 3. 둘 다 아니면 404 (403 아님: 있는지조차 숨기기). 관리자는 모든 예약 상세를 볼 수 있다 (취소도 가능해서)
+        if not (is_mine or is_my_restaurant or me.is_admin()):
             raise NotFoundError()
 
-        return reservation, slot
+        return reservation, slot, owner_id

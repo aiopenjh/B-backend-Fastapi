@@ -13,6 +13,7 @@ from slot.domain.time_slot import TimeSlot # 담당3 슬롯
 ME = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.CUSTOMER) # 예약한 본인
 OWNER = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.OWNER) # 식당주인
 STRANGER = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.CUSTOMER) # 관계없는 다른
+ADMIN = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN) # 관리자 (담당 4)
 
 SLOT = TimeSlot(
     id=10,
@@ -76,3 +77,38 @@ async def test_missing_reservation_gets_404(): # 없는 예약 상세 확인 404
 
     with pytest.raises(NotFoundError):
         await service.get_reservation(ME, 555)
+
+async def test_get_reservation_with_owner_returns_restaurant_owner(): # 상세 + 식당 주인 id 확인 (담당 4: can_cancel용)
+    service = ReservationQueryService(db=None)
+    service.query = FakeReservationQueryRepository()
+
+    reservation, _, owner_id = await service.get_reservation_with_owner(OWNER, RESERVATION.id)
+
+    assert reservation == RESERVATION
+    assert owner_id == OWNER.user_id        # 식당 주인 id를 버리지 않고 같이 돌려준다
+
+
+async def test_get_reservation_with_owner_hides_from_stranger(): # 관계없는 사람은 여기서도 404
+    service = ReservationQueryService(db=None)
+    service.query = FakeReservationQueryRepository()
+
+    with pytest.raises(NotFoundError):
+        await service.get_reservation_with_owner(STRANGER, RESERVATION.id)
+
+
+async def test_admin_can_see_any_reservation(): # 관리자는 남의 예약 상세도 확인 통과 (담당 4)
+    service = ReservationQueryService(db=None)
+    service.query = FakeReservationQueryRepository()
+
+    reservation, slot = await service.get_reservation(ADMIN, RESERVATION.id)   # 누가? 관리자
+
+    assert reservation == RESERVATION
+    assert slot == SLOT
+
+
+async def test_admin_missing_reservation_gets_404(): # 관리자도 없는 예약은 404
+    service = ReservationQueryService(db=None)
+    service.query = FakeReservationQueryRepository()
+
+    with pytest.raises(NotFoundError):
+        await service.get_reservation(ADMIN, 555)

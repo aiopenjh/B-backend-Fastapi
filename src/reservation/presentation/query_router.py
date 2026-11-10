@@ -28,7 +28,7 @@ async def list_my_reservations(
     items, total = await service.list_my_reservations(me, status, page)
     now = seoul_now()
     return APIResponse.ok(data=Page(
-        items=[ReservationOut.from_domain(r, s, me.user_id, now) for r, s in items],  # 보는 사람 = 나
+        items=[ReservationOut.from_domain(r, s, me, now) for r, s in items],  # 보는 사람 = 나 (역할까지 넘김)
         page=page.page,
         page_size=page.page_size,
         total=total,
@@ -43,6 +43,8 @@ async def get_reservation(
     service: ReservationQueryService = Depends(create_reservation_query_service),
 ) -> APIResponse[ReservationOut]:
     # 매니저에게 "이 예약 보여 줘도 되는지 보고 꺼내 와" 시키기
-    reservation, slot = await service.get_reservation(me, reservation_id)
-    # 보는 사람 = 나 (내 예약이면 취소 가능, 운영자로 보면 False)
-    return APIResponse.ok(data=ReservationOut.from_domain(reservation, slot, me.user_id, seoul_now()))
+    reservation, slot, owner_id = await service.get_reservation_with_owner(me, reservation_id)
+    # 보는 사람 = 나. 내 예약이거나, 내가 그 식당 운영자면 취소 가능 (식당 주인 id를 같이 넘김)
+    return APIResponse.ok(
+        data=ReservationOut.from_domain(reservation, slot, me, seoul_now(), restaurant_owner_id=owner_id)
+    )
