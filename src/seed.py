@@ -25,8 +25,8 @@ GUARD_EMAIL = "owner.a@example.com"       # ▶ 이 이메일이 있으면 시�
 USERS = [
     ("customer.a@example.com", "고객A", "010-1111-0001", Role.CUSTOMER),
     ("customer.b@example.com", "고객B", "010-1111-0002", Role.CUSTOMER),
-    (GUARD_EMAIL,              "운영자A", "010-2222-0001", Role.OWNER),
-    ("owner.b@example.com",    "운영자B", "010-2222-0002", Role.OWNER),
+    (GUARD_EMAIL,              "운영자A", "010-2222-1001", Role.OWNER),  # [담당5] 식당 CSV 운영자(010-2222-0001~0200)와 겹치지 않게
+    ("owner.b@example.com",    "운영자B", "010-2222-1002", Role.OWNER),
 ]
 
 # [담당5] 관리자 화면(/ui/admin) 시연용 계정 — 위 회원들과 비밀번호가 달라서 따로 둔다
