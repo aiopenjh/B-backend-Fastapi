@@ -1,4 +1,5 @@
 # [담당1 - 강성수]
+import asyncio
 import uuid
 
 from common.unit_of_work import ConflictError, UnitOfWork
@@ -24,7 +25,12 @@ class UserService:
         if await self.repo.find_by_email(user_email) is not None:
             raise DuplicatedUserError()
 
-        user = User.create(
+        # User.create 안에서 bcrypt 해시(약 0.25초)를 한다. 그동안 DB 연결을 붙잡지 않게
+        # 읽기 트랜잭션을 끝내고, 이벤트 루프를 막지 않게 스레드에서 만든다.
+        # 그 사이 같은 이메일 가입은 commit의 UNIQUE 충돌로 잡힌다
+        await self.uow.release()
+        user = await asyncio.to_thread(
+            User.create,
             email=user_email,
             raw_password=raw_password,
             name=name,
