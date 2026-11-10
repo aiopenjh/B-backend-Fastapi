@@ -1,5 +1,7 @@
 # [담당1 - 강성수]
 
+import asyncio
+import threading
 import uuid
 from datetime import datetime, UTC
 
@@ -133,6 +135,89 @@ async def user(user_repo, hasher) -> User:
     )
 
     return await user_repo.save(created)
+
+
+class LoopProbeHasher(FakePasswordHasher):
+    """verify가 도는 동안 이벤트 루프가 다른 코루틴을 실행할 수 있는지 잰다.
+
+    verify가 루프 스레드에서 돌면 ticker가 실행되지 못해 progressed를 기다리다 시간이 끝난다.
+    """
+
+    def __init__(self, events: list[str] | None = None) -> None:
+        self.started = threading.Event()
+        self.progressed = threading.Event()
+        self.loop_blocked: bool | None = None
+        self.events = events if events is not None else []
+
+    def verify(self, raw_password: str, hashed_password: str) -> bool:
+        self.events.append("verify")
+        self.started.set()
+        self.loop_blocked = not self.progressed.wait(timeout=1.0)
+        return super().verify(raw_password, hashed_password)
+
+
+async def tick_until_started(hasher: LoopProbeHasher) -> None:
+    while not hasher.started.is_set():
+        await asyncio.sleep(0.001)
+    hasher.progressed.set()
+
+
+class ReleaseRecordingUnitOfWork(FakeUnitOfWork):
+    def __init__(self, blacklist, events: list[str]) -> None:
+        super().__init__(blacklist=blacklist)
+        self.events = events
+
+    async def release(self) -> None:
+        self.events.append("release")
+
+
+def make_service(user_repo, hasher, blacklist, uow) -> AuthService:
+    return AuthService(
+        user_repo=user_repo,
+        hasher=hasher,
+        token_provider=JwtTokenProvider(secret_key=SECRET),
+        blacklist_repo=blacklist,
+        uow=uow,
+    )
+
+
+async def test_login_keeps_event_loop_running_while_verifying(
+    user_repo, blacklist, uow, user
+):
+    probe = LoopProbeHasher()
+    service = make_service(user_repo, probe, blacklist, uow)
+
+    issued, _ = await asyncio.gather(
+        service.login("owner@example.com", PASSWORD), tick_until_started(probe)
+    )
+
+    assert issued.access_token
+    assert probe.loop_blocked is False
+
+
+class ReadRecordingUserRepository(InMemoryUserRepository):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__()
+        self.events = events
+
+    async def find_by_email(self, email: Email) -> User | None:
+        self.events.append("read")
+        return await super().find_by_email(email)
+
+
+async def test_login_releases_read_transaction_between_read_and_verify(blacklist, user):
+    events: list[str] = []
+    repo = ReadRecordingUserRepository(events)
+    repo.users[user.id] = user
+    probe = LoopProbeHasher(events)
+    probe.progressed.set()  # 루프 측정은 위 테스트가 함. 여기선 순서만 본다
+    uow = ReleaseRecordingUnitOfWork(blacklist, events)
+    service = make_service(repo, probe, blacklist, uow)
+
+    await service.login("owner@example.com", PASSWORD)
+
+    # 읽은 뒤에 끝내야 해시 중 연결을 붙잡지 않는다. 읽기 전에 끝내면 의미가 없다
+    assert events == ["read", "release", "verify"]
 
 
 async def test_login_success_returns_token_for_users(service, user):

@@ -15,3 +15,10 @@ class UnitOfWork(ABC):
     @abstractmethod
     async def commit(self) -> None:
         """변경을 확정한다. 충돌하면 ConflictError 발생"""
+
+    async def release(self) -> None:
+        """읽기만 한 트랜잭션을 끝내 DB 연결을 돌려준다.
+
+        비밀번호 해시처럼 오래 걸리는 작업 전에 부른다. 확정하지 않은 변경은 버려지므로
+        아무것도 바꾸지 않은 상태에서만 부른다. 기본은 아무것도 하지 않는다.
+        """
