@@ -35,6 +35,11 @@ uv run python demo/make_slots.py
 
 시연 순서와 상태 코드 내는 법은 `SCENARIO.md`를 보세요.
 
+## 노쇼 설정 (`.env`)
+
+- `NO_SHOW_GRACE_SECONDS=60` — 시작 뒤 이만큼 지나야 운영자 화면에 "노쇼" 버튼이 나옵니다 (기본 900초, 평소 300초, 시연 60초).
+- 자동 노쇼는 쓰지 않습니다. `NO_SHOW_CHECK_SECONDS`는 넣지 않습니다 (기본 꺼짐).
+
 ## 보이는 것
 
 | 줄 | 예 |
