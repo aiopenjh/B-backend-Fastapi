@@ -3,11 +3,14 @@
 
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, Any
+from typing import Annotated, Any
 
-if TYPE_CHECKING:
-    from owner.application.service import OwnerService
-    from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
+from fastapi import Depends
+
+from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
+from container import create_owner_service  # 담당 5: 운영자 매니저 공장
+from owner.application.service import OwnerService  # 담당 5: 운영자 매니저
+from web_auth import UIUser  # 담당 5: 쿠키로 로그인한 사람
 
 
 @dataclass
@@ -25,7 +28,7 @@ class PageResult:
 class OwnerUIQueries:
     """require_owner를 통과한 사용자와 요청 단위 서비스를 주입받는다."""
 
-    def __init__(self, owner: "AuthenticatedUser", service: "OwnerService"):
+    def __init__(self, owner: AuthenticatedUser, service: OwnerService):
         self.owner = owner
         self.service = service
 
@@ -59,13 +62,14 @@ class OwnerUIQueries:
         return PageResult(items, total, page, page_size)
 
 
-def get_owner_ui_queries() -> OwnerUIQueries | None:
-    """연결 지점: 인증·미완성 모듈 통합 후 아래 두 의존성을 주입한다.
+def get_owner_ui_queries(
+    user: UIUser,
+    service: Annotated[OwnerService, Depends(create_owner_service)],
+) -> OwnerUIQueries | None:
+    """운영자로 로그인했으면 운영자 매니저를 화면용으로 감싸서 준다.
 
-    owner = Depends(require_owner)
-    service = Depends(create_owner_service)
-    return OwnerUIQueries(owner, service)
-
-    현재 None은 미연결이며, 빈 조회 결과나 인증 성공을 뜻하지 않는다.
+    None이면 로그인 안 했거나 운영자가 아니다 → 화면이 로그인 화면이나 403 안내로 보낸다.
     """
-    return None
+    if user is None or not user.is_owner():
+        return None
+    return OwnerUIQueries(user, service)

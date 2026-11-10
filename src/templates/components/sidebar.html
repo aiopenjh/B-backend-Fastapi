@@ -1,11 +1,30 @@
-{# [담당 5] 왼쪽 메뉴 조각: base.html이 include로 끼워 넣음 #}
-<aside class="sidebar">
-  <a class="brand" href="{{ url_for('ui_login') }}" aria-label="TABLE 첫 화면"><span class="brand-symbol">t</span>TABLE<span class="owner-label">OWNER</span></a>
-  <p class="nav-label">WORKSPACE</p>
-  <nav aria-label="주 메뉴">
-    <a href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants','reservations'] %}aria-current="page"{% endif %}><span aria-hidden="true">▦</span>운영 식당</a>
-    <a href="{{ url_for('ui_login') }}" {% if active_page == 'login' %}aria-current="page"{% endif %}><span aria-hidden="true">↪</span>로그인</a>
-  </nav>
-  <div class="sidebar-note"><span class="status-dot"></span>화면 미리보기<p>실제 계정·예약 연결 전</p></div>
-  <div class="sidebar-footer">KANT PROJECT<span>가게 예약 서비스</span></div>
-</aside>
+{# [담당 5] 메뉴 조각: base.html이 include로 끼워 넣음 (화면 아래 탭 바) #}
+{% set ui_user = request.state.ui_user if request.state.ui_user is defined else none %}
+{% set is_owner = ui_user is not none and ui_user.is_owner() %}
+{% set is_admin = ui_user is not none and ui_user.is_admin() %}
+
+<nav class="tabbar" aria-label="주 메뉴">
+  {% if is_admin %}
+    <a class="tab" href="{{ url_for('ui_admin_owners') }}" {% if active_page == 'admin' %}aria-current="page"{% endif %}>
+      <span class="tab-icon" aria-hidden="true">◎</span>관리자</a>
+    <a class="tab" href="{{ url_for('ui_browse') }}" {% if active_page == 'browse' %}aria-current="page"{% endif %}>
+      <span class="tab-icon" aria-hidden="true">⌕</span>식당 둘러보기</a>
+  {% elif is_owner %}
+    <a class="tab" href="{{ url_for('ui_restaurants') }}" {% if active_page in ['restaurants', 'reservations'] %}aria-current="page"{% endif %}>
+      <span class="tab-icon" aria-hidden="true">▦</span>운영 식당</a>
+  {% else %}
+    <a class="tab" href="{{ url_for('ui_browse') }}" {% if active_page == 'browse' %}aria-current="page"{% endif %}>
+      <span class="tab-icon" aria-hidden="true">⌕</span>식당 둘러보기</a>
+  {% endif %}
+
+  {% if ui_user %}
+    <form class="tab-form" method="post" action="{{ url_for('ui_logout') }}">
+      <button class="tab" type="submit">
+        <span class="tab-icon" aria-hidden="true">↩</span>로그아웃
+      </button>
+    </form>
+  {% else %}
+    <a class="tab" href="{{ url_for('ui_login') }}" {% if active_page == 'login' %}aria-current="page"{% endif %}>
+      <span class="tab-icon" aria-hidden="true">↪</span>로그인</a>
+  {% endif %}
+</nav>
