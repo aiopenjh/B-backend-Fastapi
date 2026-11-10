@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from common.database import get_session  # 공통: 요청마다 DB 연결 하나

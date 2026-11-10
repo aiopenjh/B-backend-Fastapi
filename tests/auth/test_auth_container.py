@@ -6,6 +6,7 @@ os.environ.setdefault(
     "POSTGRES_URL", "postgresql+asyncpg://test:test@localhost:5432/test"
 )
 
+from fastapi.dependencies.utils import get_dependant
 from starlette.requests import Request
 
 import container
@@ -23,6 +24,16 @@ def build(request: Request):
         token_provider=None,
         uow=None,
     )
+
+
+def test_fastapi_injects_request_into_auth_service_factory():
+    # 위 테스트들은 공장 함수를 직접 불러서, FastAPI가 request를 요청 객체로
+    # 알아보는지는 확인하지 못한다. Request import가 빠지면 FastAPI는 request를
+    # 필수 쿼리 파라미터로 여겨 모든 로그인이 422가 된다
+    dependant = get_dependant(path="/login", call=container.create_auth_service)
+
+    assert dependant.request_param_name == "request"
+    assert "request" not in {param.name for param in dependant.query_params}
 
 
 def test_auth_service_gets_client_ip_from_request():
