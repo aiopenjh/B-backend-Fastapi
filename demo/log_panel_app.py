@@ -29,6 +29,10 @@ sys.path.insert(0, str(HERE.parent / "src"))  # 팀 코드(src)를 import 할 �
 from main import app  # 팀 앱 그대로 (위에서 src 경로를 넣은 뒤에 가져옴)
 
 LOGIN_PAGES = {"/ui", "/ui/login"}  # 로그인 폼이 있는 화면
+DETAIL_PAGE = re.compile(r"^/ui/restaurants/\d+$")  # 식당 상세(예약하기) 화면
+CLOSED_SLOT = re.compile(r'(<input type="radio" name="slot_id"[^>]*?)\s+disabled')  # 마감·자리 부족 시간 버튼
+# 화면이 잡아서 안내로 바꾼 실패 코드 → 원래 HTTP 상태 (로그 창에 같이 찍음)
+FAIL_STATUS = {"NOT_FOUND": 404, "NOT_THIS_RESTAURANT": 404}
 STATUS = re.compile(r"(?<=\s)([1-5])\d\d(?=\s|$)")  # 로그 줄 속 HTTP 상태 번호 (200·401·500 …)
 logger = logging.getLogger("demo")
 
@@ -95,9 +99,11 @@ def explain(request: Request, response: Response) -> None:
     if request.method == "POST" and path == "/ui/login" and response.status_code == 401:
         logger.warning("화면 로그인 실패 401 (이메일 또는 비밀번호가 틀림)")
     location = response.headers.get("location", "")
-    fail = parse_qs(urlparse(location).query).get("fail")
-    if fail:
-        logger.warning("화면 예약하기 실패 409 %s", fail[0])
+    query = parse_qs(urlparse(location).query)
+    if fail := query.get("fail"):
+        logger.warning("화면 예약하기 실패 %s %s", FAIL_STATUS.get(fail[0], 409), fail[0])
+    if cancel_fail := query.get("cancel_fail"):
+        logger.warning("화면 예약 취소 실패 %s %s", FAIL_STATUS.get(cancel_fail[0], 409), cancel_fail[0])
     if response.status_code in (403, 404) and path.startswith("/ui"):
         logger.warning("화면 안내 %s %s", response.status_code, path)
 
@@ -117,6 +123,9 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
         if request.url.path in LOGIN_PAGES:
             # 시연용: 브라우저의 이메일 형식 검사를 꺼서 엉터리 값도 서버까지 가게 함 (로그에 401이 찍힘)
             page = page.replace("<form", "<form novalidate", 1)
+        if DETAIL_PAGE.match(request.url.path):
+            # 시연용: 마감·자리 부족 시간도 눌리게 열어 둠 → 누르면 서버가 409(SLOT_SOLD_OUT 등)로 막는 걸 보여 줌
+            page = CLOSED_SLOT.sub(r"\1", page)
         headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
         return Response(page, status_code=response.status_code, headers=headers)
 
