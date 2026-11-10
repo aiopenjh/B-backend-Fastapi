@@ -74,6 +74,7 @@ class OwnerUIQueries:
                 "party_size": reservation.party_size,
                 "contact_phone": reservation.contact_phone,
                 "status": reservation.status,
+                "cancel_reason": reservation.cancel_reason,  # 담당 4: NO_SHOW면 화면에 "노쇼"로 표시
             }
             for reservation, slot in rows
         ]

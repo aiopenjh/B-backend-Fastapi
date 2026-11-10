@@ -1,10 +1,17 @@
+import asyncio
+import os
+from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from common.database import get_session  # 공통: 요청마다 DB 연결 하나
+from common.logger import get_logger  # 공통: 로그
+from slot.domain.day_range import seoul_now  # 담당 3: 지금 시각 (서울)
+
+logger = get_logger(__name__)
 
 from auth.application.service import AuthService
 from auth.domain.provider import TokenProvider
@@ -155,21 +162,66 @@ def create_restaurant_service(
     return RestaurantService(repo=RestaurantRepository(session), uow=uow)
 
 
-# 담당 4 : 예약 매니저 공장 (생성, 취소). 취소 권한을 보려고 식당 매니저를 받아서 식당 공장 아래에 둠
+# 담당 4 : 노쇼 유예 시간 (시작 후 이만큼 지나야 노쇼). 환경변수 NO_SHOW_GRACE_SECONDS(초), 기본 15분
+def env_seconds(name: str, default: int) -> int:
+    """환경변수에서 초(정수)를 읽는다. 비었거나 숫자가 아니거나 음수면 기본값을 쓰고, 잘못된 값은 경고 로그를 남긴다 (앱이 켜지다 죽지 않게)"""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("%s=%r 은(는) 숫자가 아니라 기본값 %d초를 씁니다", name, raw, default)
+        return default
+    if value < 0:
+        logger.warning("%s=%d 은(는) 음수라 기본값 %d초를 씁니다", name, value, default)
+        return default
+    return value
+
+
+NO_SHOW_GRACE = timedelta(seconds=env_seconds("NO_SHOW_GRACE_SECONDS", 900))
+
+
+# 담당 4 : 예약 매니저 공장 (생성, 취소, 노쇼, 입장 확인)
 def create_reservation_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     slot_repo: Annotated[SlotRepository, Depends(create_slot_repository)],
-    restaurant_service: Annotated[
-        RestaurantService, Depends(create_restaurant_service)
-    ],
     uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
 ) -> ReservationService:
     return ReservationService(
         reservation_repo=SQLAlchemyReservationRepository(session),
         slot_repo=slot_repo,
-        restaurant_service=restaurant_service,
         uow=uow,
+        no_show_grace=NO_SHOW_GRACE,
     )
+
+
+# 담당 4 : 자동 노쇼 한 번. 새 세션으로 예약 매니저를 위 공장과 똑같이 조립해서 노쇼 대상을 처리한다
+async def expire_no_shows_once(
+    session_factory: async_sessionmaker[AsyncSession], now: datetime
+) -> int:
+    async with session_factory() as session:
+        service = create_reservation_service(
+            session=session,
+            slot_repo=create_slot_repository(session=session),
+            uow=create_unit_of_work(session=session),
+        )
+        return await service.expire_no_shows(now)
+
+
+# 담당 4 : 자동 노쇼 반복. main.py의 lifespan이 앱을 켤 때 시작하고, 끌 때 멈춘다
+async def run_no_show_loop(
+    session_factory: async_sessionmaker[AsyncSession], interval_seconds: float
+) -> None:
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            handled = await expire_no_shows_once(session_factory, seoul_now())
+            if handled:
+                logger.info("자동 노쇼 처리 %d건", handled)
+        except Exception:
+            # 한 번 실패해도(DB 끊김 등) 로그만 남기고 다음 반복은 계속한다. 멈출 때(CancelledError)는 여기서 안 잡힌다
+            logger.exception("자동 노쇼 처리 실패")
 
 
 def wire_dependencies(app: FastAPI) -> None:

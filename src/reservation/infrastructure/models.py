@@ -72,3 +72,13 @@ class ReservationModel(Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # 누가·왜 취소했나 (CancelledBy, CancelReason을 문자열로 저장). 취소 전에는 비어 있다.
+    cancelled_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    cancel_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cancel_note: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # 운영자가 "입장"을 누른 시각. 비어 있으면 아직 안 온 것 (노쇼 판단에 씀)
+    checked_in_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

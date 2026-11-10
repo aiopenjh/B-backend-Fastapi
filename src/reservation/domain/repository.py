@@ -1,6 +1,7 @@
 # [담당 4] 예약 창고 메뉴판 : 예약을 저장하고 꺼내는 기능의 약속(인터페이스)
 import uuid
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 
 from reservation.domain.reservation import Reservation
 
@@ -26,4 +27,12 @@ class ReservationRepository(ABC):
 
     @abstractmethod
     async def save(self, reservation: Reservation) -> None:
-        """예약 취소 : 바뀐 상태(status, cancelled_at)를 DB에 반영"""
+        """예약 취소·입장 확인 : 바뀐 상태(status, cancelled_at, 누가·왜·메모, checked_in_at)를 DB에 반영"""
+
+    @abstractmethod
+    async def restaurant_owner_of(self, reservation_id: int) -> uuid.UUID | None:
+        """운영자 취소·입장 확인 : 이 예약이 속한 식당(삭제 안 된 것)의 주인 id. 없으면 None"""
+
+    @abstractmethod
+    async def list_no_show_ids(self, now: datetime, grace: timedelta) -> list[int]:
+        """자동 노쇼 : 확정 + 입장 안 함 + 시작 후 유예 시간이 지난 예약 번호들"""
