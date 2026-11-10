@@ -1,4 +1,4 @@
-{# [담당 5] 로그인 화면: 로그인 API 연결 전이라 입력을 잠가 둠 #}
+{# [담당 5] 로그인 화면: 담당 1 로그인으로 JWT를 받아 쿠키에 담음 (POST /ui/login) #}
 {% extends "base.html" %}
 {% block title %}로그인{% endblock %}
 {% block content %}
@@ -19,22 +19,32 @@
 
   <section class="login-card" aria-labelledby="login-title">
     <span class="small-logo" aria-hidden="true">t</span>
-    <h2 id="login-title">반가워요, 운영자님</h2>
-    <p class="muted">식당의 예약을 확인해 보세요.</p>
-    <form aria-describedby="login-help">
-      <fieldset disabled>
+    <h2 id="login-title">반가워요</h2>
+    {% set ui_user = request.state.ui_user if request.state.ui_user is defined else none %}
+    {% if ui_user %}
+    <p class="muted">이미 로그인했어요.</p>
+    <form method="post" action="{{ url_for('ui_logout') }}">
+      <button class="button button-outline full-width" type="submit">로그아웃</button>
+    </form>
+    {% else %}
+    <p class="muted">이메일과 비밀번호로 로그인하세요.</p>
+    <form method="post" action="{{ url_for('ui_login_submit') }}" aria-describedby="login-help">
+      <fieldset>
         <legend class="sr-only">로그인 정보</legend>
+        <input type="hidden" name="next" value="{{ next }}">
         <label for="username">이메일</label>
-        <input id="username" name="username" type="email" autocomplete="username" placeholder="이메일 주소를 입력하세요">
+        <input id="username" name="username" type="email" autocomplete="username" required value="{{ email }}" placeholder="이메일 주소를 입력하세요">
         <label for="password">비밀번호</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요">
-        <button class="button button-primary full-width" type="button" disabled>로그인</button>
+        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="비밀번호를 입력하세요">
+        <button class="button button-primary full-width" type="submit">로그인</button>
       </fieldset>
     </form>
-    <p id="login-help" class="form-help"><span class="status-dot"></span>로그인 연결 준비 중 · 입력은 비활성 상태입니다.</p>
+    {% if error %}<p id="login-help" class="form-error" role="alert">{{ error }}</p>
+    {% else %}<p id="login-help" class="form-help"><span class="status-dot"></span>로그인 상태는 이 브라우저에만 남아요.</p>{% endif %}
+    {% endif %}
     <div class="card-divider"><span>먼저 둘러보세요</span></div>
-    <a class="button button-outline full-width" href="{{ url_for('ui_restaurants') }}">운영 화면 미리보기 <span aria-hidden="true">↗</span></a>
-    <p class="login-footnote">현재 미리보기에는 실제 계정과 예약이 없습니다.</p>
+    <a class="button button-outline full-width" href="{{ url_for('ui_browse') }}">식당 둘러보기 <span aria-hidden="true">↗</span></a>
+    <p class="login-footnote">식당 목록과 빈자리는 로그인 없이 볼 수 있어요.</p>
   </section>
 </div>
 {% endblock %}

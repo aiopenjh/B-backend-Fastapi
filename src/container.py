@@ -13,6 +13,8 @@ from auth.infrastructure.repositories import SQLAlchemyTokenBlackListRepository
 from auth.infrastructure.security import JwtTokenProvider
 from auth.presentation.dependencies import auth_service
 
+from admin.application.service import AdminService  # 담당 5: 관리자 매니저
+from browse.application.service import BrowseService  # 담당 5: 손님 둘러보기 매니저
 from owner.application.service import OwnerService  # 담당 5: 운영자 매니저
 
 from slot.application.service import SlotService  # 담당 3: 슬롯(예약 시간대) 매니저
@@ -122,6 +124,20 @@ def create_owner_service(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> OwnerService:
     return OwnerService(session)
+
+
+# 담당 5: 관리자 매니저 공장
+def create_admin_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> AdminService:
+    return AdminService(session)
+
+
+# 담당 5: 손님 둘러보기 매니저 공장
+def create_browse_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> BrowseService:
+    return BrowseService(session)
 
 
 # 담당 5: 예약 조회 매니저 공장
