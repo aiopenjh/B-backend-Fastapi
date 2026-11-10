@@ -5,10 +5,12 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Self
 
+from auth.domain.value_object import AuthenticatedUser
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
     CancellationNotAllowedError,
 )
+from restaurant.domain.restaurant import Restaurant
 
 
 class ReservationStatus(StrEnum):
@@ -69,4 +71,14 @@ class Reservation:
             self.user_id == user_id
             and self.status is ReservationStatus.CONFIRMED
             and now < slot_starts_at
+        )
+
+    def can_be_cancelled_by(
+        self, user: AuthenticatedUser, restaurant: Restaurant
+    ) -> bool:
+        """취소 권한만 본다 (상태·시각은 cancel이 본다). 예약자 본인, 관리자, 그 식당의 운영자면 True."""
+        return (
+            self.user_id == user.user_id
+            or user.is_admin()
+            or (user.is_owner() and restaurant.is_owned_by(user.user_id))
         )

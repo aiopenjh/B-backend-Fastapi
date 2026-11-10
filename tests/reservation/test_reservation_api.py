@@ -82,9 +82,9 @@ class FakeReservationService:
         return CONFIRMED, SLOT
 
     async def cancel(
-        self, user_id: uuid.UUID, reservation_id: int, now: datetime
+        self, user: AuthenticatedUser, reservation_id: int, now: datetime
     ) -> tuple[Reservation, TimeSlot]:
-        self.cancel_calls.append((user_id, reservation_id))
+        self.cancel_calls.append((user.user_id, reservation_id))
         if self.error:
             raise self.error  # 진짜 서비스가 도메인 규칙에 걸려 에러를 던지는 흉내
         return CANCELLED, SLOT

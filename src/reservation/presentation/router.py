@@ -54,13 +54,16 @@ async def create_reservation(
     "/{reservation_id}/cancel",
     response_model=APIResponse[ReservationOut],
     responses={
-        404: {"model": APIResponse[None], "description": "예약이 없거나 남의 예약"},
+        404: {
+            "model": APIResponse[None],
+            "description": "예약이 없거나, 취소할 수 없는 사람의 요청 (남의 예약, 다른 식당 예약)",
+        },
         409: {
             "model": APIResponse[None],
             "description": "이미 취소한 예약이거나 슬롯이 이미 시작됨",
         },
     },
-    summary="예약 취소",
+    summary="예약 취소 (예약자 본인, 그 식당 운영자, 관리자)",
 )
 async def cancel_reservation(
     reservation_id: Annotated[
@@ -71,8 +74,8 @@ async def cancel_reservation(
 ) -> APIResponse[ReservationOut]:
     now = seoul_now()  # 취소 판단과 응답의 can_cancel이 같은 시각을 쓰도록 한 번만 구함
     reservation, slot = await service.cancel(
-        user_id=me.user_id, reservation_id=reservation_id, now=now
-    )
+        user=me, reservation_id=reservation_id, now=now
+    )  # 역할(손님, 운영자, 관리자)까지 봐야 해서 로그인한 사람 전체를 넘김
     return APIResponse.ok(
         data=ReservationOut.from_domain(reservation, slot, me.user_id, now)
     )
