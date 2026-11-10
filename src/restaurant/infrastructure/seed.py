@@ -3,7 +3,8 @@
 실행 (프로젝트 루트에서, Docker DB가 켜져 있어야 함):
     uv run python src/restaurant/infrastructure/seed.py restaurants_menus_sample.csv
 
-- 운영자 비밀번호는 모두 1234 (시연용). bcrypt는 느려서 한 번만 계산해 재사용
+- 운영자 비밀번호는 모두 Seed1234! (담당 3 팀 시드 src/seed.py와 같음). bcrypt는 느려서 한 번만 계산해 재사용
+- 음식 종류(cuisine)는 영어 코드: KOREAN, CHINESE, JAPANESE, WESTERN, BUNSIK, PUB, CAFE, WORLD
 - 이미 같은 이메일의 사용자가 있으면 그 줄은 건너뜀 (여러 번 실행해도 중복 없음)
 - 빈 칸(image_url 등)은 NULL로 넣음
 - 맨 끝에 한 번만 commit
@@ -26,7 +27,7 @@ from restaurant.infrastructure.models import MenuModel, RestaurantModel
 from user.domain.user import Role
 from user.infrastructure.models import UserModel
 
-DEMO_PASSWORD = "1234"
+DEMO_PASSWORD = "Seed1234!"  # 담당 3 팀 시드(src/seed.py)의 SEED_PASSWORD와 같게
 MENU_COUNT = 3
 
 

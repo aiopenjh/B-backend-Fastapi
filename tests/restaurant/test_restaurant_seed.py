@@ -4,7 +4,7 @@ ROW = {
     "name": "들꽃분식집",
     "description": "종로구 낙원동의 분식 전문점",
     "address": "서울특별시 종로구 수표로 146 (낙원동)",
-    "cuisine": "분식",
+    "cuisine": "BUNSIK",
     "image_url": "",
     "phone": "02-0000-0001",
     "email": "owner00001@example.com",
@@ -32,7 +32,7 @@ def test_parse_row_turns_empty_image_url_into_none():
 
     assert restaurant["image_url"] is None
     assert restaurant["name"] == "들꽃분식집"
-    assert restaurant["cuisine"] == "분식"
+    assert restaurant["cuisine"] == "BUNSIK"
 
 
 def test_parse_row_makes_three_menus_with_int_price():
