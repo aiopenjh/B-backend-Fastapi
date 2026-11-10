@@ -39,6 +39,14 @@ class FakeAuthService:
             return TOKENS[token]
         raise InvalidCredentialsError()
 
+    async def logout(self, token):
+        if token not in TOKENS:
+            raise InvalidCredentialsError()
+        LOGGED_OUT.append(token)
+
+
+LOGGED_OUT: list[str] = []  # 가짜 로그아웃이 막은 토큰
+
 
 class FakeOwnerService:
     """가짜 운영자 매니저: 내 식당 1곳, 2번 식당은 남의 식당(403)"""
@@ -96,6 +104,43 @@ async def test_logout_deletes_cookie(client):
 
     assert response.status_code == 303
     assert f'{COOKIE_NAME}=""' in response.headers["set-cookie"] or "Max-Age=0" in response.headers["set-cookie"]
+
+
+async def test_logout_blocks_token_on_server_then_deletes_cookie(client):
+    LOGGED_OUT.clear()
+    client.cookies.set(COOKIE_NAME, "owner-token")
+    async with client:
+        response = await client.post("/ui/logout")
+
+    assert LOGGED_OUT == ["owner-token"]  # 담당 1 logout으로 토큰을 막음
+    assert response.status_code == 303
+    assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+async def test_logout_with_broken_token_still_deletes_cookie(client):
+    LOGGED_OUT.clear()
+    client.cookies.set(COOKIE_NAME, "forged-token")
+    async with client:
+        response = await client.post("/ui/logout")
+
+    assert LOGGED_OUT == []  # 막을 토큰이 없음
+    assert response.status_code == 303
+    assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+async def test_cookie_is_secure_only_on_https():
+    app = FastAPI()
+    register_web(app)
+    app.dependency_overrides[create_auth_service] = FakeAuthService
+    form = {"username": "owner@example.com", "password": PASSWORD}
+    http = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
+    https = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test")
+    async with http, https:
+        local = await http.post("/ui/login", data=form)
+        deployed = await https.post("/ui/login", data=form)
+
+    assert "secure" not in local.headers["set-cookie"].lower()  # 로컬 http에서는 그대로 로그인됨
+    assert "secure" in deployed.headers["set-cookie"].lower()  # https면 https에서만 보냄
 
 
 async def test_owner_page_without_login_goes_to_login_with_next(client):

@@ -175,13 +175,20 @@ async def login_submit(
     response.set_cookie(
         COOKIE_NAME, issued.access_token, max_age=issued.expires_in,
         httponly=True, samesite="lax", path=COOKIE_PATH,  # 자바스크립트로 못 읽고, 화면 주소에만 보냄
+        secure=request.url.scheme == "https",  # https로 열렸으면 https에서만 쿠키를 보냄 (로컬 http는 그대로)
     )
     return response
 
 
-# 담당 5: 화면 로그아웃 — 쿠키를 지운다 (서버 쪽 토큰 폐기는 담당 1 로그아웃 API가 생기면 연결)
+# 담당 5: 화면 로그아웃 — 담당 1 logout(#45)으로 토큰을 막고, 쿠키를 지운다
 @router.post("/logout", name="ui_logout")
-async def logout_submit(request: Request):
+async def logout_submit(request: Request, auth: Auth):
+    token = request.cookies.get(COOKIE_NAME)
+    if token:
+        try:
+            await auth.logout(token=token)  # 차단 명단에 올림 → 복사해 둔 같은 토큰도 이제 못 씀
+        except AppError:
+            pass  # 이미 만료·로그아웃된 토큰이면 막을 것이 없으니 쿠키만 지운다
     response = RedirectResponse(request.url_for("ui_login"), status_code=303)
     response.delete_cookie(COOKIE_NAME, path=COOKIE_PATH)
     return response
