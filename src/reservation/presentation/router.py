@@ -10,6 +10,7 @@ from container import NO_SHOW_GRACE, create_reservation_service
 from owner.presentation.dependencies import require_owner
 from reservation.application.service import ReservationService
 from reservation.domain.reservation import CancelledBy
+from reservation.domain.value_object import Actor
 from reservation.presentation.schemas import (
     BIGINT_MAX,
     ReservationCancelRequest,
@@ -77,8 +78,9 @@ async def cancel_reservation(
 ) -> APIResponse[ReservationOut]:
     now = seoul_now()  # 취소 판단과 응답의 can_cancel이 같은 시각을 쓰도록 한 번만 구함
     # 기본값이 손님 취소(누가 CUSTOMER, 이유 CUSTOMER_REQUEST)라 내 예약만 취소된다
+    # 로그인한 사람을 예약 쪽 Actor로 바꿔서 넘긴다 (매니저·도메인은 로그인 모듈을 모른다)
     reservation, slot = await service.cancel(
-        user=me, reservation_id=reservation_id, now=now
+        user=Actor(me.user_id, me.role), reservation_id=reservation_id, now=now
     )
     return APIResponse.ok(data=ReservationOut.from_domain(reservation, slot, me, now))
 
@@ -114,7 +116,7 @@ async def owner_cancel_reservation(
 ) -> APIResponse[ReservationOut]:
     now = seoul_now()
     reservation, slot = await service.cancel(
-        user=owner,
+        user=Actor(owner.user_id, owner.role),
         reservation_id=reservation_id,
         now=now,
         by=CancelledBy.OWNER,
@@ -159,7 +161,7 @@ async def owner_check_in(
 ) -> APIResponse[ReservationOut]:
     now = seoul_now()
     reservation, slot = await service.check_in(
-        user=owner, reservation_id=reservation_id, now=now
+        user=Actor(owner.user_id, owner.role), reservation_id=reservation_id, now=now
     )
     return APIResponse.ok(
         data=ReservationOut.from_domain(
@@ -201,7 +203,7 @@ async def admin_cancel_reservation(
 ) -> APIResponse[ReservationOut]:
     now = seoul_now()
     reservation, slot = await service.cancel(
-        user=admin,
+        user=Actor(admin.user_id, admin.role),
         reservation_id=reservation_id,
         now=now,
         by=CancelledBy.ADMIN,

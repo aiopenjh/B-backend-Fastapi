@@ -1,4 +1,4 @@
-# [담당 4] 예약 도메인 예외 : 취소·노쇼·입장 확인 규칙을 어기면 내는 오류
+# [담당 4] 예약 도메인 예외 : 취소·노쇼·입장 확인 규칙을 어기면 내는 오류, 트랜잭션 시간 제한에 걸렸을 때의 오류
 from enum import unique
 from http import HTTPStatus
 
@@ -25,6 +25,14 @@ class ReservationErrorCode(ErrorCode):
     CANCEL_NOTE_REQUIRED = (
         HTTPStatus.UNPROCESSABLE_CONTENT,
         "취소 메모를 입력해 주세요.",
+    )
+    RESERVATION_BUSY = (
+        HTTPStatus.CONFLICT,
+        "다른 예약을 처리하고 있어요. 잠시 후 다시 시도해 주세요.",
+    )
+    RESERVATION_TIMEOUT = (
+        HTTPStatus.SERVICE_UNAVAILABLE,
+        "요청 처리 시간이 초과되었어요. 잠시 후 다시 시도해 주세요.",
     )
 
 
@@ -74,3 +82,17 @@ class CancelNoteRequiredError(AppError):
     """관리자가 메모 없이 취소하려 할 때 낸다 (422)."""
 
     error_code = ReservationErrorCode.CANCEL_NOTE_REQUIRED
+
+
+class ReservationBusyError(AppError):
+    """앞 요청이 슬롯·예약을 잠근 채 락 대기 시간을 넘겨 기다리기를 포기했을 때 낸다 (409, 잠시 후 다시).
+    DB 오류(55P03)를 infrastructure의 time_limits 훅이 이 에러로 바꾼다."""
+
+    error_code = ReservationErrorCode.RESERVATION_BUSY
+
+
+class ReservationTimeoutError(AppError):
+    """쿼리가 쿼리 제한 시간을 넘겨 DB가 취소했을 때(57014) 낸다 (503).
+    DB 오류를 infrastructure의 time_limits 훅이 이 에러로 바꾼다."""
+
+    error_code = ReservationErrorCode.RESERVATION_TIMEOUT

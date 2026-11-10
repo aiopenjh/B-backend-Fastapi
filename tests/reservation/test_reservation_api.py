@@ -1,8 +1,9 @@
-# [담당 4] 예약 창구 테스트 : 가짜 매니저로 예약 생성.취소 API의 요청.응답 확인
+# [담당 4] 예약 창구 테스트 : 가짜 매니저로 예약 생성.취소 API의 요청.응답 확인, 로그인 사람을 Actor로 바꿔 넘기는지
 import uuid
 from datetime import datetime
 
 import httpx
+import pytest
 from fastapi import FastAPI
 
 from auth.domain.value_object import AuthenticatedUser, AuthRole
@@ -10,13 +11,19 @@ from auth.presentation.dependencies import get_authenticated_user
 from common.error_handlers import register_error_handlers
 from common.schemas import SEOUL
 from container import create_reservation_service
-from reservation.domain.exceptions import AlreadyCancelledError, NoShowTooEarlyError
+from reservation.domain.exceptions import (
+    AlreadyCancelledError,
+    NoShowTooEarlyError,
+    ReservationBusyError,
+    ReservationTimeoutError,
+)
 from reservation.domain.reservation import (
     CancelledBy,
     CancelReason,
     Reservation,
     ReservationStatus,
 )
+from reservation.domain.value_object import Actor, ActorRole
 from reservation.presentation.router import admin_router, owner_router, router
 from slot.domain.exceptions import SlotSoldOut
 from slot.domain.time_slot import TimeSlot
@@ -79,6 +86,7 @@ class FakeReservationService:
         self.cancel_calls: list[tuple[uuid.UUID, int]] = []  # 취소 때 창구가 넘긴 값
         self.cancel_options: list[tuple] = []  # 취소 때 넘긴 (누가, 왜, 메모)
         self.check_in_calls: list[tuple[uuid.UUID, int]] = []  # 입장 확인 때 넘긴 값
+        self.actors: list[Actor] = []  # 취소·입장 확인 때 창구가 넘긴 사람 그대로
         self.error = error  # 넣어 주면 생성.취소.입장 확인에서 이 에러를 던진다
 
     async def create(
@@ -96,13 +104,14 @@ class FakeReservationService:
 
     async def cancel(
         self,
-        user: AuthenticatedUser,
+        user: Actor,
         reservation_id: int,
         now: datetime,
         by: CancelledBy = CancelledBy.CUSTOMER,
         reason: CancelReason = CancelReason.CUSTOMER_REQUEST,
         note: str | None = None,
     ) -> tuple[Reservation, TimeSlot]:
+        self.actors.append(user)
         self.cancel_calls.append((user.user_id, reservation_id))
         self.cancel_options.append((by, reason, note))
         if self.error:
@@ -110,8 +119,9 @@ class FakeReservationService:
         return CANCELLED, SLOT
 
     async def check_in(
-        self, user: AuthenticatedUser, reservation_id: int, now: datetime
+        self, user: Actor, reservation_id: int, now: datetime
     ) -> tuple[Reservation, TimeSlot]:
+        self.actors.append(user)
         self.check_in_calls.append((user.user_id, reservation_id))
         if self.error:
             raise self.error
@@ -384,3 +394,58 @@ async def test_customer_cancel_still_sends_customer_request():
     assert fake.cancel_options == [
         (CancelledBy.CUSTOMER, CancelReason.CUSTOMER_REQUEST, None)
     ]
+
+
+# 창구는 로그인한 사람(AuthenticatedUser)을 예약 쪽 Actor로 바꿔서 매니저에게 넘긴다 (손님·운영자·관리자 창구 모두)
+@pytest.mark.parametrize(
+    ("user", "url", "body", "role"),
+    [
+        (ME, "/api/v1/reservations/15/cancel", None, ActorRole.CUSTOMER),
+        (
+            OWNER,
+            "/api/v1/owner/reservations/15/cancel",
+            {"reason": "PHONE_REQUEST"},
+            ActorRole.OWNER,
+        ),
+        (OWNER, "/api/v1/owner/reservations/15/check-in", None, ActorRole.OWNER),
+        (
+            ADMIN,
+            "/api/v1/admin/reservations/15/cancel",
+            {"reason": "OTHER", "note": "정리"},
+            ActorRole.ADMIN,
+        ),
+    ],
+)
+async def test_router_passes_actor_to_service(user, url, body, role):
+    fake = FakeReservationService()
+
+    async with make_client(fake, user=user) as client:
+        response = await client.post(url, json=body)
+
+    assert response.status_code == 200
+    # 모양이 같은 AuthenticatedUser가 아니라 진짜 Actor여야 한다 (그래야 매니저가 로그인 모듈을 몰라도 된다)
+    assert len(fake.actors) == 1
+    assert type(fake.actors[0]) is Actor
+    assert fake.actors[0] == Actor(user.user_id, role)
+
+
+# 시간 제한에 걸린 에러도 실패 봉투로 바뀐다: 락 대기 초과는 409(잠시 후 다시), 쿼리·멈춤 초과는 503
+@pytest.mark.parametrize(
+    ("error", "status", "code"),
+    [
+        (ReservationBusyError(), 409, "RESERVATION_BUSY"),
+        (ReservationTimeoutError(), 503, "RESERVATION_TIMEOUT"),
+    ],
+)
+async def test_time_limit_errors_become_envelopes(error, status, code):
+    fake = FakeReservationService(error=error)
+
+    async with make_client(fake) as client:
+        created = await client.post(
+            "/api/v1/reservations", json={"slot_id": 7, "party_size": 2}
+        )
+        cancelled = await client.post("/api/v1/reservations/15/cancel")
+
+    for response in (created, cancelled):
+        assert response.status_code == status
+        assert response.json()["code"] == code

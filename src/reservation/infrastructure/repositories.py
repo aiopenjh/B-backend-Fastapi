@@ -1,8 +1,8 @@
-# [담당 4] 예약 창고 주방 : reservations 표를 읽고 써서 Reservation으로 돌려줌
+# [담당 4] 예약 창고 주방 : reservations 표를 읽고 써서 Reservation으로 돌려줌, 트랜잭션 시간 제한 걸기
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,7 @@ from reservation.domain.reservation import (
     ReservationStatus,
 )
 from reservation.infrastructure.models import ReservationModel
+from reservation.infrastructure.time_limits import DEFAULT_TIME_LIMITS, TimeLimits
 from restaurant.infrastructure.models import RestaurantModel
 from slot.infrastructure.models import ReservationSlotModel
 
@@ -42,8 +43,30 @@ def to_reservation(model: ReservationModel) -> Reservation:
 class SQLAlchemyReservationRepository(ReservationRepository):
     """ReservationRepository 약속을 SQLAlchemy로 구현. 세션은 밖(서비스)에서 받아 쓴다."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, time_limits: TimeLimits = DEFAULT_TIME_LIMITS
+    ) -> None:
         self.session = session
+        self.time_limits = (
+            time_limits  # 공장이 환경변수 값으로 넣어 줌 (없으면 3초·5초·10초)
+        )
+
+    async def set_time_limits(self) -> None:
+        # set_config(이름, 값, true) = SET LOCAL : 이 트랜잭션에만 걸리고 commit/rollback하면 원래대로 돌아간다
+        # (SET은 값 자리에 변수를 못 쓰지만 set_config는 쓸 수 있어서, 값이 SQL에 직접 섞이지 않는다)
+        settings = self.time_limits.as_settings()
+        await self.session.execute(
+            text(
+                "SELECT set_config('lock_timeout', :lock, true),"
+                " set_config('statement_timeout', :statement, true),"
+                " set_config('idle_in_transaction_session_timeout', :idle, true)"
+            ),
+            {
+                "lock": settings["lock_timeout"],
+                "statement": settings["statement_timeout"],
+                "idle": settings["idle_in_transaction_session_timeout"],
+            },
+        )
 
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
         stmt = (
