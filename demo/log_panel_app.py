@@ -9,9 +9,7 @@
 - 시연·테스트용이다. 로그에 내부 정보가 있으니 배포에는 쓰지 않는다.
 """
 
-import hashlib
 import logging
-import os
 import re
 import sys
 from collections import deque
@@ -37,11 +35,7 @@ from container import create_auth_service
 from main import app  # 팀 앱 그대로 (위에서 src 경로를 넣은 뒤에 가져옴)
 from web_auth import COOKIE_NAME, COOKIE_PATH, home_url
 
-# 시연 계정 바꾸기: 관리자로 로그인하면 켜지는 "시연 모드" 쿠키.
-# 값은 .env의 비밀 키로 만들어서 서버를 다시 켜도 그대로 (비밀 키를 모르면 흉내 못 냄)
-DEMO_COOKIE = "demo_switch"
-DEMO_TOKEN = hashlib.sha256(f"demo-switch:{os.getenv('JWT_SECRET_KEY', '')}".encode()).hexdigest()
-DEMO_HOURS = 12  # 시연 모드 유지 시간 (브라우저를 껐다 켜도 유지)
+# 시연 계정 바꾸기: 시연 앱에서는 로그 창 위에 항상 고정 (로그인 전·후, 누구로 있든 언제든 바꿈)
 ACCOUNTS = {"admin": ("관리자", seed.ADMIN[0], seed.ADMIN_PASSWORD)} | {
     email.split("@")[0].replace(".", "_"): (name, email, seed.SEED_PASSWORD)
     for email, name, _, _ in sorted(seed.USERS, key=lambda user: user[3] != "OWNER")  # 운영자 먼저, 그다음 손님
@@ -133,16 +127,12 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)  # 안쪽 팀 미들웨어가 이 요청 로그를 이미 남긴 뒤
         explain(request, response)
-        demo_mode(request, response)
         is_page = response.headers.get("content-type", "").startswith("text/html")
         if not (is_page and request.url.path.startswith("/ui")):
             return response
         body = b"".join([chunk async for chunk in response.body_iterator])
-        # 관리자 화면이 200으로 열렸다면 지금 사람은 관리자 → 시연 모드를 바로 켬 (예전 쿠키가 남아 있어도)
-        admin_page = request.url.path.startswith("/ui/admin") and response.status_code == 200
-        demo_on = admin_page or request.cookies.get(DEMO_COOKIE) == DEMO_TOKEN
         panel = views.get_template("log_panel.html").render(
-            log_panel=recent_logs, style=STYLE, accounts=ACCOUNTS if demo_on else None, back=request.url.path,
+            log_panel=recent_logs, style=STYLE, accounts=ACCOUNTS, back=request.url.path,
         )
         page = body.decode("utf-8").replace("</body>", panel + "\n</body>", 1)
         if request.url.path in LOGIN_PAGES:
@@ -152,20 +142,7 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
             # 시연용: 마감·자리 부족 시간도 눌리게 열어 둠 → 누르면 서버가 409(SLOT_SOLD_OUT 등)로 막는 걸 보여 줌
             page = CLOSED_SLOT.sub(r"\1", page)
         headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
-        page_response = Response(page, status_code=response.status_code, headers=headers)
-        if admin_page and request.cookies.get(DEMO_COOKIE) != DEMO_TOKEN:
-            page_response.set_cookie(DEMO_COOKIE, DEMO_TOKEN, max_age=DEMO_HOURS * 3600, httponly=True, samesite="lax", path="/")
-        return page_response
-
-
-def demo_mode(request: Request, response: Response) -> None:
-    """관리자가 화면으로 로그인하면 시연 모드를 켜고, 로그아웃하면 끈다"""
-    if request.method != "POST":
-        return
-    if request.url.path == "/ui/login" and response.headers.get("location", "").endswith("/ui/admin/owners"):
-        response.set_cookie(DEMO_COOKIE, DEMO_TOKEN, max_age=DEMO_HOURS * 3600, httponly=True, samesite="lax", path="/")
-    elif request.url.path == "/ui/logout":
-        response.delete_cookie(DEMO_COOKIE, path="/")
+        return Response(page, status_code=response.status_code, headers=headers)
 
 
 @app.post("/demo/logs/clear", include_in_schema=False)
@@ -181,9 +158,9 @@ async def switch_account(
     auth: Annotated[AuthService, Depends(create_auth_service)],
     who: Annotated[str, Form()],
 ):
-    """시연용: 시연 모드일 때만, 시드 계정으로 진짜 로그인해서 화면 로그인 쿠키를 바꿔 끼움"""
-    if request.cookies.get(DEMO_COOKIE) != DEMO_TOKEN or who not in ACCOUNTS:
-        return Response("시연 모드가 아니에요. 관리자로 로그인해 주세요.", status_code=403)
+    """시연용: 시드 계정으로 진짜 로그인해서 화면 로그인 쿠키를 바꿔 끼움 (시연 앱에서만 있는 주소)"""
+    if who not in ACCOUNTS:
+        return Response("모르는 시연 계정이에요.", status_code=404)
     name, email, password = ACCOUNTS[who]
     try:
         issued = await auth.login(email=email, password=password)
