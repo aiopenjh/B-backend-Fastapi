@@ -4,7 +4,7 @@ import uuid
 from typing import Annotated
 from pydantic import BaseModel, EmailStr, Field, StringConstraints, ConfigDict
 
-from user.domain.user import Role, User
+from user.domain.user import PASSWORD_MAX_LENGTH, Role, User
 
 PHONE_REGEX = r"^01[016789]-?\d{3,4}-?\d{4}$"
 
@@ -25,7 +25,11 @@ class SignUpUserRequest(BaseModel):
     email: EmailStr = Field(description="로그인에 사용할 사용자 이메일")
     password: Annotated[
         str,
-        Field(min_length=8, description="비밀번호 (8자 이상, 영문/숫자/특수문자 포함)"),
+        Field(
+            min_length=8,
+            max_length=PASSWORD_MAX_LENGTH,
+            description="비밀번호 (8~72자, 영문/숫자/특수문자 포함)",
+        ),
     ]
     phone: MobilePhone
 

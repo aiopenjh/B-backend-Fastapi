@@ -12,8 +12,9 @@ class TokenBlackListModel(Base):
     __tablename__ = "token_blacklist"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # PostgreSQL은 FK에 인덱스를 자동으로 만들지 않으므로 직접 지정
     user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     # UNIQUE가 인덱스를 함께 만들므로 index 필요없음
     token_jti: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)

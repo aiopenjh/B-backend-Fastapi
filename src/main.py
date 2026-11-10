@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from auth.infrastructure.repositories import purge_expired_tokens
 from auth.presentation.routers.v1.router import router as auth_router
 from common.error_handlers import register_error_handlers
 from common.logger import get_logger
@@ -31,6 +32,9 @@ async def lifespan(app: FastAPI):
     logger.info("tables ensured")
     async with AsyncSessionLocal() as session:
         await seed(session)
+
+    # [담당1] 만료된 로그아웃 토큰(블랙리스트) 정리
+    await purge_expired_tokens(AsyncSessionLocal)
 
     yield
     await engine.dispose()  # 커넥션 풀 반납

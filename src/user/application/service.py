@@ -16,7 +16,7 @@ class UserService:
         self.uow = uow
         self.hasher = hasher
 
-    async def signUp(
+    async def sign_up(
         self, email: str, raw_password: str, name: str, phone: str
     ) -> User:
 
