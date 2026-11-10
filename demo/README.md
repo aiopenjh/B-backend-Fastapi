@@ -31,6 +31,7 @@ uv run python demo/make_slots.py
 
 - 첫 줄: 담당 2 식당 시드 (운영자·식당·메뉴 200곳)
 - 둘째 줄: 모든 식당에 내일부터 14일치 예약 시간대 (12:00 · 18:00 · 19:30, 그날 시간대가 이미 있는 식당은 건너뜀). `uv run python demo/make_slots.py 30`처럼 날 수를 바꿀 수 있습니다. 팀 코드는 고치지 않고 시간대 표에 데이터만 넣습니다.
+- 마감 409 시연: `uv run python demo/make_full.py "식당 이름"` — 그 식당의 가장 가까운 시간 하나를 시연용 손님 예약으로 꽉 채움 (`SCENARIO.md` 참고)
 
 시연 순서와 상태 코드 내는 법은 `SCENARIO.md`를 보세요.
 
