@@ -35,7 +35,7 @@ from container import create_auth_service
 from main import app  # 팀 앱 그대로 (위에서 src 경로를 넣은 뒤에 가져옴)
 from web_auth import COOKIE_NAME, COOKIE_PATH, home_url
 
-# 시연 계정 바꾸기: 시연 앱에서는 로그 창 위에 항상 고정 (로그인 전·후, 누구로 있든 언제든 바꿈)
+# 시연 계정 바꾸기: 로그인한 뒤에는 로그 창 위에 항상 고정 (누구로 있든 언제든 바꿈)
 ACCOUNTS = {"admin": ("관리자", seed.ADMIN[0], seed.ADMIN_PASSWORD)} | {
     email.split("@")[0].replace(".", "_"): (name, email, seed.SEED_PASSWORD)
     for email, name, _, _ in sorted(seed.USERS, key=lambda user: user[3] != "OWNER")  # 운영자 먼저, 그다음 손님
@@ -131,8 +131,10 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
         if not (is_page and request.url.path.startswith("/ui")):
             return response
         body = b"".join([chunk async for chunk in response.body_iterator])
+        # 화면 문지기(get_ui_user)가 이 요청에서 읽어 둔 로그인 사람 — 로그인했을 때만 계정 바꾸기 버튼을 띄움
+        logged_in = getattr(request.state, "ui_user", None) is not None
         panel = views.get_template("log_panel.html").render(
-            log_panel=recent_logs, style=STYLE, accounts=ACCOUNTS, back=request.url.path,
+            log_panel=recent_logs, style=STYLE, accounts=ACCOUNTS if logged_in else None, back=request.url.path,
         )
         page = body.decode("utf-8").replace("</body>", panel + "\n</body>", 1)
         if request.url.path in LOGIN_PAGES:
