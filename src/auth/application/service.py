@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 
 from auth.domain.exceptions import InvalidCredentialsError
@@ -45,12 +46,16 @@ class AuthService:
 
         user = await self.user_repo.find_by_email(email=user_email)
 
-        if (
-            user is None
-            or not user.is_active()
-            or not self.hasher.verify(
-                raw_password=password, hashed_password=user.password_hash
-            )
+        if user is None or not user.is_active():
+            raise InvalidCredentialsError()
+
+        # bcrypt는 약 0.25초 걸린다. 그동안 DB 연결을 붙잡지 않게 읽기 트랜잭션을 끝내고,
+        # 이벤트 루프를 막지 않게 스레드에서 검증한다
+        await self.uow.release()
+        if not await asyncio.to_thread(
+            self.hasher.verify,
+            raw_password=password,
+            hashed_password=user.password_hash,
         ):
             raise InvalidCredentialsError()
 
