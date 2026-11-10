@@ -3,7 +3,9 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from fastapi import FastAPI
+from sqlalchemy.dialects import postgresql
 
+from auth.domain.token_entities import BLACKLIST_PURGE_GRACE
 from auth.infrastructure.models import TokenBlackListModel
 from auth.infrastructure.repositories import purge_expired_tokens
 
@@ -39,8 +41,14 @@ async def test_purge_deletes_rows_expired_before_now_and_commits():
     stmt = session.statements[0]
     assert stmt.is_delete
     assert stmt.table.name == TokenBlackListModel.__tablename__
+    compiled = stmt.compile(dialect=postgresql.dialect())
+    sql = " ".join(str(compiled).split())
     # 방향까지 확인: ">"로 뒤집히면 아직 유효한 블랙리스트가 지워져 로그아웃 토큰이 살아난다
-    assert stmt.whereclause.compare(TokenBlackListModel.expired_at < NOW)
+    assert "token_blacklist.expired_at <" in sql
+    # 서버 간 시계 차이를 생각해 여유 시간만큼 이전에 만료된 행만 지운다
+    assert list(compiled.params.values()) == [NOW - BLACKLIST_PURGE_GRACE]
+    # 다른 트랜잭션이 잠근 행은 기다리지 않고 건너뛴다 (로그아웃 응답이 막히지 않게)
+    assert "FOR UPDATE SKIP LOCKED" in sql
     assert session.committed is True
 
 

@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from auth.domain.exceptions import (
     InvalidCredentialsError,
@@ -13,15 +14,18 @@ from auth.domain.limiter import (
 from auth.domain.provider import TokenProvider
 from auth.domain.repository import TokenBlackListRepository
 from auth.domain.value_object import AuthRole, AuthenticatedUser
-from auth.domain.token_entities import BlackListToken
+from auth.domain.token_entities import BLACKLIST_PURGE_GRACE, BlackListToken
 
 from common.errors import InvalidInputError, UnauthorizedError
+from common.logger import get_logger
 from common.unit_of_work import ConflictError, UnitOfWork
 
 from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
 from user.domain.value_object import Email
 
+
+logger = get_logger(__name__)
 
 # 계정이 없거나 탈퇴했을 때도 같은 검증 작업을 하려고 쓰는 비밀번호.
 # 이 값으로는 로그인할 수 없다 (계정이 있어야 성공하므로 비교용으로만 쓰임)
@@ -177,3 +181,25 @@ class AuthService:
         except ConflictError:
             # 같은 토큰으로 동시에 로그아웃하면 두 번째는 jti UNIQUE에 걸린다
             raise UnauthorizedError()
+
+        await self._purge_expired_blacklist()
+
+    async def _purge_expired_blacklist(self) -> None:
+        """만료된 블랙리스트 행을 지운다.
+
+        블랙리스트는 로그아웃할 때만 늘어나므로, 같은 자리에서 지우면 크기가
+        "아직 만료되지 않은 로그아웃 토큰 수"로 제한된다 (앱 시작 때도 한 번 지움).
+        로그아웃(토큰 차단)은 이미 확정됐으니, 정리가 실패해도 응답은 성공으로 둔다.
+        """
+        try:
+            # 시계 차이를 생각해 여유 시간만큼 이전에 만료된 행만 지운다
+            cutoff = datetime.now(UTC) - BLACKLIST_PURGE_GRACE
+            await self.blacklist_repo.cleanup_expired(cutoff)
+            await self.uow.commit()
+        except Exception:
+            logger.warning("만료된 블랙리스트 정리에 실패했습니다", exc_info=True)
+            try:
+                await self.uow.release()
+            except Exception:
+                # 연결이 끊긴 경우 등. 세션은 요청이 끝날 때 닫힌다
+                logger.warning("블랙리스트 정리 되돌리기에 실패했습니다", exc_info=True)

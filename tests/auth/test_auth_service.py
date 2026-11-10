@@ -1,15 +1,17 @@
 # [담당1 - 강성수]
 
 import asyncio
+import logging
 import threading
 import time
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import pytest
 
 from auth.application.service import DUMMY_PASSWORD, AuthService
+from auth.domain.token_entities import BLACKLIST_PURGE_GRACE
 from auth.domain.exceptions import (
     InvalidCredentialsError,
     TooManyLoginAttemptsError,
@@ -63,6 +65,10 @@ class InMemoryUserRepository(UserRepository):
         return user
 
 
+class FakeDBError(Exception):
+    """실제 DB 오류(sqlalchemy DBAPIError, InterfaceError 등)를 흉내 낸다"""
+
+
 class InMemoryBlackListRepository(TokenBlackListRepository):
     """add는 대기열에만 넣고, FakeUnitOfWork.commit이 불려야 확정된다."""
 
@@ -70,6 +76,10 @@ class InMemoryBlackListRepository(TokenBlackListRepository):
         self.jtis: set[str] = set()
         self.saved: list[BlackListToken] = []
         self.pending: list[BlackListToken] = []
+        # 정리(DELETE)도 commit이 불려야 확정된다
+        self.pending_cleanup: datetime | None = None
+        self.cleanup_calls: list[datetime] = []
+        self.fail_cleanup: BaseException | None = None
 
     async def add(self, token: BlackListToken) -> None:
         self.pending.append(token)
@@ -78,7 +88,19 @@ class InMemoryBlackListRepository(TokenBlackListRepository):
         return jti in self.jtis
 
     async def cleanup_expired(self, current_time: datetime) -> None:
-        pass
+        if self.fail_cleanup is not None:
+            raise self.fail_cleanup
+        self.cleanup_calls.append(current_time)
+        self.pending_cleanup = current_time
+
+    def apply_cleanup(self) -> None:
+        if self.pending_cleanup is None:
+            return
+        cutoff = self.pending_cleanup
+        expired = {t.jti for t in self.saved if t.expired_at < cutoff}
+        self.saved = [t for t in self.saved if t.jti not in expired]
+        self.jtis -= expired
+        self.pending_cleanup = None
 
 
 class FakeUnitOfWork(UnitOfWork):
@@ -89,19 +111,32 @@ class FakeUnitOfWork(UnitOfWork):
     ) -> None:
         self.blacklist = blacklist
         self.commits = 0
+        self.releases = 0
         self.conflict = conflict
+        self.fail_purge_commit = False
 
     async def commit(self) -> None:
         if self.conflict:
             self.blacklist.pending.clear()
+            self.blacklist.pending_cleanup = None
             raise ConflictError()
+
+        if self.fail_purge_commit and self.blacklist.pending_cleanup is not None:
+            raise FakeDBError("커밋 중 연결 끊김")
 
         for token in self.blacklist.pending:
             self.blacklist.jtis.add(token.jti)
             self.blacklist.saved.append(token)
 
         self.blacklist.pending.clear()
+        self.blacklist.apply_cleanup()
         self.commits += 1
+
+    async def release(self) -> None:
+        # 확정하지 않은 변경을 버린다 (rollback)
+        self.blacklist.pending.clear()
+        self.blacklist.pending_cleanup = None
+        self.releases += 1
 
 
 @pytest.fixture
@@ -784,7 +819,7 @@ async def test_logout_success_blocks_the_token(service, user, blacklist, uow):
     with pytest.raises(UnauthorizedError):
         await service.authenticate(issued.access_token)
 
-    assert uow.commits == 1
+    assert uow.commits == 2  # 블랙리스트 등록 1번 + 만료 행 정리 1번
     assert blacklist.saved[0].user_id == user.id
 
 
@@ -808,14 +843,15 @@ async def test_login_again_after_logout_issues_working_token(service, user):
         await service.authenticate(first.access_token)
 
 
-async def test_logout_fail_already_logged_out(service, user, uow):
+async def test_logout_fail_already_logged_out(service, user, uow, blacklist):
     issued = await service.login("owner@example.com", PASSWORD)
 
     await service.logout(issued.access_token)
 
     with pytest.raises(UnauthorizedError):
         await service.logout(issued.access_token)
-    assert uow.commits == 1
+    assert uow.commits == 2  # 첫 로그아웃의 등록·정리만. 두 번째는 커밋하지 않음
+    assert len(blacklist.cleanup_calls) == 1
 
 
 async def test_logout_fail_invalid_token(service, blacklist, uow):
@@ -824,6 +860,7 @@ async def test_logout_fail_invalid_token(service, blacklist, uow):
 
     assert blacklist.saved == []
     assert uow.commits == 0
+    assert blacklist.cleanup_calls == []
 
 
 async def test_logout_conflict_at_commit_becomes_unauthorized(
@@ -843,4 +880,95 @@ async def test_logout_conflict_at_commit_becomes_unauthorized(
     issued = await service.login("owner@example.com", PASSWORD)
 
     with pytest.raises(UnauthorizedError):
+        await service.logout(issued.access_token)
+    assert blacklist.cleanup_calls == []
+
+
+# --- S10: 로그아웃할 때 만료된 블랙리스트 행도 정리한다
+
+
+def add_committed(blacklist, jti: str, expired_at: datetime, user_id) -> None:
+    blacklist.jtis.add(jti)
+    blacklist.saved.append(
+        BlackListToken(jti=jti, user_id=user_id, expired_at=expired_at)
+    )
+
+
+async def test_logout_purges_expired_blacklist_rows(service, user, blacklist):
+    now = datetime.now(UTC)
+    add_committed(blacklist, "expired-before", now - timedelta(hours=1), user.id)
+    # 막 만료된 행은 서버 간 시계 차이를 생각해 여유 시간 동안 남긴다
+    add_committed(blacklist, "just-expired", now - timedelta(minutes=1), user.id)
+    add_committed(blacklist, "still-valid", now + timedelta(hours=1), user.id)
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    await service.logout(issued.access_token)
+
+    remaining = {token.jti for token in blacklist.saved}
+    assert "expired-before" not in remaining
+    assert {"just-expired", "still-valid"} <= remaining
+    assert len(remaining) == 3  # 여유 시간 안의 행 + 유효한 행 + 방금 로그아웃한 토큰
+    # 방금 로그아웃한 토큰은 정리되지 않고 계속 막힌다
+    with pytest.raises(UnauthorizedError):
+        await service.authenticate(issued.access_token)
+
+
+async def test_logout_purges_rows_expired_before_now_minus_grace(
+    service, user, blacklist
+):
+    issued = await service.login("owner@example.com", PASSWORD)
+    before = datetime.now(UTC)
+
+    await service.logout(issued.access_token)
+
+    after = datetime.now(UTC)
+    assert len(blacklist.cleanup_calls) == 1
+    assert (
+        before - BLACKLIST_PURGE_GRACE
+        <= blacklist.cleanup_calls[0]
+        <= after - BLACKLIST_PURGE_GRACE
+    )
+
+
+async def test_logout_succeeds_even_if_purge_fails(
+    service, user, blacklist, uow, caplog
+):
+    # 정리는 부가 작업이다. 실패해도 로그아웃(토큰 차단)은 이미 확정됐다
+    blacklist.fail_cleanup = FakeDBError("잠금 대기 시간 초과")
+    issued = await service.login("owner@example.com", PASSWORD)
+    releases_before = uow.releases  # 로그인도 해시 전에 읽기 트랜잭션을 끝낸다
+
+    await service.logout(issued.access_token)
+
+    with pytest.raises(UnauthorizedError):
+        await service.authenticate(issued.access_token)
+    assert uow.commits == 1  # 등록만 확정
+    assert uow.releases - releases_before == 1  # 실패한 정리는 되돌림
+    assert any(
+        record.levelno == logging.WARNING and "블랙리스트 정리" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+async def test_logout_succeeds_even_if_purge_commit_fails(service, user, uow, caplog):
+    issued = await service.login("owner@example.com", PASSWORD)
+    uow.fail_purge_commit = True
+    releases_before = uow.releases
+
+    await service.logout(issued.access_token)
+
+    with pytest.raises(UnauthorizedError):
+        await service.authenticate(issued.access_token)
+    assert uow.releases - releases_before == 1
+    assert any(record.levelno == logging.WARNING for record in caplog.records)
+
+
+async def test_logout_does_not_swallow_cancellation_during_purge(
+    service, user, blacklist
+):
+    # 요청 취소는 오류가 아니다. 정리 중에 취소되면 그대로 전파돼야 한다
+    blacklist.fail_cleanup = asyncio.CancelledError()
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    with pytest.raises(asyncio.CancelledError):
         await service.logout(issued.access_token)
