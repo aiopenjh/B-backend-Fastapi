@@ -1,11 +1,14 @@
 # [담당 5] 손님 둘러보기 창고: 지역(구 → 동)과 음식 종류로 식당 꺼내기 (읽기 전용)
 from datetime import date, datetime
 
-from sqlalchemy import String, cast, func, select
+from sqlalchemy import String, cast, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from restaurant.domain.restaurant import Restaurant  # 담당 2: 식당
-from restaurant.infrastructure.models import RestaurantModel  # 담당 2: 식당 표(DB)
+from restaurant.infrastructure.models import (  # 담당 2: 식당·메뉴 표(DB)
+    MenuModel,
+    RestaurantModel,
+)
 from restaurant.infrastructure.repository import to_restaurant  # 담당 2: 표 → 식당
 from slot.domain.day_range import SEOUL  # 담당 3: 서울 시간대
 from slot.infrastructure.models import ReservationSlotModel  # 담당 3: 슬롯 표(DB)
@@ -65,7 +68,15 @@ class BrowseQueryRepository:
         if dong:
             conditions.append(DONG == dong)
         if q:
-            conditions.append(RestaurantModel.name.icontains(q, autoescape=True))
+            # 전체 검색: 식당 이름, 주소(구·동·길), 메뉴 이름 중 하나라도 맞으면
+            has_menu = exists().where(
+                MenuModel.restaurant_id == RestaurantModel.id, MenuModel.name.icontains(q, autoescape=True)
+            )
+            conditions.append(or_(
+                RestaurantModel.name.icontains(q, autoescape=True),
+                RestaurantModel.address.icontains(q, autoescape=True),
+                has_menu,
+            ))
         if cuisine:
             conditions.append(RestaurantModel.cuisine == cuisine)
 

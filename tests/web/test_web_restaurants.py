@@ -205,3 +205,13 @@ async def test_bad_seed_is_422(client):
         response = await client.get("/ui/restaurants?seed=<script>")
 
     assert response.status_code == 422
+
+
+async def test_search_bar_is_above_filters_and_keeps_query(client, fakes):
+    async with client:
+        response = await client.get("/ui/restaurants?q=김밥&district=종로구")
+
+    assert fakes[2].received[2] == "김밥"  # 검색어는 창고로 (이름·메뉴·주소 전체 검색)
+    assert response.text.index('class="search-bar"') < response.text.index('class="filter-form"')  # 검색창이 필터 위
+    assert 'name="q" value="김밥"' in response.text  # 필터를 바꿔도 검색어 유지
+    assert '"김밥" 검색' in response.text

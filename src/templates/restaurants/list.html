@@ -1,4 +1,4 @@
-{# [담당 5] 손님용 식당 목록 화면: 식당 이름·음식 종류·지역·상세 지역으로 찾기 + 식당 카드 (10개씩) #}
+{# [담당 5] 손님용 식당 목록 화면: 전체 검색(이름·메뉴·주소) + 음식 종류·구·동으로 찾기 + 식당 카드 (10개씩) #}
 {% extends "base.html" %}
 {% block title %}식당 둘러보기{% endblock %}
 {% block content %}
@@ -11,6 +11,15 @@
   <span class="page-label">RESTAURANTS</span>
 </div>
 
+<form class="search-bar" method="get" action="{{ url_for('ui_browse') }}" role="search">
+  <label class="sr-only" for="q">식당 이름·메뉴·주소로 찾기</label>
+  <input id="q" type="search" name="q" value="{{ q }}" placeholder="식당 이름, 메뉴, 동네로 찾기 (예: 김밥, 낙원동)">
+  <input type="hidden" name="cuisine" value="{{ cuisine }}">
+  <input type="hidden" name="district" value="{{ district }}">
+  <input type="hidden" name="dong" value="{{ dong }}">
+  <button class="button button-primary" type="submit">검색</button>
+</form>
+
 <section class="panel" aria-labelledby="browse-title">
   <div class="panel-heading">
     <h2 id="browse-title">
@@ -21,15 +30,15 @@
       {% else %}
         전체 지역
       {% endif %}
+      {% if q %}
+        <span class="muted">· "{{ q }}" 검색</span>
+      {% endif %}
     </h2>
     <span class="subtle-tag">로그인 없이 볼 수 있어요</span>
   </div>
 
   <form class="filter-form" method="get" action="{{ url_for('ui_browse') }}">
-    <div>
-      <label for="q">식당 이름</label>
-      <input id="q" type="search" name="q" value="{{ q }}" placeholder="이름으로 찾기">
-    </div>
+    <input type="hidden" name="q" value="{{ q }}">
     <div>
       <label for="cuisine">음식 종류</label>
       <select id="cuisine" name="cuisine">
