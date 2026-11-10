@@ -5,7 +5,7 @@
 
 - 운영자 비밀번호는 모두 Seed1234! (담당 3 팀 시드 src/seed.py와 같음). bcrypt는 느려서 한 번만 계산해 재사용
 - 음식 종류(cuisine)는 영어 코드: KOREAN, CHINESE, JAPANESE, WESTERN, BUNSIK, PUB, CAFE, WORLD
-- 이미 같은 이메일의 사용자가 있으면 그 줄은 건너뜀 (여러 번 실행해도 중복 없음)
+- 기존 시드 식당은 사진만 갱신. 운영자가 별도로 등록한 사진은 보존
 - 빈 칸(image_url 등)은 NULL로 넣음
 - 맨 끝에 한 번만 commit
 """
@@ -20,7 +20,7 @@ SRC_DIR = Path(__file__).resolve().parents[2]
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from restaurant.infrastructure.models import MenuModel, RestaurantModel
@@ -29,6 +29,7 @@ from user.infrastructure.models import UserModel
 
 DEMO_PASSWORD = "Seed1234!"  # 담당 3 팀 시드(src/seed.py)의 SEED_PASSWORD와 같게
 MENU_COUNT = 3
+PHOTO_PREFIX = "/static/restaurant-photos/"
 
 
 def parse_row(row: dict) -> tuple[dict, dict, list[dict]]:
@@ -58,11 +59,31 @@ async def seed_rows(session: AsyncSession, rows: list[dict], password_hash: str)
     for row in rows:
         owner, restaurant, menus = parse_row(row)
 
-        # 같은 이메일의 운영자가 이미 있으면 건너뜀
-        exists = await session.scalar(
+        owner_id = await session.scalar(
             select(UserModel.id).where(UserModel.email == owner["email"])
         )
-        if exists is not None:
+        if owner_id is not None:
+            photo = restaurant["image_url"]
+            if photo and photo.startswith(PHOTO_PREFIX):
+                await session.execute(
+                    update(RestaurantModel)
+                    .where(
+                        RestaurantModel.owner_id == owner_id,
+                        RestaurantModel.name == restaurant["name"],
+                        RestaurantModel.address == restaurant["address"],
+                        RestaurantModel.deleted_at.is_(None),
+                        RestaurantModel.image_url.is_distinct_from(photo),
+                        or_(
+                            RestaurantModel.image_url.is_(None),
+                            RestaurantModel.image_url.startswith(PHOTO_PREFIX),
+                            RestaurantModel.image_url.startswith(
+                                "https://commons.wikimedia.org/wiki/Special:FilePath/"
+                            ),
+                        ),
+                    )
+                    .values(image_url=photo)
+                    .execution_options(synchronize_session=False)
+                )
             continue
 
         user = UserModel(
