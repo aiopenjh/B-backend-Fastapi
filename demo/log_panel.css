@@ -29,6 +29,33 @@
   color:#fff;
 }
 
+.log-panel {
+  position:relative;
+}
+
+.log-clear {
+  position:absolute;
+  top:8px;
+  right:12px;
+  margin:0;
+}
+
+.log-clear button {
+  font:inherit;
+  font-size:11px;
+  color:#d7dde6;
+  background:transparent;
+  border:1px solid #3a4250;
+  border-radius:6px;
+  padding:3px 10px;
+  cursor:pointer;
+}
+
+.log-clear button:hover {
+  color:#fff;
+  border-color:#8b95a5;
+}
+
 .demo-switch {
   display:flex;
   flex-wrap:wrap;

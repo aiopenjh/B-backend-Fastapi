@@ -160,6 +160,13 @@ def demo_mode(request: Request, response: Response) -> None:
         response.delete_cookie(DEMO_COOKIE, path="/")
 
 
+@app.post("/demo/logs/clear", include_in_schema=False)
+async def clear_logs(back: Annotated[str, Form()] = "/ui"):
+    """시연용: 로그 창 비우기 (터미널의 cls처럼). 터미널에 찍힌 로그는 그대로"""
+    recent_logs.lines.clear()
+    return RedirectResponse(back if back.startswith("/ui") else "/ui", status_code=303)
+
+
 @app.post("/demo/switch", include_in_schema=False)
 async def switch_account(
     request: Request,
