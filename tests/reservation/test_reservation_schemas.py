@@ -223,3 +223,35 @@ def test_reservation_create_rejects_zero_slot_id():
 def test_reservation_create_rejects_too_big_slot_id():
     with pytest.raises(ValidationError):
         ReservationCreate(slot_id=9223372036854775808, party_size=2)
+
+
+# 슬롯 번호는 진짜 정수만 받는다 (글자, 소수, true를 정수로 바꿔 주지 않는다)
+@pytest.mark.parametrize("slot_id", ["7", 7.0, True])
+def test_reservation_create_rejects_non_int_slot_id(slot_id):
+    with pytest.raises(ValidationError):
+        ReservationCreate(slot_id=slot_id, party_size=2)
+
+
+# 인원도 진짜 정수만 받는다 (true가 1명이 되면 안 된다)
+@pytest.mark.parametrize("party_size", ["2", 2.0, True])
+def test_reservation_create_rejects_non_int_party_size(party_size):
+    with pytest.raises(ValidationError):
+        ReservationCreate(slot_id=7, party_size=party_size)
+
+
+# 연락처는 휴대폰 번호 모양만 받는다 (글자, 이모지, NUL, 다른 나라 숫자는 막는다)
+@pytest.mark.parametrize(
+    "contact_phone",
+    ["abc", "!!!!", "😀", "010\x001234", "010-١٢٣٤-٥٦٧٨", "02-123-4567"],
+)
+def test_reservation_create_rejects_non_phone_contact(contact_phone):
+    with pytest.raises(ValidationError):
+        ReservationCreate(slot_id=7, party_size=2, contact_phone=contact_phone)
+
+
+# 하이픈은 있어도 되고 없어도 된다
+@pytest.mark.parametrize("contact_phone", ["010-1234-5678", "01012345678"])
+def test_reservation_create_accepts_mobile_phone(contact_phone):
+    body = ReservationCreate(slot_id=7, party_size=2, contact_phone=contact_phone)
+
+    assert body.contact_phone == contact_phone

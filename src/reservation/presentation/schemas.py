@@ -12,22 +12,27 @@ from slot.domain.time_slot import TimeSlot
 # BIGINT 최댓값. 이보다 큰 id는 DB 오류(500) 대신 422로 막음
 BIGINT_MAX = 9223372036854775807
 
+# DB의 BIGINT id 칸에 들어갈 번호. 글자("7"), 소수(7.0), true는 정수로 바꾸지 않고 막는다
+BigIntId = Annotated[int, Field(strict=True, ge=1, le=BIGINT_MAX)]
+
+# 휴대폰 번호 모양 (담당 1 user의 규칙과 같고, \d 대신 [0-9]로 아라비아 숫자만 받는다)
+PHONE_REGEX = r"^01[016789]-?[0-9]{3,4}-?[0-9]{4}$"
+
 
 class ReservationCreate(BaseModel):
     """예약 생성 요청 스키마 (손님이 보내는 본문)"""
 
-    slot_id: Annotated[
-        int, Field(ge=1, le=BIGINT_MAX, examples=[7], description="예약할 슬롯 ID")
-    ]
+    slot_id: Annotated[BigIntId, Field(examples=[7], description="예약할 슬롯 ID")]
     party_size: Annotated[
-        int, Field(ge=1, examples=[2], description="예약 인원 (1명 이상)")
+        int, Field(strict=True, ge=1, examples=[2], description="예약 인원 (1명 이상)")
     ]
     contact_phone: Annotated[
         str | None,
         Field(
             max_length=20,
+            pattern=PHONE_REGEX,
             examples=["010-1234-5678"],
-            description="연락처(선택, 20자 이하)",
+            description="연락처(선택, 하이픈은 있어도 없어도 됨)",
         ),
     ] = None
 
