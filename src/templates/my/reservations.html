@@ -36,7 +36,9 @@
         </p>
       </div>
       <div class="my-reservation-side">
-        {% if reservation.status == 'CONFIRMED' and slot.starts_at > now %}
+        {% if reservation.status == 'CONFIRMED' and reservation.checked_in_at %}
+        <span class="badge badge-confirmed"><span></span>입장 완료</span>
+        {% elif reservation.status == 'CONFIRMED' and slot.starts_at > now %}
         <span class="badge badge-confirmed"><span></span>예약 확정</span>
         <form method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
           <input type="hidden" name="next" value="{{ request.url.path }}">
@@ -44,6 +46,11 @@
         </form>
         {% elif reservation.status == 'CONFIRMED' %}
         <span class="badge"><span></span>방문 시간 지남</span>
+        {% elif reservation.cancel_reason == 'NO_SHOW' %}
+        <span class="badge badge-no-show"><span></span>노쇼</span>
+        {% elif reservation.cancelled_by and reservation.cancelled_by != 'CUSTOMER' %}
+        <span class="badge"><span></span>식당에서 취소</span>
+        <small class="cancel-detail">{{ CANCEL_REASONS.get(reservation.cancel_reason, '') }}</small>
         {% else %}
         <span class="badge"><span></span>취소됨</span>
         {% endif %}

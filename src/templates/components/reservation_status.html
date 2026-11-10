@@ -1,0 +1,15 @@
+{# [담당 5] 예약 상태 표시 조각: 확정·입장·취소(누가·왜)·노쇼를 한 칸에. 표마다 include로 끼워 넣음 #}
+{% if reservation.status == 'CONFIRMED' and reservation.checked_in_at %}
+<span class="badge badge-confirmed"><span></span>입장 완료</span>
+{% elif reservation.status == 'CONFIRMED' %}
+<span class="badge badge-confirmed"><span></span>예약 확정</span>
+{% elif reservation.cancel_reason == 'NO_SHOW' %}
+<span class="badge badge-no-show"><span></span>노쇼</span>
+{% elif reservation.status == 'CANCELLED' %}
+<span class="badge"><span></span>취소</span>
+{% if reservation.cancelled_by and reservation.cancelled_by != 'CUSTOMER' %}
+<small class="cancel-detail">{{ CANCELLED_BY.get(reservation.cancelled_by, reservation.cancelled_by) }} · {{ CANCEL_REASONS.get(reservation.cancel_reason, reservation.cancel_reason) }}{% if reservation.cancel_note %} · {{ reservation.cancel_note }}{% endif %}</small>
+{% endif %}
+{% else %}
+{{ reservation.status }}
+{% endif %}

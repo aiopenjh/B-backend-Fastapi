@@ -1,9 +1,19 @@
 {# [담당 5] 예약 취소 결과 알림 조각: 취소 뒤 돌아온 주소의 ?cancelled= / ?cancel_fail= 을 읽어 보여 줌 #}
 {% set cancelled = request.query_params.get('cancelled') %}
+{% set no_show = request.query_params.get('no_show') %}
+{% set checked_in = request.query_params.get('checked_in') %}
 {% set cancel_fail = request.query_params.get('cancel_fail') %}
 {% if cancelled %}
 <div class="booking-notice booking-done" role="status">
   <strong>예약 #{{ cancelled }}을 취소했어요</strong>
+</div>
+{% elif no_show %}
+<div class="booking-notice booking-done" role="status">
+  <strong>예약 #{{ no_show }}을 노쇼로 처리했어요</strong>
+</div>
+{% elif checked_in %}
+<div class="booking-notice booking-done" role="status">
+  <strong>예약 #{{ checked_in }} 손님이 입장했어요</strong>
 </div>
 {% elif cancel_fail %}
 <div class="booking-notice booking-fail" role="alert">

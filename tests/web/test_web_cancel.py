@@ -55,12 +55,17 @@ class FakeBooking:
     def __init__(self):
         self.cancelled = []
 
-    async def cancel(self, user, reservation_id, now):
+    async def cancel(self, user, reservation_id, now, by=None, reason=None, note=None):
         if reservation_id == 12:
             raise AlreadyCancelledError()
         if reservation_id == 99:
             raise NotFoundError()
         self.cancelled.append((user.role, reservation_id))
+        self.last = (by, reason, note)
+        return ROWS[0]
+
+    async def check_in(self, user, reservation_id, now):
+        self.cancelled.append(("check_in", reservation_id))
         return ROWS[0]
 
 
@@ -182,8 +187,11 @@ async def test_owner_and_admin_tables_have_cancel_buttons(booking):
 
     for page in (owner_page, admin_page):
         assert page.status_code == 200
-        assert page.text.count("/ui/reservations/11/cancel") == 1
-        assert "/ui/reservations/12/cancel" not in page.text
+        assert page.text.count("/ui/reservations/11/cancel") == 1  # 시작 전 확정 → 취소(이유 고르기)
+        assert "/ui/reservations/13/cancel" not in page.text  # 이미 취소된 예약은 버튼 없음
+    assert 'value="PHONE_REQUEST"' in owner_page.text and 'value="SYSTEM_ERROR"' in admin_page.text  # 역할별 이유
+    assert 'name="reason" value="NO_SHOW"' in owner_page.text  # 지난 확정(12번) → 운영자에게 노쇼 버튼
+    assert 'placeholder="메모 (필수)"' in admin_page.text
     assert "한식" in admin_page.text  # 음식 종류는 한국어로
     assert "<strong>손님A</strong>" in owner_page.text  # 운영자 표에도 예약자 이름
 
@@ -194,3 +202,28 @@ async def test_front_door_goes_to_browse(booking):
 
     assert response.status_code == 307
     assert response.headers["location"].endswith("/ui/restaurants")  # 맨 앞 주소는 404 대신 둘러보기로
+
+
+async def test_owner_and_admin_cancel_send_who_and_why(booking):
+    from reservation.domain.reservation import CancelledBy, CancelReason
+
+    async with make_client(booking, OWNER) as owner:
+        await owner.post("/ui/reservations/11/cancel", data={"reason": "PHONE_REQUEST", "note": " 손님 전화 "})
+    assert booking.last == (CancelledBy.OWNER, CancelReason.PHONE_REQUEST, "손님 전화")
+    async with make_client(booking, ADMIN) as admin:
+        await admin.post("/ui/reservations/11/cancel", data={"reason": "SYSTEM_ERROR", "note": "앱 오류"})
+    assert booking.last == (CancelledBy.ADMIN, CancelReason.SYSTEM_ERROR, "앱 오류")
+    async with make_client(booking, CUSTOMER) as customer:
+        await customer.post("/ui/reservations/11/cancel", data={"reason": "SYSTEM_ERROR"})
+    assert booking.last[:2] == (CancelledBy.CUSTOMER, CancelReason.CUSTOMER_REQUEST)  # 손님은 이유를 못 바꿈
+
+
+async def test_no_show_and_check_in_and_bad_reason(booking):
+    async with make_client(booking, OWNER) as owner:
+        no_show = await owner.post("/ui/reservations/11/cancel", data={"reason": "NO_SHOW", "next": "/ui/owner/restaurants"})
+        checked = await owner.post("/ui/reservations/11/check-in", data={"next": "/ui/owner/restaurants"})
+        bad = await owner.post("/ui/reservations/11/cancel", data={"reason": "HACK", "next": "/ui/owner/restaurants"})
+
+    assert no_show.headers["location"].endswith("no_show=11")
+    assert checked.headers["location"].endswith("checked_in=11") and ("check_in", 11) in booking.cancelled
+    assert bad.headers["location"].endswith("cancel_fail=CANCEL_REASON_NOT_ALLOWED")

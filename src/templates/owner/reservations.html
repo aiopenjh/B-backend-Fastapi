@@ -55,7 +55,7 @@
           <th scope="col">예약자</th>
           <th scope="col">연락처</th>
           <th scope="col">상태</th>
-          <th scope="col">취소</th>
+          <th scope="col">처리</th>
         </tr>
       </thead>
       <tbody>
@@ -98,15 +98,33 @@
           <td data-label="예약자"><strong>{{ reservation.guest_name or '—' }}</strong></td>
           <td data-label="연락처">{{ reservation.contact_phone or '미입력' }}</td>
           <td data-label="상태">
-            {% if reservation.status == 'CONFIRMED' %}<span class="badge badge-confirmed"><span></span>예약 확정</span>
-            {% elif reservation.status == 'CANCELLED' and reservation.cancel_reason == 'NO_SHOW' %}<span class="badge"><span></span>노쇼</span>
-            {% elif reservation.status == 'CANCELLED' %}<span class="badge"><span></span>취소</span>
-            {% else %}{{ reservation.status }}{% endif %}
+            {% include "components/reservation_status.html" %}
           </td>
-          <td data-label="취소">
-            {% if reservation.status == 'CONFIRMED' and reservation.starts_at > now %}
-            <form method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
-              <input type="hidden" name="next" value="{{ request.url.path }}?{{ request.url.query }}">
+          <td data-label="처리">
+            {% set back = request.url.path ~ "?" ~ request.url.query %}
+            {% if reservation.can_check_in %}
+            <form class="row-action" method="post" action="{{ url_for('ui_check_in', reservation_id=reservation.id) }}">
+              <input type="hidden" name="next" value="{{ back }}">
+              <button class="button button-primary small-button" type="submit">입장</button>
+            </form>
+            {% endif %}
+            {% if reservation.can_mark_no_show %}
+            <form class="row-action" method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
+              <input type="hidden" name="next" value="{{ back }}">
+              <input type="hidden" name="reason" value="NO_SHOW">
+              <button class="button button-outline small-button" type="submit">노쇼</button>
+            </form>
+            {% endif %}
+            {% if reservation.can_cancel %}
+            <form class="row-action cancel-form" method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
+              <input type="hidden" name="next" value="{{ back }}">
+              <label class="sr-only" for="reason-{{ reservation.id }}">취소 이유</label>
+              <select id="reason-{{ reservation.id }}" name="reason">
+                <option value="PHONE_REQUEST">전화 요청</option>
+                <option value="RESTAURANT_ISSUE">식당 사정</option>
+                <option value="OTHER">기타</option>
+              </select>
+              <input name="note" maxlength="100" placeholder="메모 (선택)">
               <button class="text-link cancel-button" type="submit" aria-label="예약 #{{ reservation.id }} 취소">취소</button>
             </form>
             {% endif %}

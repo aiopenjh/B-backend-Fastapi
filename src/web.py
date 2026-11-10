@@ -40,6 +40,10 @@ from reservation.application.query_service import (
     ReservationQueryService,  # 담당 5: 예약 조회 매니저
 )
 from reservation.application.service import ReservationService  # 담당 4: 예약 매니저
+from reservation.domain.reservation import (  # 담당 4: 누가·왜 취소 (#57)
+    CancelledBy,
+    CancelReason,
+)
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.domain.exceptions import RestaurantNotFoundError  # 담당 2: 없는 식당
 from restaurant.presentation.routers.v1.router import (
@@ -134,9 +138,25 @@ BOOKING_ERRORS = {
 CANCEL_ERRORS = {
     "ALREADY_CANCELLED": "이미 취소된 예약이에요.",
     "CANCELLATION_NOT_ALLOWED": "예약 시간이 시작돼서 취소할 수 없어요.",
-    "NOT_FOUND": "취소할 수 있는 예약이 아니에요.",
+    "NOT_FOUND": "처리할 수 있는 예약이 아니에요.",
+    "CANCEL_REASON_NOT_ALLOWED": "이 취소 이유는 쓸 수 없어요.",
+    "CANCEL_NOTE_REQUIRED": "관리자 취소는 메모를 꼭 적어 주세요.",
+    "NO_SHOW_TOO_EARLY": "아직 노쇼로 처리할 수 없어요. (시작 뒤 유예 시간이 지나야 해요)",
+    "ALREADY_CHECKED_IN": "이미 입장 확인된 예약이에요.",
+    "CHECK_IN_NOT_ALLOWED": "지금은 입장 확인을 할 수 없어요. (시작 30분 전부터 끝나기 전까지)",
+    "VALIDATION_ERROR": "입력값을 다시 확인해 주세요. (메모는 100자까지)",
 }
 templates.env.globals["CANCEL_ERRORS"] = CANCEL_ERRORS
+# 취소 이유·취소한 사람 → 화면 글자 (담당 4 CancelReason·CancelledBy)
+templates.env.globals["CANCEL_REASONS"] = {
+    "CUSTOMER_REQUEST": "손님 취소",
+    "PHONE_REQUEST": "전화 요청",
+    "RESTAURANT_ISSUE": "식당 사정",
+    "NO_SHOW": "노쇼",
+    "SYSTEM_ERROR": "시스템 오류",
+    "OTHER": "기타",
+}
+templates.env.globals["CANCELLED_BY"] = {"CUSTOMER": "손님", "OWNER": "운영자", "ADMIN": "관리자", "SYSTEM": "자동"}
 
 
 def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
@@ -539,17 +559,50 @@ async def cancel_submit(
     reservation_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
     booking: Booking,
     next: Annotated[str, Form()] = "",
+    reason: Annotated[str, Form()] = "",
+    note: Annotated[str, Form(max_length=300)] = "",
+):
+    user = request.state.ui_user
+    if user is None:
+        return to_login(request)
+    back = URL(safe_next(next) or home_url(request, user))
+    # 누가 취소하나: 손님은 이유 없이(손님 요청), 운영자·관리자는 고른 이유와 메모 (#57 담당 4 규칙이 판단)
+    if user.is_admin():
+        by = CancelledBy.ADMIN
+    elif user.is_owner():
+        by = CancelledBy.OWNER
+    else:
+        by, reason = CancelledBy.CUSTOMER, CancelReason.CUSTOMER_REQUEST
+    try:
+        chosen = CancelReason(reason)
+    except ValueError:
+        return RedirectResponse(back.include_query_params(cancel_fail="CANCEL_REASON_NOT_ALLOWED"), status_code=303)
+    try:
+        # 손님은 내 예약, 운영자는 내 식당 예약, 관리자는 모든 예약. 아니면 404, 시간·이유가 안 맞으면 409·422
+        await booking.cancel(user, reservation_id, seoul_now(), by=by, reason=chosen, note=note.strip() or None)
+    except AppError as error:
+        return RedirectResponse(back.include_query_params(cancel_fail=error.error_code.name), status_code=303)
+    done = "no_show" if chosen == CancelReason.NO_SHOW else "cancelled"
+    return RedirectResponse(back.include_query_params(**{done: reservation_id}), status_code=303)
+
+
+# 담당 5: 운영자 "입장" — 담당 4 ReservationService.check_in(#57), 그 식당 운영자만
+@router.post("/reservations/{reservation_id}/check-in", name="ui_check_in")
+async def check_in_submit(
+    request: Request,
+    reservation_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
+    booking: Booking,
+    next: Annotated[str, Form()] = "",
 ):
     user = request.state.ui_user
     if user is None:
         return to_login(request)
     back = URL(safe_next(next) or home_url(request, user))
     try:
-        # 손님은 내 예약, 운영자는 내 식당 예약, 관리자는 모든 예약. 아니면 404, 이미 취소·시작됨은 409
-        await booking.cancel(user, reservation_id, seoul_now())
+        await booking.check_in(user, reservation_id, seoul_now())
     except AppError as error:
         return RedirectResponse(back.include_query_params(cancel_fail=error.error_code.name), status_code=303)
-    return RedirectResponse(back.include_query_params(cancelled=reservation_id), status_code=303)
+    return RedirectResponse(back.include_query_params(checked_in=reservation_id), status_code=303)
 
 
 # 담당 5: 손님 "내 예약" 화면 — 담당 5 내 예약 조회 매니저 + 취소 버튼

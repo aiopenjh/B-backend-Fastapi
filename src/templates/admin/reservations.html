@@ -47,7 +47,7 @@
           <th scope="col">예약자 이메일</th>
           <th scope="col">연락처</th>
           <th scope="col">상태</th>
-          <th scope="col">취소</th>
+          <th scope="col">처리</th>
         </tr>
       </thead>
       <tbody>
@@ -60,15 +60,18 @@
           <td data-label="예약자 이메일">{{ guest.email }}</td>
           <td data-label="연락처">{{ reservation.contact_phone or guest.phone }}</td>
           <td data-label="상태">
-            {% if reservation.status == 'CONFIRMED' %}<span class="badge badge-confirmed"><span></span>예약 확정</span>
-            {% elif reservation.status == 'CANCELLED' and reservation.cancel_reason == 'NO_SHOW' %}<span class="badge"><span></span>노쇼</span>
-            {% elif reservation.status == 'CANCELLED' %}<span class="badge"><span></span>취소</span>
-            {% else %}{{ reservation.status }}{% endif %}
+            {% include "components/reservation_status.html" %}
           </td>
-          <td data-label="취소">
-            {% if reservation.status == 'CONFIRMED' and slot.starts_at > now %}
-            <form method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
+          <td data-label="처리">
+            {% if reservation.status == 'CONFIRMED' %}
+            <form class="row-action cancel-form" method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
               <input type="hidden" name="next" value="{{ request.url.path }}?{{ request.url.query }}">
+              <label class="sr-only" for="reason-{{ reservation.id }}">취소 이유</label>
+              <select id="reason-{{ reservation.id }}" name="reason">
+                <option value="SYSTEM_ERROR">시스템 오류</option>
+                <option value="OTHER">기타</option>
+              </select>
+              <input name="note" maxlength="100" required placeholder="메모 (필수)">
               <button class="text-link cancel-button" type="submit" aria-label="예약 #{{ reservation.id }} 취소">취소</button>
             </form>
             {% endif %}
