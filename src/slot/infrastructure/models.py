@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from common.model import Base
 
+
 class ReservationSlotModel(Base):
     __tablename__ = "reservation_slots"
     __table_args__ = (

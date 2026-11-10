@@ -1,0 +1,17 @@
+<div class="table-scroll">
+  <table>
+    <caption class="sr-only">식당별 최근 예약 접수와 예약 목록</caption>
+    <thead><tr><th scope="col">식당</th><th scope="col">주소</th><th scope="col">최근 예약 접수</th></tr></thead>
+    <tbody>
+      {% for restaurant in restaurants %}
+      <tr>
+        <td data-label="식당"><a class="text-link" href="{{ url_for('ui_admin_reservations', restaurant_id=restaurant.id) }}">{{ restaurant.name }}</a></td>
+        <td data-label="주소">{{ restaurant.address }}</td>
+        <td data-label="최근 예약 접수">{{ restaurant.received|seoul_datetime if restaurant.received else '예약 없음' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">일치하는 식당이 없어요.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

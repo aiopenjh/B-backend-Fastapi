@@ -1,0 +1,151 @@
+{# [담당 5] 손님용 식당 상세 화면: 식당 정보 + 메뉴 + 날짜·인원·시간 골라 예약하기 #}
+{% extends "base.html" %}
+{% block title %}{{ restaurant.name if restaurant else '식당을 찾을 수 없음' }}{% endblock %}
+{% block content %}
+<div class="breadcrumb"><a href="{{ url_for('ui_browse') }}">식당 둘러보기</a><span>/</span>{{ restaurant.name if restaurant else '없는 식당' }}</div>
+
+{% if restaurant is none %}
+{# 없거나 지운 식당 → 404 안내 #}
+<section class="panel empty-state">
+  <span class="empty-symbol" aria-hidden="true">?</span>
+  <h3>식당을 찾을 수 없어요</h3>
+  <p>없거나 더 이상 운영하지 않는 식당입니다.</p>
+  <p><a class="button button-outline" href="{{ url_for('ui_browse') }}">← 식당 목록</a></p>
+</section>
+
+{% else %}
+{% if restaurant.image_url %}
+<div class="detail-hero">
+  <img src="{{ restaurant.image_url }}" alt="{{ restaurant.name }} 대표 사진">
+</div>
+{% endif %}
+<div class="page-heading">
+  <div>
+    <span class="subtle-tag">{{ restaurant.cuisine|cuisine }}</span>
+    <h1 class="detail-title">{{ restaurant.name }}</h1>
+    <p class="muted">{{ restaurant.address }}{% if restaurant.phone %}<span class="separator">·</span>{{ restaurant.phone }}{% endif %}</p>
+  </div>
+  <a class="button button-outline" href="{{ url_for('ui_browse') }}">← 식당 목록</a>
+</div>
+{% if restaurant.description %}<p class="detail-description">{{ restaurant.description }}</p>{% endif %}
+
+<div class="detail-grid">
+  {# 메뉴 #}
+  <section class="panel" aria-labelledby="menu-title">
+    <div class="panel-heading">
+      <h2 id="menu-title">메뉴 <span class="number-tag">{{ restaurant.menus|length }}</span></h2>
+    </div>
+    {% if restaurant.menus %}
+    <ul class="menu-list">
+      {% for menu in restaurant.menus %}
+      <li>
+        <div>
+          <strong>{{ menu.name }}</strong>
+          {% if menu.description %}<p>{{ menu.description }}</p>{% endif %}
+        </div>
+        <span class="menu-price">{{ "{:,}".format(menu.price) }}원</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state"><h3>등록된 메뉴가 없어요</h3></div>
+    {% endif %}
+  </section>
+
+  <section class="panel" aria-labelledby="booking-title">
+    <div class="panel-heading">
+      <div>
+        <h2 id="booking-title">예약하기</h2>
+        <p class="muted">한국 시간 기준</p>
+      </div>
+    </div>
+
+    {% if done %}
+      {% set done_reservation, done_slot = done %}
+      <div class="booking-notice booking-done" role="status">
+        <strong>예약됐어요</strong>
+        <p>{{ done_slot.starts_at|seoul_datetime }} · {{ done_reservation.party_size }}명 · 예약 번호 #{{ done_reservation.id }}</p>
+        <p>이 시간대 {% if done_slot.remaining == 0 %}매진 · {% endif %}남은 {{ done_slot.remaining }}석</p>
+        <a class="text-link" href="{{ url_for('ui_my_reservations') }}">내 예약 보기</a>
+      </div>
+    {% elif fail %}
+      <div class="booking-notice booking-fail" role="alert">{{ fail }}</div>
+    {% endif %}
+
+    <form class="filter-form" method="get" action="{{ url_for('ui_restaurant', restaurant_id=restaurant.id) }}">
+      <div>
+        <label for="visit-date">날짜</label>
+        <input id="visit-date" type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()">
+      </div>
+      <div>
+        <label for="party-size">인원</label>
+        <select id="party-size" name="party_size" onchange="this.form.submit()">
+          {% for n in range(1, 9) %}
+            <option value="{{ n }}" {% if party_size == n %}selected{% endif %}>{{ n }}명</option>
+          {% endfor %}
+          {% if party_size > 8 %}
+            <option value="{{ party_size }}" selected>{{ party_size }}명</option>
+          {% endif %}
+        </select>
+      </div>
+    </form>
+    <p class="filter-help">날짜나 인원을 바꾸면 그날 시간이 바로 다시 나와요.</p>
+
+    {% if not availability or not (availability|selectattr('available')|list) %}
+      <div class="empty-state">
+        <span class="empty-symbol" aria-hidden="true">◷</span>
+        <h3>이 날은 예약 가능한 시간이 없어요</h3>
+        {% if next_open %}
+          <p><a class="button button-outline" href="{{ url_for('ui_restaurant', restaurant_id=restaurant.id).include_query_params(date=next_open.isoformat(), party_size=party_size) }}">가장 가까운 날 보기 ({{ next_open.isoformat() }})</a></p>
+        {% else %}
+          <p>다른 날짜를 골라 주세요.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if availability %}
+      <form method="post" action="{{ url_for('ui_reserve', restaurant_id=restaurant.id) }}">
+        <input type="hidden" name="date" value="{{ selected_date }}">
+        <input type="hidden" name="party_size" value="{{ party_size }}">
+        <fieldset class="slot-picker">
+          <legend class="sr-only">시간 선택</legend>
+          {% for item in availability %}
+            {% set slot = item.slot %}
+            {% if slot.has_started(now) %}
+              {% set reason = "지난 시간" %}
+            {% elif slot.remaining == 0 %}
+              {% set reason = "매진" %}
+            {% elif party_size > slot.max_party_size %}
+              {% set reason = "최대 " ~ slot.max_party_size ~ "명" %}
+            {% elif slot.remaining < party_size %}
+              {% set reason = "자리 부족" %}
+            {% else %}
+              {% set reason = "" %}
+            {% endif %}
+            <label class="slot-option {% if not item.available %}is-closed{% endif %}">
+              <input type="radio" name="slot_id" value="{{ slot.id }}" required
+                {% if not item.available %}disabled{% endif %}
+                {% if slot_id == slot.id and item.available %}checked{% endif %}>
+              <span class="slot-time">{{ slot.starts_at|seoul_time }}</span>
+              <span class="slot-seats">
+                {% if reason %}{{ reason }} · {% endif %}남은 {{ slot.remaining }}석
+              </span>
+            </label>
+          {% endfor %}
+        </fieldset>
+        {% if can_book %}
+          <button class="button button-primary full-width booking-button" type="submit">{{ party_size }}명 예약하기</button>
+        {% else %}
+          <p class="filter-help">손님 계정으로 예약할 수 있어요.</p>
+        {% endif %}
+      </form>
+      {% set max_party = availability|map(attribute='slot.max_party_size')|max %}
+      <p class="group-note">
+        한 번에 최대 {{ max_party }}명까지 예약할 수 있어요.
+        단체는 식당에 전화로 문의해 주세요{% if restaurant.phone %} ({{ restaurant.phone }}){% endif %}.
+      </p>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+{% endblock %}

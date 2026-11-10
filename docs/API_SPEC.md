@@ -11,7 +11,7 @@
 | **API 하나 = 명세 하나** (경우마다 나누지 않음) | 같은 경로·메서드가 여러 번 나오지 않게 합니다 |
 | **요청 상세는 한 가지 형식만** | 잘못된 값은 "다른 요청"이 아니라 "실패 응답을 받는 경우"입니다 |
 | **응답 상세는 상태 코드별로 나눔** | 성공 1개와 실패 여러 개를 코드로 구분합니다 |
-| **성공·실패 응답 본문은 모두 공통 봉투(`APIResponse`)를 따름** | 성공이면 `data`만, 실패면 `code`·`message`·`errors`만 경우마다 다릅니다. 형식을 매번 다시 쓰지 않습니다 |
+| **일반 JSON 응답은 공통 봉투(`APIResponse`)를 따름** | 성공이면 `data`만, 실패면 `code`·`message`·`errors`만 경우마다 다릅니다. 형식을 매번 다시 쓰지 않습니다 |
 | **실패 예시는 "이 요청 → 이 응답"으로 짝지음** | 그대로 실패 테스트 케이스가 됩니다 |
 | **같은 200 안에서 값만 다른 경우는 실패가 아님** | 예: 예약 가능 조회의 `available: true/false`는 200 예시 하나에 둘 다 보이게 씁니다 |
 
@@ -29,7 +29,7 @@
 
 ### 응답 봉투 `APIResponse[T]` (`common/schemas.py`)
 
-모든 응답 본문은 아래 봉투 하나로 감쌉니다. 성공 여부는 `success`와 HTTP 상태 코드가 **항상 같이** 말합니다 (실패를 200으로 보내지 않습니다).
+일반 JSON 응답은 아래 봉투를 사용합니다. 로그인 성공은 OAuth2 토큰 객체, 로그아웃 성공은 204 빈 본문, 운영자 예약 CSV는 `text/csv`입니다. 성공 여부는 `success`와 HTTP 상태 코드가 **항상 같이** 말합니다 (실패를 200으로 보내지 않습니다).
 
 | 필드 | 타입 | 성공 | 실패 |
 | --- | --- | --- | --- |
@@ -120,16 +120,19 @@
 | 409 | `ALREADY_CANCELLED` | 이미 취소한 예약 |
 | 409 | `CANCELLATION_NOT_ALLOWED` | 시작 시각이 지나 취소할 수 없음 |
 | 422 | `VALIDATION_ERROR` | 형식이 잘못된 입력 (필드 누락, 타입·범위 위반) |
+| 409 | `ALREADY_CHECKED_IN` / `CHECK_IN_NOT_ALLOWED` / `NO_SHOW_TOO_EARLY` | 이미 입장·입장 시간 위반·유예 시간 전 노쇼 처리 |
+| 422 | `CANCEL_REASON_NOT_ALLOWED` / `CANCEL_NOTE_REQUIRED` | 역할에 맞지 않는 사유 또는 관리자 메모 누락 |
+| 429 | `TOO_MANY_LOGIN_ATTEMPTS` | 로그인 시도 제한 |
 | 500 | `INTERNAL_SERVER_ERROR` | 처리하지 못한 예외. 요청 로그 미들웨어가 잡아 `request_id`가 든 실패 봉투로 응답하고 스택을 로그에 남김 |
 | 503 | `SERVICE_UNAVAILABLE` | DB 연결 실패 |
 
-401·403·404·422·500·503 코드는 `common/errors.py`의 `CommonErrorCode`에 들어 있습니다 (HTTP 상태와 기본 메시지를 함께 가짐). 모듈 전용 코드는 각 모듈의 `domain/exceptions.py`에 있습니다: 사용자 400·404(`user`), `SLOT_SOLD_OUT`·`PARTY_SIZE_EXCEEDED`·`SLOT_ALREADY_STARTED`(`slot`), `ALREADY_CANCELLED`(`reservation`). `DUPLICATE_RESERVATION`·`CANCELLATION_NOT_ALLOWED`는 아직 코드에 없고, 쓰는 담당이 추가합니다. 새 코드가 필요하면 이 표에 먼저 추가하고 공유합니다.
+공통 코드는 `src/common/errors.py`, 로그인 시도 제한은 `auth/domain/exceptions.py`, 예약·슬롯 규칙은 각 모듈의 `domain/exceptions.py`에 정의돼 있습니다.
 
 ### 예시 데이터
 
 모든 명세가 같은 시드 데이터를 가정하면 예시끼리 맞물립니다.
 
-사용자 id는 UUID입니다(2026-11-04, [ARCHITECTURE 3장](ARCHITECTURE.md#3-데이터-모델-erd)). 예시에서는 읽기 쉽게 `00000000-0000-4000-8000-00000000000N` 형식을 쓰고, 아래 표에서는 끝자리만 `…0001`처럼 줄여 씁니다. 실제 값은 저장할 때 정해집니다. 식당·슬롯·예약 id는 정수 그대로입니다.
+사용자 id는 UUID입니다(2026-11-04, [ARCHITECTURE 3장](ARCHITECTURE.md#3-데이터-모델-erd)). 예시에서는 읽기 쉽게 `00000000-0000-4000-8000-00000000000N` 형식을 쓰고, 아래 표에서는 끝자리만 `…0001`처럼 줄여 씁니다. 가입 시 사용자 UUID를 생성합니다. 아래 식당·슬롯 번호도 설명용 예시이므로 시연할 때는 현재 DB에서 조회한 번호를 사용합니다. 식당·슬롯·예약 id는 정수 그대로입니다.
 
 | id | 대상 | 설명 |
 | --- | --- | --- |
@@ -199,9 +202,22 @@ Authorization: Bearer <access_token>
 
 ## 4. API 명세
 
-API 목록은 [ARCHITECTURE 5장](ARCHITECTURE.md#5-api와-담당)에 있습니다. 각자 템플릿으로 자기 API를 이 아래에 추가합니다. 아래 예약 생성은 작성 예시입니다.
+전체 API 목록은 [아키텍처 5장](ARCHITECTURE.md#5-api와-담당), 실행 중인 서버의 요청 스키마는 `/docs`에서 확인합니다. 아래 경로 앞에는 `/api/v1`이 붙습니다.
 
-### 예약 생성 (작성 예시)
+### 담당 5 조회 API와 빈자리 조회
+
+| API Path | HTTP method | 요청 상세 | 응답 상세 |
+| --- | --- | --- | --- |
+| `/users/me/reservations` | GET | Bearer 토큰, 선택 쿼리 `status`·`page`·`page_size` | 200 `Page[ReservationOut]`, 내 예약만 반환. 미인증 401 |
+| `/reservations/{reservation_id}` | GET | Bearer 토큰, 예약 번호 | 200 `ReservationOut`. 본인·해당 식당 운영자·관리자만 조회. 없거나 관련 없는 예약은 404 |
+| `/owner/restaurants` | GET | 운영자 토큰, 선택 쿼리 `page`·`page_size` | 200 `Page[RestaurantOut]`, 다른 역할 403 |
+| `/owner/restaurants/{restaurant_id}/reservations` | GET | 운영자 토큰, 선택 쿼리 `date`(서울 기준)·`page`·`page_size` | 200 `Page[ReservationOut]`, 다른 운영자 식당 403, 없는 식당 404 |
+| `/owner/restaurants/{restaurant_id}/reservations/export/csv` | GET | 운영자 토큰, 선택 쿼리 `date` | 200 `text/csv` 첨부 파일. 다른 운영자 식당 403 |
+| `/restaurants/{restaurant_id}/availability` (담당 3) | GET | 공개, 필수 쿼리 `date=YYYY-MM-DD`·`party_size`(1 이상) | 200 `data.slots[]`에 `id`·`starts_at`·`ends_at`·`remaining`·`max_party_size`·`available`. 매진은 `remaining: 0`, `available: false` |
+
+예약 생성은 201과 예약 정보를 반환합니다. 같은 시간대의 잔여석은 빈자리 조회 API로 다시 읽습니다. 잔여 10석에서 4명 예약 후 `remaining`은 6입니다. 해당 슬롯을 이미 예약한 회원은 매진 검사보다 중복 검사에 먼저 걸립니다.
+
+### 예약 생성
 
 | 항목 | 값 |
 | --- | --- |
@@ -210,7 +226,7 @@ API 목록은 [ARCHITECTURE 5장](ARCHITECTURE.md#5-api와-담당)에 있습니�
 | http method | `POST` |
 | 담당자 | 김민지 (담당 4) |
 | 인증 | 로그인 |
-| 명세 작성 현황 | 작성 중 |
+| 구현 위치 | `src/reservation/presentation/router.py` |
 | 테스트 여부 | ☐ 정상 · ☐ 실패 |
 
 **요청 상세**
@@ -266,7 +282,13 @@ Authorization: Bearer <access_token>
     "status": "CONFIRMED",
     "created_at": "2026-10-28T15:20:00+09:00",
     "cancelled_at": null,
-    "can_cancel": true
+    "can_cancel": true,
+    "cancelled_by": null,
+    "cancel_reason": null,
+    "cancel_note": null,
+    "checked_in_at": null,
+    "can_check_in": false,
+    "can_mark_no_show": false
   },
   "request_id": "req_5d1e42",
   "responded_at": "2026-10-28T15:20:00+09:00"
@@ -277,7 +299,7 @@ Authorization: Bearer <access_token>
 
 ```text
 [409 SLOT_SOLD_OUT]
-요청: POST /api/v1/reservations  {"slot_id": 9, "party_size": 3}   (고객 A, 남은 자리 2)
+요청: POST /api/v1/reservations  {"slot_id": 9, "party_size": 3}   (해당 시간에 예약이 없는 손님, 남은 자리 2)
 응답: 409
 {
   "success": false,
@@ -314,8 +336,8 @@ Authorization: Bearer <access_token>
 | http method | `POST` |
 | 담당자 | 강성수 (담당 1) |
 | 인증 | 필요 없음 |
-| 명세 작성 현황 | 완료 (코드 #18·#25. `main.py`의 `wire_dependencies(app)` 연결 전이라 지금은 500) |
-| 테스트 여부 | ☐ 정상 · ☐ 실패 (API 테스트 없음. 서비스 단위 테스트 6개만 있음) |
+| 명세 작성 현황 | 완료 (코드 #18·#25·#31, 입력 규칙 #53·#61) |
+| 테스트 여부 | ☑ 정상 · ☑ 실패 (서비스·도메인·스키마 테스트, 이메일 규칙 위반 422 API 테스트, 화면 가입 테스트 `tests/web/test_web_signup.py`) |
 
 **요청 상세**
 
@@ -334,8 +356,8 @@ Content-Type: application/json
 | 필드 | 위치 | 타입 | 필수 | 규칙 |
 | --- | --- | --- | --- | --- |
 | `name` | body | 문자열 | O | 2~20자 |
-| `email` | body | 문자열 | O | 이메일 형식. 앞뒤 공백을 지우고 소문자로 바꿔 저장 (`Email` 값 객체) |
-| `password` | body | 문자열 | O | 8자 이상, 영문·숫자·특수문자(`@$!%*#?&`)를 각각 1개 이상. 이 밖의 문자(공백, `^` 등)는 쓸 수 없음 |
+| `email` | body | 문자열 | O | 앞뒤 공백을 지우고 소문자로 바꾼 뒤 검사·저장 (`Email` 값 객체, 스키마도 같은 규칙). ASCII만. `@` 앞은 영문·숫자·`. _ % + -`(점은 처음·끝·연속 불가, 최대 64자), `@` 뒤는 영문·숫자·하이픈으로 된 이름을 점으로 잇고 최상위 도메인은 영문 2자 이상. 전체 최대 254자 |
+| `password` | body | 문자열 | O | 8~72자, 영문·숫자·특수문자를 각각 1개 이상. 특수문자는 공백을 뺀 ASCII 기호 전부(`. _ - ! @ #` 등). 공백·한글 자판 기호(`₩` 등)·전각 문자는 쓸 수 없음 |
 | `phone` | body | 문자열 | O | 휴대폰 번호 `01[016789]-?\d{3,4}-?\d{4}` |
 
 **응답 상세**
@@ -344,7 +366,7 @@ Content-Type: application/json
 | --- | --- | --- |
 | 201 | `OK` | 가입 성공 (역할은 항상 `CUSTOMER`) |
 | 400 | `DUPLICATED_USER_ERROR` | 이미 가입된 이메일 |
-| 422 | `VALIDATION_ERROR` | 필드 누락·형식 위반, 비밀번호 규칙 위반 (`errors.password`) |
+| 422 | `VALIDATION_ERROR` | 필드 누락·형식 위반. 이메일 규칙 위반은 `errors.email = ["올바른 이메일 형식이 아닙니다."]`, 비밀번호 규칙 위반은 `errors.password` |
 
 성공 응답 예시 (`APIResponse[UserResponse]`, `password_hash`는 나가지 않음):
 
@@ -379,4 +401,4 @@ Content-Type: application/json
 }
 ```
 
-알려진 한계: 비밀번호 길이 상한이 없어 72바이트를 넘으면 bcrypt가 오류를 냅니다(500). `Email` 정규식이 `+`가 들어간 주소(예: `a+b@x.com`)를 422로 거부합니다.
+알려진 한계: 국제화 이메일(한글 로컬 부분·한글 도메인)과 `xn--`로 시작하는 최상위 도메인은 받지 않습니다(422).

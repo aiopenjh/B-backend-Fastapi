@@ -34,16 +34,17 @@
 - 타임스탬프는 오프셋 포함 ISO 형식, 가격은 원 단위 정수. 날짜 필터는 Asia/Seoul 기준
 - 상태 코드:
   - 200: 조회, 수정, 취소
-  - 201: 새 예약
+  - 201: 회원가입, 새 예약, 메뉴 등록
   - 204: 로그아웃
   - 401: 로그인 안 됨/만료/로그아웃한 토큰
   - 403: 운영자가 아님(역할), 남의 식당(소유)
   - 404: 없는 리소스, 또는 관련 없는 사람에게 숨긴 리소스 (예: 남의 예약)
   - 409: 예약 규칙 위반·상태 충돌 (`SLOT_SOLD_OUT`, `PARTY_SIZE_EXCEEDED`, `SLOT_ALREADY_STARTED`, `DUPLICATE_RESERVATION`, `ALREADY_CANCELLED`, `CANCELLATION_NOT_ALLOWED`)
   - 422: 잘못된 입력
+  - 429: 로그인 시도 제한 (`TOO_MANY_LOGIN_ATTEMPTS`)
   - 500: 처리하지 못한 예외 (`INTERNAL_SERVER_ERROR`, 요청 로그 미들웨어가 봉투로 변환. `app.exception_handler(Exception)`은 이 미들웨어보다 바깥이라 호출되지 않으므로 따로 만들지 않음)
   - 503: DB 연결 실패
-- 응답 형식은 봉투 `APIResponse[T]` 하나로 통일: `success`, `code`, `message`, `errors`, `data`, `request_id`, `responded_at` ([API_SPEC 2장](API_SPEC.md#2-공통-규칙)). 예외: 로그인 성공(OAuth2 토큰 응답)과 로그아웃(204, 본문 없음). 클라이언트는 메시지 문구가 아니라 `code`로 분기하고, HTTP 상태 코드도 실패에 맞게 보냄 (실패를 200으로 보내지 않음)
+- 응답 형식은 봉투 `APIResponse[T]` 하나로 통일: `success`, `code`, `message`, `errors`, `data`, `request_id`, `responded_at` ([API_SPEC 2장](API_SPEC.md#2-공통-규칙)). 예외: 로그인 성공(OAuth2 토큰 응답)과 로그아웃(204, 본문 없음), 운영자 예약 내보내기(`text/csv`). 클라이언트는 메시지 문구가 아니라 `code`로 분기하고, HTTP 상태 코드도 실패에 맞게 보냄 (실패를 200으로 보내지 않음)
 - 라우터는 `response_model=APIResponse[출력 스키마]`처럼 `data`의 타입을 지정함 (그래야 `/docs`에 스키마가 보임)
 - 도메인 규칙 위반은 `AppError`를 상속한 도메인 예외로 던지고, 공통 핸들러가 HTTP 응답으로 바꿈. 도메인에서 `HTTPException`을 쓰지 않음
 - OpenAPI 문서는 실제 구현된 API 기준
@@ -68,10 +69,10 @@
 
 ## 6. 범위에서 뺀 것
 
-프론트 연결(React 등), CI, Redis 캐시는 범위에서 뺐습니다 (2026-10-28). Jinja2 화면은 2026-11-02 회의에서 다시 넣었습니다 (담당 5, 운영자 화면 틀 먼저 · 식당 목록·상세는 식당 부품 뒤). API는 FastAPI의 API 문서 화면(`/docs`)과 pytest로 확인합니다. 자세한 목록은 [ARCHITECTURE.md](ARCHITECTURE.md) 7장을 봅니다.
+프론트 연결(React 등), CI, Redis 캐시는 범위에서 뺐습니다 (2026-10-28). Jinja2 화면은 2026-11-02 회의에서 다시 넣었습니다 (담당 5, 손님·운영자·관리자 화면). API는 FastAPI의 API 문서 화면(`/docs`)과 pytest로 확인합니다. 자세한 목록은 [ARCHITECTURE.md](ARCHITECTURE.md) 7장을 봅니다.
 
 - DB 장애를 "결과 없음"으로 성공 처리하면 안 됨
-- 예약 완료는 서버가 성공(201)을 돌려준 뒤에만 완료로 봄
+- JSON 예약 생성은 커밋 후 201을 반환. HTML 예약 폼은 같은 서비스가 성공한 뒤 303으로 상세 화면을 다시 열어 최신 잔여석을 표시
 
 ## 7. 테스트
 
@@ -80,7 +81,7 @@
 - 도메인 규칙: DB 없이 도메인 객체만 만들어서 pytest (가장 빠르고 먼저 씀)
 - API 검증/출력: pytest + `httpx.AsyncClient`(`ASGITransport`) 비동기 테스트
 - 저장/소유권: 실제 PostgreSQL 테스트 DB로 통합 테스트
-- 예약 취소: 실제 DB로 두 번째 취소가 409이고 좌석이 한 번만 복구되는지
+- 예약 취소: 시작 전 취소는 예약 인원만큼 한 번만 복구. 노쇼와 시작 후 관리자 취소는 복구하지 않음
 - 로그아웃: 로그아웃한 토큰으로 `GET /users/me` → 401
 - (선택) 예약 경합/재시도: 독립된 PostgreSQL 세션 두 개로 일부러 겹치게 실행
 

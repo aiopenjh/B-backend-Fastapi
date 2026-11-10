@@ -4,6 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from auth.domain.value_object import AuthenticatedUser
+from auth.presentation.dependencies import get_authenticated_user
 from common.schemas import APIResponse
 from user.application.service import UserService
 from user.presentation.dependencies import user_service
@@ -21,7 +23,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def sign_up(
     request: SignUpUserRequest, service: Annotated[UserService, Depends(user_service)]
 ) -> APIResponse[UserResponse]:
-    user = await service.signUp(
+    user = await service.sign_up(
         email=request.email,
         raw_password=request.password,
         name=request.name,
@@ -30,3 +32,17 @@ async def sign_up(
     return APIResponse.ok(
         data=UserResponse.from_domain(user), message="회원가입이 완료되었습니다."
     )
+
+
+@router.get(
+    "/me",
+    response_model=APIResponse[UserResponse],
+    status_code=status.HTTP_200_OK,
+    summary="내 정보 조회",
+)
+async def get_me(
+    current_user: Annotated[AuthenticatedUser, Depends(get_authenticated_user)],
+    service: Annotated[UserService, Depends(user_service)],
+) -> APIResponse[UserResponse]:
+    user = await service.get_user(user_id=current_user.user_id)
+    return APIResponse.ok(data=UserResponse.from_domain(user))

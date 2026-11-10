@@ -1,0 +1,201 @@
+name,description,address,cuisine,image_url,phone,email,menu1,menu1_price,menu2,menu2_price,menu3,menu3_price
+들꽃분식집,종로구 낙원동의 분식 전문점,서울특별시 종로구 수표로 146 (낙원동),BUNSIK,/static/restaurant-photos/gimbap.webp,010-2222-0001,owner00001@example.com,김밥,2500,라볶이,5500,튀김 모둠,3500
+동네백반,와룡동에서 오래된 한식 가게,서울특별시 종로구 돈화문로11가길 107 (와룡동),KOREAN,/static/restaurant-photos/eggroll.webp,010-2222-0002,owner00002@example.com,계란말이,7000,설렁탕,11000,칼국수,9500
+초록각,가족과 함께 오기 좋은 중식 식당,서울특별시 종로구 새문안로9길 158 (당주동),CHINESE,/static/restaurant-photos/double.webp,010-2222-0003,owner00003@example.com,울면,8000,짬짜면,10000,유린기,20000
+모퉁이찌개,인사동에서 오래된 한식 가게,서울특별시 종로구 인사동길 181 (인사동),KOREAN,/static/restaurant-photos/sundubu.webp,010-2222-0004,owner00004@example.com,순두부찌개,9000,육개장,11500,제육볶음,11000
+달빛카페,종로구 명륜4가의 카페 전문점,서울특별시 종로구 대학로 172 (명륜4가),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0005,owner00005@example.com,자몽 에이드,4500,치즈케이크,6500,바닐라라떼,6000
+온기 한상 2호점,"노원구 공릉동의 한식 가게. 해물파전, 갈비탕 등을 준비합니다.",서울특별시 노원구 공릉로 73 (공릉동),KOREAN,/static/restaurant-photos/jeon.webp,010-2222-0006,owner00006@example.com,해물파전,13500,갈비탕,13500,육개장,11000
+두레 펍,"서대문구 창천동의 주점 가게. 치즈 계란말이, 오돌뼈 등을 준비합니다.",서울특별시 서대문구 연세로 86 (창천동),PUB,/static/restaurant-photos/cheeseegg.webp,010-2222-0007,owner00007@example.com,치즈 계란말이,11500,오돌뼈,13500,닭발,15000
+창천동 돈카츠,"서대문구 창천동의 일식 가게. 라멘, 냉소바 등을 준비합니다.",서울특별시 서대문구 연세로 99 (창천동),JAPANESE,/static/restaurant-photos/soba.webp,010-2222-0008,owner00008@example.com,라멘,9500,냉소바,9000,텐동,13000
+한결 그릴,"중구 을지로3가의 양식 가게. 크림 파스타, 안심 스테이크 등을 준비합니다.",서울특별시 중구 을지로 112 (을지로3가),WESTERN,/static/restaurant-photos/steak.webp,010-2222-0009,owner00009@example.com,크림 파스타,13000,안심 스테이크,29000,까르보나라,15000
+창천동 비스트로,"서대문구 창천동의 양식 가게. 크림 파스타, 토마토 파스타 등을 준비합니다.",서울특별시 서대문구 연세로 125 (창천동),WESTERN,/static/restaurant-photos/caesar.webp,010-2222-0010,owner00010@example.com,크림 파스타,13000,토마토 파스타,12000,시저 샐러드,11000
+하나분식집,"동대문구 장안동의 분식 가게. 쫄면, 김밥 등을 준비합니다.",서울특별시 동대문구 장한로 138 (장안동),BUNSIK,/static/restaurant-photos/jjolmyeon.webp,010-2222-0011,owner00011@example.com,쫄면,6500,김밥,3000,순대,3500
+옛날 집밥,"광진구 자양동의 한식 가게. 감자탕, 갈비탕 등을 준비합니다.",서울특별시 광진구 뚝섬로 151 (자양동),KOREAN,/static/restaurant-photos/galbitang.webp,010-2222-0012,owner00012@example.com,감자탕,12500,갈비탕,14000,삼겹살 (1인분),17000
+푸른 찌개,"금천구 가산동의 한식 가게. 해물파전, 비빔밥 등을 준비합니다.",서울특별시 금천구 가산디지털1로 164 (가산동),KOREAN,/static/restaurant-photos/baekban.webp,010-2222-0013,owner00013@example.com,해물파전,12500,비빔밥,9000,칼국수,8500
+가을 반점,"영등포구 문래동3가의 중식 가게. 유린기, 짜장면 등을 준비합니다.",서울특별시 영등포구 도림로 177 (문래동3가),CHINESE,/static/restaurant-photos/yuringi.webp,010-2222-0014,owner00014@example.com,유린기,19000,짜장면,6000,군만두,6000
+가온 중화요리,"영등포구 여의도동의 중식 가게. 마파두부밥, 짬뽕 등을 준비합니다.",서울특별시 영등포구 국제금융로 19 (여의도동),CHINESE,/static/restaurant-photos/mapo.webp,010-2222-0015,owner00015@example.com,마파두부밥,8500,짬뽕,9000,탕수육,18000
+마루키친,"중랑구 면목동의 양식 가게. 토마토 파스타, 오므라이스 등을 준비합니다.",서울특별시 중랑구 면목로 32 (면목동),WESTERN,/static/restaurant-photos/tomatopasta.webp,010-2222-0016,owner00016@example.com,토마토 파스타,14000,오므라이스,9500,함박 스테이크,15000
+화양동 반점,"광진구 화양동의 중식 가게. 간짜장, 볶음밥 등을 준비합니다.",서울특별시 광진구 능동로 45 (화양동),CHINESE,/static/restaurant-photos/jajang.webp,010-2222-0017,owner00017@example.com,간짜장,8500,볶음밥,8500,군만두,6000
+도담 한식당,"서초구 방배동의 한식 가게. 감자탕, 육개장 등을 준비합니다.",서울특별시 서초구 방배로 58 (방배동),KOREAN,/static/restaurant-photos/yukgaejang.webp,010-2222-0018,owner00018@example.com,감자탕,11500,육개장,11000,제육볶음,12000
+옛날 칼국수,"성북구 성북동의 한식 가게. 감자탕, 계란말이 등을 준비합니다.",서울특별시 성북구 성북로 71 (성북동),KOREAN,/static/restaurant-photos/kalguksu.webp,010-2222-0019,owner00019@example.com,감자탕,12000,계란말이,7000,칼국수,9500
+보리 식당 2호점,"영등포구 여의도동의 한식 가게. 냉면, 감자탕 등을 준비합니다.",서울특별시 영등포구 국제금융로 84 (여의도동),KOREAN,/static/restaurant-photos/naengmyeon.webp,010-2222-0020,owner00020@example.com,냉면,9000,감자탕,12500,해물파전,14000
+온새밥상,"관악구 봉천동의 한식 가게. 김치찌개, 감자탕 등을 준비합니다.",서울특별시 관악구 관악로 97 (봉천동),KOREAN,/static/restaurant-photos/kimchi.webp,010-2222-0021,owner00021@example.com,김치찌개,9000,감자탕,12000,칼국수,9000
+방배동 커피바,"서초구 방배동의 카페 가게. 바닐라라떼, 자몽 에이드 등을 준비합니다.",서울특별시 서초구 방배로 110 (방배동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0022,owner00022@example.com,바닐라라떼,5500,자몽 에이드,5500,레몬 파운드,4800
+신당동 베트남 키친,"중구 신당동의 세계 음식 가게. 소고기 쌀국수, 분짜 등을 준비합니다.",서울특별시 중구 다산로 123 (신당동),WORLD,/static/restaurant-photos/pho.webp,010-2222-0023,owner00023@example.com,소고기 쌀국수,11500,분짜,13000,짜조,6500
+낙원동 치즈케이크,"종로구 낙원동의 카페 가게. 치즈케이크, 자몽 에이드 등을 준비합니다.",서울특별시 종로구 수표로 136 (낙원동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0024,owner00024@example.com,치즈케이크,6500,자몽 에이드,5500,아메리카노,4000
+방학동 백반,"도봉구 방학동의 한식 가게. 비빔밥, 냉면 등을 준비합니다.",서울특별시 도봉구 방학로 149 (방학동),KOREAN,/static/restaurant-photos/bibimbap.webp,010-2222-0025,owner00025@example.com,비빔밥,9500,냉면,10000,계란말이,7000
+늘봄 칼국수,"종로구 명륜4가의 한식 가게. 김치찌개, 된장찌개 등을 준비합니다.",서울특별시 종로구 대학로 162 (명륜4가),KOREAN,/static/restaurant-photos/kimchi.webp,010-2222-0026,owner00026@example.com,김치찌개,10000,된장찌개,8500,부대찌개,11500
+솔짬뽕,"중구 을지로3가의 중식 가게. 군만두, 짬뽕 등을 준비합니다.",서울특별시 중구 을지로 175 (을지로3가),CHINESE,/static/restaurant-photos/jjambbong.webp,010-2222-0027,owner00027@example.com,군만두,7000,짬뽕,9000,짬짜면,10000
+목동 사천주방,"양천구 목동의 중식 가게. 마파두부밥, 가지볶음 등을 준비합니다.",서울특별시 양천구 목동동로 17 (목동),CHINESE,/static/restaurant-photos/mapo.webp,010-2222-0028,owner00028@example.com,마파두부밥,10500,가지볶음,14500,산라탕,10000
+윤슬백반,"양천구 신정동의 한식 가게. 삼겹살 (1인분), 냉면 등을 준비합니다.",서울특별시 양천구 신정로 30 (신정동),KOREAN,/static/restaurant-photos/bbq.webp,010-2222-0029,owner00029@example.com,삼겹살 (1인분),16000,냉면,9500,갈비탕,13000
+봉천동 분식,"관악구 봉천동의 분식 가게. 쫄면, 순대 등을 준비합니다.",서울특별시 관악구 관악로 43 (봉천동),BUNSIK,/static/restaurant-photos/jjolmyeon.webp,010-2222-0030,owner00030@example.com,쫄면,5000,순대,4000,튀김 모둠,3000
+자양동 떡볶이,"광진구 자양동의 분식 가게. 우동, 김밥 등을 준비합니다.",서울특별시 광진구 뚝섬로 56 (자양동),BUNSIK,/static/restaurant-photos/bunsik.webp,010-2222-0031,owner00031@example.com,우동,5000,김밥,3000,어묵,3500
+미아동 브런치 카페,"강북구 미아동의 카페 가게. 시저 샐러드, 잠봉 샌드위치 등을 준비합니다.",서울특별시 강북구 솔샘로 69 (미아동),CAFE,/static/restaurant-photos/caesar.webp,010-2222-0032,owner00032@example.com,시저 샐러드,11000,잠봉 샌드위치,9500,플랫화이트,5000
+정담 한식당,"관악구 신림동의 한식 가게. 삼겹살 (1인분), 된장찌개 등을 준비합니다.",서울특별시 관악구 신림로 82 (신림동),KOREAN,/static/restaurant-photos/bbq.webp,010-2222-0033,owner00033@example.com,삼겹살 (1인분),16000,된장찌개,9500,계란말이,7000
+참집밥,"영등포구 문래동3가의 한식 가게. 비빔밥, 불고기 정식 등을 준비합니다.",서울특별시 영등포구 도림로 95 (문래동3가),KOREAN,/static/restaurant-photos/bibimbap.webp,010-2222-0034,owner00034@example.com,비빔밥,10000,불고기 정식,13500,해물파전,14000
+한울찌개,"구로구 고척동의 한식 가게. 불고기 정식, 계란말이 등을 준비합니다.",서울특별시 구로구 경인로 108 (고척동),KOREAN,/static/restaurant-photos/bulgogi.webp,010-2222-0035,owner00035@example.com,불고기 정식,12000,계란말이,7000,해물파전,14000
+상봉동 생맥주집,"중랑구 상봉동의 주점 가게. 감자튀김, 수제 소시지 등을 준비합니다.",서울특별시 중랑구 망우로 121 (상봉동),PUB,/static/restaurant-photos/fries.webp,010-2222-0036,owner00036@example.com,감자튀김,8500,수제 소시지,14500,생맥주,5500
+문래동3가 브뤼셀 프리츠,"영등포구 문래동3가의 세계 음식 가게. 벨기에식 감자튀김, 홍합 스튜 등을 준비합니다.",서울특별시 영등포구 도림로 134 (문래동3가),WORLD,/static/restaurant-photos/fries.webp,010-2222-0037,owner00037@example.com,벨기에식 감자튀김,7500,홍합 스튜,15500,와플,6500
+노을 칼국수,"성동구 성수동2가의 한식 가게. 해물파전, 감자탕 등을 준비합니다.",서울특별시 성동구 연무장길 147 (성수동2가),KOREAN,/static/restaurant-photos/jeon.webp,010-2222-0038,owner00038@example.com,해물파전,13000,감자탕,11500,계란말이,7000
+온기 차이나,"성북구 동선동1가의 중식 가게. 짬짜면, 군만두 등을 준비합니다.",서울특별시 성북구 동소문로20길 160 (동선동1가),CHINESE,/static/restaurant-photos/double.webp,010-2222-0039,owner00039@example.com,짬짜면,9500,군만두,6500,탕수육,19000
+시골차이나,"영등포구 여의도동의 중식 가게. 마파두부밥, 유린기 등을 준비합니다.",서울특별시 영등포구 국제금융로 173 (여의도동),CHINESE,/static/restaurant-photos/mapo.webp,010-2222-0040,owner00040@example.com,마파두부밥,9500,유린기,18000,짜장면,7500
+한남동 작은 주막,"용산구 한남동의 주점 가게. 어묵탕, 감자전 등을 준비합니다.",서울특별시 용산구 대사관로 15 (한남동),PUB,/static/restaurant-photos/fishpot.webp,010-2222-0041,owner00041@example.com,어묵탕,15000,감자전,13000,생막걸리,5000
+성북동 한잔상회,"성북구 성북동의 주점 가게. 두부김치, 골뱅이 소면 등을 준비합니다.",서울특별시 성북구 성북로 28 (성북동),PUB,/static/restaurant-photos/tofu.webp,010-2222-0042,owner00042@example.com,두부김치,16000,골뱅이 소면,19000,유자 하이볼,7500
+여의도동 연탄포차,"영등포구 여의도동의 주점 가게. 숯불 닭발, 주먹밥 등을 준비합니다.",서울특별시 영등포구 국제금융로 41 (여의도동),PUB,/static/restaurant-photos/pub.webp,010-2222-0043,owner00043@example.com,숯불 닭발,16500,주먹밥,4500,계란찜,6500
+마루찌개,"은평구 응암동의 한식 가게. 육개장, 부대찌개 등을 준비합니다.",서울특별시 은평구 응암로 54 (응암동),KOREAN,/static/restaurant-photos/budae.webp,010-2222-0044,owner00044@example.com,육개장,11500,부대찌개,10500,계란말이,7000
+가산동 그릴하우스,"금천구 가산동의 양식 가게. 안심 스테이크, 구운 채소 등을 준비합니다.",서울특별시 금천구 가산디지털1로 67 (가산동),WESTERN,/static/restaurant-photos/steak.webp,010-2222-0045,owner00045@example.com,안심 스테이크,29000,구운 채소,8500,버섯 수프,7500
+목동 교자관,"양천구 목동의 중식 가게. 군만두, 물만두 등을 준비합니다.",서울특별시 양천구 목동동로 80 (목동),CHINESE,/static/restaurant-photos/mandu.webp,010-2222-0046,owner00046@example.com,군만두,8000,물만두,7500,우육면,12000
+정담 한상 3호점,"용산구 이태원동의 한식 가게. 김치찌개, 불고기 정식 등을 준비합니다.",서울특별시 용산구 이태원로 93 (이태원동),KOREAN,/static/restaurant-photos/kimchi.webp,010-2222-0047,owner00047@example.com,김치찌개,10000,불고기 정식,13000,육개장,11000
+구로동 선술집,"구로구 구로동의 주점 가게. 치즈 계란말이, 닭꼬치 등을 준비합니다.",서울특별시 구로구 디지털로 106 (구로동),PUB,/static/restaurant-photos/cheeseegg.webp,010-2222-0048,owner00048@example.com,치즈 계란말이,12500,닭꼬치,9500,매실 하이볼,8000
+정담 찌개,"성북구 동선동1가의 한식 가게. 감자탕, 해물파전 등을 준비합니다.",서울특별시 성북구 동소문로20길 119 (동선동1가),KOREAN,/static/restaurant-photos/baekban.webp,010-2222-0049,owner00049@example.com,감자탕,11500,해물파전,13000,설렁탕,11000
+을지로3가 백반,"중구 을지로3가의 한식 가게. 부대찌개, 설렁탕 등을 준비합니다.",서울특별시 중구 을지로 132 (을지로3가),KOREAN,/static/restaurant-photos/budae.webp,010-2222-0050,owner00050@example.com,부대찌개,10000,설렁탕,10000,순두부찌개,10000
+봄날 김밥 5호점,"강동구 천호동의 분식 가게. 치즈김밥, 튀김 모둠 등을 준비합니다.",서울특별시 강동구 천호대로 145 (천호동),BUNSIK,/static/restaurant-photos/gimbap.webp,010-2222-0051,owner00051@example.com,치즈김밥,4500,튀김 모둠,4500,김밥,3000
+참 펍,"성동구 성수동2가의 주점 가게. 감자튀김, 어묵탕 등을 준비합니다.",서울특별시 성동구 연무장길 158 (성수동2가),PUB,/static/restaurant-photos/fries.webp,010-2222-0052,owner00052@example.com,감자튀김,7000,어묵탕,12000,치즈 계란말이,10500
+오늘 밥상,"서대문구 연희동의 한식 가게. 계란말이, 갈비탕 등을 준비합니다.",서울특별시 서대문구 연희로 171 (연희동),KOREAN,/static/restaurant-photos/eggroll.webp,010-2222-0053,owner00053@example.com,계란말이,6500,갈비탕,14500,감자탕,12000
+하늘 백반,"강동구 천호동의 한식 가게. 설렁탕, 육개장 등을 준비합니다.",서울특별시 강동구 천호대로 13 (천호동),KOREAN,/static/restaurant-photos/seolleongtang.webp,010-2222-0054,owner00054@example.com,설렁탕,11000,육개장,11500,제육볶음,10000
+사당동 아르헨티나 그릴,"동작구 사당동의 세계 음식 가게. 치미추리 안심 스테이크, 엠파나다 등을 준비합니다.",서울특별시 동작구 동작대로 26 (사당동),WORLD,/static/restaurant-photos/steak.webp,010-2222-0055,owner00055@example.com,치미추리 안심 스테이크,26500,엠파나다,7500,구운 채소,6500
+사당동 생맥주집,"동작구 사당동의 주점 가게. 감자튀김, 수제 소시지 등을 준비합니다.",서울특별시 동작구 동작대로 39 (사당동),PUB,/static/restaurant-photos/fries.webp,010-2222-0056,owner00056@example.com,감자튀김,8500,수제 소시지,14500,생맥주,5500
+화양동 밥상,"광진구 화양동의 한식 가게. 갈비탕, 김치찌개 등을 준비합니다.",서울특별시 광진구 능동로 52 (화양동),KOREAN,/static/restaurant-photos/galbitang.webp,010-2222-0057,owner00057@example.com,갈비탕,14000,김치찌개,9000,부대찌개,11000
+동선동1가 해물짬뽕,"성북구 동선동1가의 중식 가게. 해물짬뽕, 삼선볶음밥 등을 준비합니다.",서울특별시 성북구 동소문로20길 65 (동선동1가),CHINESE,/static/restaurant-photos/jjambbong.webp,010-2222-0058,owner00058@example.com,해물짬뽕,11000,삼선볶음밥,10000,유린기,18500
+해담 칼국수 3호점,"동작구 상도동의 한식 가게. 제육볶음, 된장찌개 등을 준비합니다.",서울특별시 동작구 상도로 78 (상도동),KOREAN,/static/restaurant-photos/jeyuk.webp,010-2222-0059,owner00059@example.com,제육볶음,12000,된장찌개,8500,계란말이,7000
+참 칼국수,"용산구 한남동의 한식 가게. 삼겹살 (1인분), 제육볶음 등을 준비합니다.",서울특별시 용산구 대사관로 91 (한남동),KOREAN,/static/restaurant-photos/bbq.webp,010-2222-0060,owner00060@example.com,삼겹살 (1인분),16000,제육볶음,11500,냉면,9500
+오늘 떡볶이,"강북구 수유동의 분식 가게. 치즈김밥, 우동 등을 준비합니다.",서울특별시 강북구 도봉로 104 (수유동),BUNSIK,/static/restaurant-photos/bunsik.webp,010-2222-0061,owner00061@example.com,치즈김밥,5500,우동,4500,김밥,3000
+온기 비스트로 3호점,"중랑구 상봉동의 양식 가게. 시저 샐러드, 리조또 등을 준비합니다.",서울특별시 중랑구 망우로 117 (상봉동),WESTERN,/static/restaurant-photos/risotto.webp,010-2222-0062,owner00062@example.com,시저 샐러드,10500,리조또,14000,크림 파스타,13000
+마루비스트로,"성북구 동선동1가의 양식 가게. 마르게리타 피자, 크림 파스타 등을 준비합니다.",서울특별시 성북구 동소문로20길 130 (동선동1가),WESTERN,/static/restaurant-photos/pizza.webp,010-2222-0063,owner00063@example.com,마르게리타 피자,16500,크림 파스타,13500,시저 샐러드,10500
+온새 돈카츠,"도봉구 창동의 일식 가게. 냉소바, 사시미 모둠 등을 준비합니다.",서울특별시 도봉구 노해로 143 (창동),JAPANESE,/static/restaurant-photos/japan.webp,010-2222-0064,owner00064@example.com,냉소바,8000,사시미 모둠,30500,가라아게,9500
+해담 분식 5호점,"강남구 역삼동의 분식 가게. 튀김 모둠, 참치김밥 등을 준비합니다.",서울특별시 강남구 테헤란로 156 (역삼동),BUNSIK,/static/restaurant-photos/jjolmyeon.webp,010-2222-0065,owner00065@example.com,튀김 모둠,3500,참치김밥,4500,쫄면,7000
+동네 김밥,"강서구 화곡동의 분식 가게. 어묵, 라볶이 등을 준비합니다.",서울특별시 강서구 화곡로 169 (화곡동),BUNSIK,/static/restaurant-photos/bunsik.webp,010-2222-0066,owner00066@example.com,어묵,3000,라볶이,5000,우동,5000
+미소 한상,"마포구 망원동의 한식 가게. 칼국수, 김치찌개 등을 준비합니다.",서울특별시 마포구 포은로 11 (망원동),KOREAN,/static/restaurant-photos/kalguksu.webp,010-2222-0067,owner00067@example.com,칼국수,8500,김치찌개,10000,감자탕,12500
+동네반점,"용산구 한남동의 중식 가게. 군만두, 짬뽕 등을 준비합니다.",서울특별시 용산구 대사관로 24 (한남동),CHINESE,/static/restaurant-photos/mandu.webp,010-2222-0068,owner00068@example.com,군만두,6000,짬뽕,9500,울면,7000
+이태원동 소바,"용산구 이태원동의 일식 가게. 냉소바, 온소바 등을 준비합니다.",서울특별시 용산구 이태원로 37 (이태원동),JAPANESE,/static/restaurant-photos/soba.webp,010-2222-0069,owner00069@example.com,냉소바,10500,온소바,10500,유부초밥,5500
+윤슬 분식집,"구로구 구로동의 분식 가게. 라볶이, 김밥 등을 준비합니다.",서울특별시 구로구 디지털로 50 (구로동),BUNSIK,/static/restaurant-photos/gimbap.webp,010-2222-0070,owner00070@example.com,라볶이,6500,김밥,2500,떡볶이,4500
+봄날 그릴,"노원구 공릉동의 양식 가게. 크림 파스타, 안심 스테이크 등을 준비합니다.",서울특별시 노원구 공릉로 63 (공릉동),WESTERN,/static/restaurant-photos/grillroom.webp,010-2222-0071,owner00071@example.com,크림 파스타,15000,안심 스테이크,29000,까르보나라,14000
+한울 레스토랑,"중구 을지로3가의 양식 가게. 리조또, 까르보나라 등을 준비합니다.",서울특별시 중구 을지로 76 (을지로3가),WESTERN,/static/restaurant-photos/hambak.webp,010-2222-0072,owner00072@example.com,리조또,14000,까르보나라,13000,함박 스테이크,13000
+고척동 테라스 카페,"구로구 고척동의 카페 가게. 브런치 크림 파스타, 에그 토스트 등을 준비합니다.",서울특별시 구로구 경인로 89 (고척동),CAFE,/static/restaurant-photos/cream.webp,010-2222-0073,owner00073@example.com,브런치 크림 파스타,13500,에그 토스트,8500,콜드브루,5000
+가산동 스시,"금천구 가산동의 일식 가게. 모둠초밥, 연어초밥 등을 준비합니다.",서울특별시 금천구 가산디지털1로 102 (가산동),JAPANESE,/static/restaurant-photos/sushi.webp,010-2222-0074,owner00074@example.com,모둠초밥,18000,연어초밥,17000,차완무시,4500
+온새 국밥,"성동구 행당동의 한식 가게. 부대찌개, 설렁탕 등을 준비합니다.",서울특별시 성동구 왕십리로 115 (행당동),KOREAN,/static/restaurant-photos/seolleongtang.webp,010-2222-0075,owner00075@example.com,부대찌개,10500,설렁탕,11000,감자탕,12000
+가을 분식,"송파구 송파동의 분식 가게. 튀김 모둠, 순대 등을 준비합니다.",서울특별시 송파구 백제고분로 128 (송파동),BUNSIK,/static/restaurant-photos/bunsik.webp,010-2222-0076,owner00076@example.com,튀김 모둠,4000,순대,5000,라볶이,5500
+상계동 김밥집,"노원구 상계동의 분식 가게. 김밥, 쫄면 등을 준비합니다.",서울특별시 노원구 상계로 141 (상계동),BUNSIK,/static/restaurant-photos/gimbap.webp,010-2222-0077,owner00077@example.com,김밥,3500,쫄면,6500,만둣국,7000
+응암동 카츠집,"은평구 응암동의 일식 가게. 치즈 돈카츠, 등심 돈카츠 등을 준비합니다.",서울특별시 은평구 응암로 154 (응암동),JAPANESE,/static/restaurant-photos/cutlet.webp,010-2222-0078,owner00078@example.com,치즈 돈카츠,13500,등심 돈카츠,11500,미니 우동,4500
+옛날칼국수,"광진구 자양동의 한식 가게. 불고기 정식, 제육볶음 등을 준비합니다.",서울특별시 광진구 뚝섬로 167 (자양동),KOREAN,/static/restaurant-photos/baekban.webp,010-2222-0079,owner00079@example.com,불고기 정식,14000,제육볶음,11000,된장찌개,8000
+햇살 밥상,"마포구 서교동의 한식 가게. 비빔밥, 칼국수 등을 준비합니다.",서울특별시 마포구 와우산로 9 (서교동),KOREAN,/static/restaurant-photos/bibimbap.webp,010-2222-0080,owner00080@example.com,비빔밥,8500,칼국수,9000,제육볶음,10000
+옛날 키친,"서초구 서초동의 양식 가게. 시저 샐러드, 안심 스테이크 등을 준비합니다.",서울특별시 서초구 서초대로 22 (서초동),WESTERN,/static/restaurant-photos/bistro.webp,010-2222-0081,owner00081@example.com,시저 샐러드,12000,안심 스테이크,27500,마르게리타 피자,16000
+창동 오븐피자,"도봉구 창동의 양식 가게. 마르게리타 피자, 루콜라 피자 등을 준비합니다.",서울특별시 도봉구 노해로 35 (창동),WESTERN,/static/restaurant-photos/pizza.webp,010-2222-0082,owner00082@example.com,마르게리타 피자,16000,루콜라 피자,18500,레몬 소다,5000
+한결 그릴 방학동점,"도봉구 방학동의 양식 가게. 안심 스테이크, 크림 파스타 등을 준비합니다.",서울특별시 도봉구 방학로 48 (방학동),WESTERN,/static/restaurant-photos/steak.webp,010-2222-0083,owner00083@example.com,안심 스테이크,28000,크림 파스타,14500,오므라이스,10500
+정담 국밥,"금천구 시흥동의 한식 가게. 냉면, 삼겹살 (1인분) 등을 준비합니다.",서울특별시 금천구 시흥대로 61 (시흥동),KOREAN,/static/restaurant-photos/naengmyeon.webp,010-2222-0084,owner00084@example.com,냉면,10000,삼겹살 (1인분),16500,된장찌개,9500
+느티레스토랑,"은평구 불광동의 양식 가게. 크림 파스타, 오므라이스 등을 준비합니다.",서울특별시 은평구 불광로 74 (불광동),WESTERN,/static/restaurant-photos/cream.webp,010-2222-0085,owner00085@example.com,크림 파스타,14000,오므라이스,10000,토마토 파스타,13500
+면목동 밥상,"중랑구 면목동의 한식 가게. 칼국수, 불고기 정식 등을 준비합니다.",서울특별시 중랑구 면목로 87 (면목동),KOREAN,/static/restaurant-photos/kalguksu.webp,010-2222-0086,owner00086@example.com,칼국수,9000,불고기 정식,14000,김치찌개,10000
+소소 집밥,"중구 신당동의 한식 가게. 불고기 정식, 갈비탕 등을 준비합니다.",서울특별시 중구 다산로 100 (신당동),KOREAN,/static/restaurant-photos/bulgogi.webp,010-2222-0087,owner00087@example.com,불고기 정식,14000,갈비탕,15000,삼겹살 (1인분),16500
+망원동 일본가정식,"마포구 망원동의 일식 가게. 규동, 가라아게 정식 등을 준비합니다.",서울특별시 마포구 포은로 113 (망원동),JAPANESE,/static/restaurant-photos/japan.webp,010-2222-0088,owner00088@example.com,규동,11000,가라아게 정식,12500,미소국,2500
+시골한상,"송파구 송파동의 한식 가게. 설렁탕, 육개장 등을 준비합니다.",서울특별시 송파구 백제고분로 126 (송파동),KOREAN,/static/restaurant-photos/seolleongtang.webp,010-2222-0089,owner00089@example.com,설렁탕,12000,육개장,11500,부대찌개,10500
+봉천동 작은 주막,"관악구 봉천동의 주점 가게. 어묵탕, 감자전 등을 준비합니다.",서울특별시 관악구 관악로 139 (봉천동),PUB,/static/restaurant-photos/fishpot.webp,010-2222-0090,owner00090@example.com,어묵탕,15000,감자전,13000,생막걸리,5000
+상봉동 경양식당,"중랑구 상봉동의 일식 가게. 오므라이스, 함박 정식 등을 준비합니다.",서울특별시 중랑구 망우로 152 (상봉동),JAPANESE,/static/restaurant-photos/omurice.webp,010-2222-0091,owner00091@example.com,오므라이스,11000,함박 정식,14500,멜론 소다,4500
+방배동 한상,"서초구 방배동의 한식 가게. 불고기 정식, 감자탕 등을 준비합니다.",서울특별시 서초구 방배로 165 (방배동),KOREAN,/static/restaurant-photos/bulgogi.webp,010-2222-0092,owner00092@example.com,불고기 정식,13000,감자탕,11500,육개장,11000
+화곡동 파스타룸,"강서구 화곡동의 양식 가게. 토마토 파스타, 봉골레 등을 준비합니다.",서울특별시 강서구 화곡로 178 (화곡동),WESTERN,/static/restaurant-photos/tomatopasta.webp,010-2222-0093,owner00093@example.com,토마토 파스타,14000,봉골레,15500,포카치아,5500
+노을 반점,"은평구 응암동의 중식 가게. 탕수육, 군만두 등을 준비합니다.",서울특별시 은평구 응암로 20 (응암동),CHINESE,/static/restaurant-photos/tangsuyuk.webp,010-2222-0094,owner00094@example.com,탕수육,17500,군만두,5000,짬짜면,10500
+신림동 그릴,"관악구 신림동의 양식 가게. 토마토 파스타, 오므라이스 등을 준비합니다.",서울특별시 관악구 신림로 33 (신림동),WESTERN,/static/restaurant-photos/cutlet.webp,010-2222-0095,owner00095@example.com,토마토 파스타,13500,오므라이스,10500,치즈 돈까스,13000
+화양동 한잔상회,"광진구 화양동의 주점 가게. 두부김치, 골뱅이 소면 등을 준비합니다.",서울특별시 광진구 능동로 46 (화양동),PUB,/static/restaurant-photos/tofu.webp,010-2222-0096,owner00096@example.com,두부김치,16000,골뱅이 소면,19000,유자 하이볼,7500
+소담 비스트로,"송파구 잠실동의 양식 가게. 치즈 돈까스, 까르보나라 등을 준비합니다.",서울특별시 송파구 올림픽로 59 (잠실동),WESTERN,/static/restaurant-photos/carbonara.webp,010-2222-0097,owner00097@example.com,치즈 돈까스,11500,까르보나라,15000,크림 파스타,13500
+정담키친,"서대문구 연희동의 양식 가게. 시저 샐러드, 함박 스테이크 등을 준비합니다.",서울특별시 서대문구 연희로 72 (연희동),WESTERN,/static/restaurant-photos/caesar.webp,010-2222-0098,owner00098@example.com,시저 샐러드,10000,함박 스테이크,15000,안심 스테이크,27500
+옛날 그릴,"동대문구 제기동의 양식 가게. 안심 스테이크, 함박 스테이크 등을 준비합니다.",서울특별시 동대문구 약령중앙로 85 (제기동),WESTERN,/static/restaurant-photos/hambak.webp,010-2222-0099,owner00099@example.com,안심 스테이크,28000,함박 스테이크,13500,리조또,14000
+소소 레스토랑,"관악구 신림동의 양식 가게. 오므라이스, 함박 스테이크 등을 준비합니다.",서울특별시 관악구 신림로 98 (신림동),WESTERN,/static/restaurant-photos/omurice.webp,010-2222-0100,owner00100@example.com,오므라이스,11000,함박 스테이크,13500,크림 파스타,13000
+신사동 사이공 식탁,"강남구 신사동의 세계 음식 가게. 양지 쌀국수, 반미 등을 준비합니다.",서울특별시 강남구 도산대로 111 (신사동),WORLD,/static/restaurant-photos/pho.webp,010-2222-0101,owner00101@example.com,양지 쌀국수,11000,반미,8500,연유 커피,5000
+화곡동 티룸,"강서구 화곡동의 카페 가게. 자몽 에이드, 얼그레이 티 등을 준비합니다.",서울특별시 강서구 화곡로 124 (화곡동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0102,owner00102@example.com,자몽 에이드,5500,얼그레이 티,6000,스콘,4500
+봉천동 소바,"관악구 봉천동의 일식 가게. 냉소바, 온소바 등을 준비합니다.",서울특별시 관악구 관악로 137 (봉천동),JAPANESE,/static/restaurant-photos/soba.webp,010-2222-0103,owner00103@example.com,냉소바,10500,온소바,10500,유부초밥,5500
+단골 국밥,"광진구 화양동의 한식 가게. 설렁탕, 부대찌개 등을 준비합니다.",서울특별시 광진구 능동로 150 (화양동),KOREAN,/static/restaurant-photos/seolleongtang.webp,010-2222-0104,owner00104@example.com,설렁탕,11000,부대찌개,10500,계란말이,7000
+신사동 커피바,"강남구 신사동의 카페 가게. 바닐라라떼, 자몽 에이드 등을 준비합니다.",서울특별시 강남구 도산대로 163 (신사동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0105,owner00105@example.com,바닐라라떼,5500,자몽 에이드,5500,레몬 파운드,4800
+성수동2가 스시,"성동구 성수동2가의 일식 가게. 연어덮밥, 모둠초밥 등을 준비합니다.",서울특별시 성동구 연무장길 176 (성수동2가),JAPANESE,/static/restaurant-photos/sushi.webp,010-2222-0106,owner00106@example.com,연어덮밥,12000,모둠초밥,14500,가라아게,10000
+자양동 연탄포차,"광진구 자양동의 주점 가게. 숯불 닭발, 주먹밥 등을 준비합니다.",서울특별시 광진구 뚝섬로 18 (자양동),PUB,/static/restaurant-photos/pub.webp,010-2222-0107,owner00107@example.com,숯불 닭발,16500,주먹밥,4500,계란찜,6500
+하늘 우동,"동대문구 제기동의 일식 가게. 냉소바, 텐동 등을 준비합니다.",서울특별시 동대문구 약령중앙로 31 (제기동),JAPANESE,/static/restaurant-photos/soba.webp,010-2222-0108,owner00108@example.com,냉소바,9000,텐동,13000,사시미 모둠,31000
+성내동 선술집,"강동구 성내동의 주점 가게. 치즈 계란말이, 닭꼬치 등을 준비합니다.",서울특별시 강동구 강동대로 44 (성내동),PUB,/static/restaurant-photos/cheeseegg.webp,010-2222-0109,owner00109@example.com,치즈 계란말이,12500,닭꼬치,9500,매실 하이볼,8000
+상계동 스시,"노원구 상계동의 일식 가게. 모둠초밥, 연어초밥 등을 준비합니다.",서울특별시 노원구 상계로 57 (상계동),JAPANESE,/static/restaurant-photos/sushi.webp,010-2222-0110,owner00110@example.com,모둠초밥,18000,연어초밥,17000,차완무시,4500
+봄날반점,"강서구 마곡동의 중식 가게. 짜장면, 탕수육 등을 준비합니다.",서울특별시 강서구 마곡중앙로 70 (마곡동),CHINESE,/static/restaurant-photos/jajang.webp,010-2222-0111,owner00111@example.com,짜장면,7500,탕수육,17500,군만두,6500
+서초동 카츠집,"서초구 서초동의 일식 가게. 치즈 돈카츠, 등심 돈카츠 등을 준비합니다.",서울특별시 서초구 서초대로 83 (서초동),JAPANESE,/static/restaurant-photos/cutlet.webp,010-2222-0112,owner00112@example.com,치즈 돈카츠,13500,등심 돈카츠,11500,미니 우동,4500
+옛날한상,"종로구 와룡동의 한식 가게. 삼겹살 (1인분), 부대찌개 등을 준비합니다.",서울특별시 종로구 돈화문로 96 (와룡동),KOREAN,/static/restaurant-photos/bbq.webp,010-2222-0113,owner00113@example.com,삼겹살 (1인분),16000,부대찌개,10000,감자탕,12500
+신당동 베트남 키친 신당동점,"중구 신당동의 세계 음식 가게. 소고기 쌀국수, 분짜 등을 준비합니다.",서울특별시 중구 다산로 109 (신당동),WORLD,/static/restaurant-photos/pho.webp,010-2222-0114,owner00114@example.com,소고기 쌀국수,11500,분짜,13000,짜조,6500
+상도동 비스트로,"동작구 상도동의 양식 가게. 버섯 리조또, 라구 파스타 등을 준비합니다.",서울특별시 동작구 상도로 122 (상도동),WESTERN,/static/restaurant-photos/risotto.webp,010-2222-0115,owner00115@example.com,버섯 리조또,15000,라구 파스타,16500,판나코타,6500
+오늘 한상,"동대문구 장안동의 한식 가게. 삼겹살 (1인분), 냉면 등을 준비합니다.",서울특별시 동대문구 장한로 135 (장안동),KOREAN,/static/restaurant-photos/bbq.webp,010-2222-0116,owner00116@example.com,삼겹살 (1인분),16500,냉면,10000,순두부찌개,8500
+상도동 짬뽕,"동작구 상도동의 중식 가게. 깐풍기, 탕수육 등을 준비합니다.",서울특별시 동작구 상도로 148 (상도동),CHINESE,/static/restaurant-photos/tangsuyuk.webp,010-2222-0117,owner00117@example.com,깐풍기,20000,탕수육,18000,유린기,19500
+보리 만두,"강북구 미아동의 중식 가게. 울면, 짜장면 등을 준비합니다.",서울특별시 강북구 솔샘로 161 (미아동),CHINESE,/static/restaurant-photos/chinese-dining-room.webp,010-2222-0118,owner00118@example.com,울면,8000,짜장면,7000,짬짜면,9500
+소소각,"양천구 신정동의 중식 가게. 짜장면, 볶음밥 등을 준비합니다.",서울특별시 양천구 신정로 174 (신정동),CHINESE,/static/restaurant-photos/jajang.webp,010-2222-0119,owner00119@example.com,짜장면,7000,볶음밥,9000,유린기,19000
+오늘키친,"강남구 신사동의 양식 가게. 까르보나라, 크림 파스타 등을 준비합니다.",서울특별시 강남구 도산대로 16 (신사동),WESTERN,/static/restaurant-photos/carbonara.webp,010-2222-0120,owner00120@example.com,까르보나라,14000,크림 파스타,13000,안심 스테이크,27500
+문래동3가 그릴하우스,"영등포구 문래동3가의 양식 가게. 안심 스테이크, 구운 채소 등을 준비합니다.",서울특별시 영등포구 도림로 29 (문래동3가),WESTERN,/static/restaurant-photos/steak.webp,010-2222-0121,owner00121@example.com,안심 스테이크,29000,구운 채소,8500,버섯 수프,7500
+서초동 브뤼셀 프리츠,"서초구 서초동의 세계 음식 가게. 벨기에식 감자튀김, 홍합 스튜 등을 준비합니다.",서울특별시 서초구 서초대로 42 (서초동),WORLD,/static/restaurant-photos/fries.webp,010-2222-0122,owner00122@example.com,벨기에식 감자튀김,7500,홍합 스튜,15500,와플,6500
+역삼동 일본가정식,"강남구 역삼동의 일식 가게. 규동, 가라아게 정식 등을 준비합니다.",서울특별시 강남구 테헤란로 55 (역삼동),JAPANESE,/static/restaurant-photos/japan.webp,010-2222-0123,owner00123@example.com,규동,11000,가라아게 정식,12500,미소국,2500
+소담 집밥 2호점,"강남구 역삼동의 한식 가게. 순두부찌개, 불고기 정식 등을 준비합니다.",서울특별시 강남구 테헤란로 68 (역삼동),KOREAN,/static/restaurant-photos/sundubu.webp,010-2222-0124,owner00124@example.com,순두부찌개,9500,불고기 정식,13000,칼국수,9500
+잠실동 아르헨티나 그릴,"송파구 잠실동의 세계 음식 가게. 치미추리 안심 스테이크, 엠파나다 등을 준비합니다.",서울특별시 송파구 올림픽로 81 (잠실동),WORLD,/static/restaurant-photos/steak.webp,010-2222-0125,owner00125@example.com,치미추리 안심 스테이크,26500,엠파나다,7500,구운 채소,6500
+방배동 경양식당,"서초구 방배동의 일식 가게. 오므라이스, 함박 정식 등을 준비합니다.",서울특별시 서초구 방배로 94 (방배동),JAPANESE,/static/restaurant-photos/omurice.webp,010-2222-0126,owner00126@example.com,오므라이스,11000,함박 정식,14500,멜론 소다,4500
+방학동 치즈케이크,"도봉구 방학동의 카페 가게. 치즈케이크, 자몽 에이드 등을 준비합니다.",서울특별시 도봉구 방학로 107 (방학동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0127,owner00127@example.com,치즈케이크,6500,자몽 에이드,5500,아메리카노,4000
+제기동 생맥주집,"동대문구 제기동의 주점 가게. 감자튀김, 수제 소시지 등을 준비합니다.",서울특별시 동대문구 약령중앙로 120 (제기동),PUB,/static/restaurant-photos/fries.webp,010-2222-0128,owner00128@example.com,감자튀김,8500,수제 소시지,14500,생맥주,5500
+공릉동 작은 주막,"노원구 공릉동의 주점 가게. 어묵탕, 감자전 등을 준비합니다.",서울특별시 노원구 공릉로 133 (공릉동),PUB,/static/restaurant-photos/fishpot.webp,010-2222-0129,owner00129@example.com,어묵탕,15000,감자전,13000,생막걸리,5000
+상계동 오븐피자,"노원구 상계동의 양식 가게. 마르게리타 피자, 루콜라 피자 등을 준비합니다.",서울특별시 노원구 상계로 146 (상계동),WESTERN,/static/restaurant-photos/pizza.webp,010-2222-0130,owner00130@example.com,마르게리타 피자,16000,루콜라 피자,18500,레몬 소다,5000
+바다 주막,"중랑구 면목동의 주점 가게. 어묵탕, 모둠 안주 등을 준비합니다.",서울특별시 중랑구 면목로 159 (면목동),PUB,/static/restaurant-photos/fishpot.webp,010-2222-0131,owner00131@example.com,어묵탕,12500,모둠 안주,25000,치즈 계란말이,10000
+시흥동 분식,"금천구 시흥동의 분식 가게. 떡볶이, 치즈김밥 등을 준비합니다.",서울특별시 금천구 시흥대로 172 (시흥동),BUNSIK,/static/restaurant-photos/tteok.webp,010-2222-0132,owner00132@example.com,떡볶이,4500,치즈김밥,4500,참치김밥,5000
+불광동 떡볶이,"은평구 불광동의 분식 가게. 우동, 떡볶이 등을 준비합니다.",서울특별시 은평구 불광로 14 (불광동),BUNSIK,/static/restaurant-photos/tteok.webp,010-2222-0133,owner00133@example.com,우동,4000,떡볶이,3500,참치김밥,5000
+성북동 사이공 식탁,"성북구 성북동의 세계 음식 가게. 양지 쌀국수, 반미 등을 준비합니다.",서울특별시 성북구 성북로 27 (성북동),WORLD,/static/restaurant-photos/pho.webp,010-2222-0134,owner00134@example.com,양지 쌀국수,11000,반미,8500,연유 커피,5000
+서교동 소바,"마포구 서교동의 일식 가게. 냉소바, 온소바 등을 준비합니다.",서울특별시 마포구 와우산로 40 (서교동),JAPANESE,/static/restaurant-photos/soba.webp,010-2222-0135,owner00135@example.com,냉소바,10500,온소바,10500,유부초밥,5500
+천호동 스시,"강동구 천호동의 일식 가게. 모둠초밥, 연어초밥 등을 준비합니다.",서울특별시 강동구 천호대로 53 (천호동),JAPANESE,/static/restaurant-photos/sushi.webp,010-2222-0136,owner00136@example.com,모둠초밥,18000,연어초밥,17000,차완무시,4500
+구름 백반,"동작구 사당동의 한식 가게. 해물파전, 부대찌개 등을 준비합니다.",서울특별시 동작구 동작대로 66 (사당동),KOREAN,/static/restaurant-photos/jeon.webp,010-2222-0137,owner00137@example.com,해물파전,13000,부대찌개,9500,된장찌개,7500
+우리 칼국수 4호점,"성동구 성수동2가의 한식 가게. 칼국수, 부대찌개 등을 준비합니다.",서울특별시 성동구 연무장길 79 (성수동2가),KOREAN,/static/restaurant-photos/kalguksu.webp,010-2222-0138,owner00138@example.com,칼국수,8500,부대찌개,11500,감자탕,13000
+이태원동 파스타룸,"용산구 이태원동의 양식 가게. 토마토 파스타, 봉골레 등을 준비합니다.",서울특별시 용산구 이태원로 92 (이태원동),WESTERN,/static/restaurant-photos/tomatopasta.webp,010-2222-0139,owner00139@example.com,토마토 파스타,14000,봉골레,15500,포카치아,5500
+다온 한상,"강북구 미아동의 한식 가게. 계란말이, 불고기 정식 등을 준비합니다.",서울특별시 강북구 솔샘로 105 (미아동),KOREAN,/static/restaurant-photos/eggroll.webp,010-2222-0140,owner00140@example.com,계란말이,6000,불고기 정식,13000,해물파전,12000
+면목동 베트남 키친,"중랑구 면목동의 세계 음식 가게. 소고기 쌀국수, 분짜 등을 준비합니다.",서울특별시 중랑구 면목로 118 (면목동),WORLD,/static/restaurant-photos/pho.webp,010-2222-0141,owner00141@example.com,소고기 쌀국수,11500,분짜,13000,짜조,6500
+천호동 반점,"강동구 천호동의 중식 가게. 간짜장, 볶음밥 등을 준비합니다.",서울특별시 강동구 천호대로 131 (천호동),CHINESE,/static/restaurant-photos/jajang.webp,010-2222-0142,owner00142@example.com,간짜장,8500,볶음밥,8500,군만두,6000
+가산동 브런치 카페,"금천구 가산동의 카페 가게. 시저 샐러드, 잠봉 샌드위치 등을 준비합니다.",서울특별시 금천구 가산디지털1로 144 (가산동),CAFE,/static/restaurant-photos/caesar.webp,010-2222-0143,owner00143@example.com,시저 샐러드,11000,잠봉 샌드위치,9500,플랫화이트,5000
+맑은밥상,"강북구 수유동의 한식 가게. 제육볶음, 계란말이 등을 준비합니다.",서울특별시 강북구 도봉로 157 (수유동),KOREAN,/static/restaurant-photos/jeyuk.webp,010-2222-0144,owner00144@example.com,제육볶음,12000,계란말이,7000,해물파전,13000
+망원동 한잔상회,"마포구 망원동의 주점 가게. 두부김치, 골뱅이 소면 등을 준비합니다.",서울특별시 마포구 포은로 170 (망원동),PUB,/static/restaurant-photos/tofu.webp,010-2222-0145,owner00145@example.com,두부김치,16000,골뱅이 소면,19000,유자 하이볼,7500
+창동 테라스 카페,"도봉구 창동의 카페 가게. 브런치 크림 파스타, 에그 토스트 등을 준비합니다.",서울특별시 도봉구 노해로 12 (창동),CAFE,/static/restaurant-photos/cream.webp,010-2222-0146,owner00146@example.com,브런치 크림 파스타,13500,에그 토스트,8500,콜드브루,5000
+송파동 떡볶이,"송파구 송파동의 분식 가게. 떡볶이, 찰순대 등을 준비합니다.",서울특별시 송파구 백제고분로 25 (송파동),BUNSIK,/static/restaurant-photos/tteok.webp,010-2222-0147,owner00147@example.com,떡볶이,4500,찰순대,4500,모둠 튀김,4500
+서교동 티룸,"마포구 서교동의 카페 가게. 자몽 에이드, 얼그레이 티 등을 준비합니다.",서울특별시 마포구 와우산로 38 (서교동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0148,owner00148@example.com,자몽 에이드,5500,얼그레이 티,6000,스콘,4500
+마루 중화요리,"마포구 서교동의 중식 가게. 마파두부밥, 울면 등을 준비합니다.",서울특별시 마포구 와우산로 51 (서교동),CHINESE,/static/restaurant-photos/mapo.webp,010-2222-0149,owner00149@example.com,마파두부밥,9000,울면,8000,짬짜면,11000
+미소 그릴,"성북구 성북동의 양식 가게. 마르게리타 피자, 치즈 돈까스 등을 준비합니다.",서울특별시 성북구 성북로 64 (성북동),WESTERN,/static/restaurant-photos/pizza.webp,010-2222-0150,owner00150@example.com,마르게리타 피자,16500,치즈 돈까스,11000,오므라이스,10000
+신정동 비스트로,"양천구 신정동의 양식 가게. 버섯 리조또, 라구 파스타 등을 준비합니다.",서울특별시 양천구 신정로 77 (신정동),WESTERN,/static/restaurant-photos/risotto.webp,010-2222-0151,owner00151@example.com,버섯 리조또,15000,라구 파스타,16500,판나코타,6500
+바다 레스토랑,"강서구 마곡동의 양식 가게. 리조또, 함박 스테이크 등을 준비합니다.",서울특별시 강서구 마곡중앙로 90 (마곡동),WESTERN,/static/restaurant-photos/risotto.webp,010-2222-0152,owner00152@example.com,리조또,15000,함박 스테이크,14000,토마토 파스타,13500
+작은김밥,"성동구 행당동의 분식 가게. 치즈김밥, 떡볶이 등을 준비합니다.",서울특별시 성동구 왕십리로 103 (행당동),BUNSIK,/static/restaurant-photos/tteok.webp,010-2222-0153,owner00153@example.com,치즈김밥,5000,떡볶이,4500,순대,4000
+다온 떡볶이,"동작구 사당동의 분식 가게. 떡볶이, 순대 등을 준비합니다.",서울특별시 동작구 동작대로 116 (사당동),BUNSIK,/static/restaurant-photos/tteok.webp,010-2222-0154,owner00154@example.com,떡볶이,4500,순대,4000,참치김밥,4500
+구로동 분식집,"구로구 구로동의 분식 가게. 참치김밥, 우동 등을 준비합니다.",서울특별시 구로구 디지털로 129 (구로동),BUNSIK,/static/restaurant-photos/gimbap.webp,010-2222-0155,owner00155@example.com,참치김밥,3500,우동,5000,김밥,3500
+이음집밥,"동대문구 장안동의 한식 가게. 비빔밥, 설렁탕 등을 준비합니다.",서울특별시 동대문구 장한로 142 (장안동),KOREAN,/static/restaurant-photos/bibimbap.webp,010-2222-0156,owner00156@example.com,비빔밥,8500,설렁탕,11000,불고기 정식,13000
+골목 김밥,"강동구 성내동의 분식 가게. 우동, 김밥 등을 준비합니다.",서울특별시 강동구 강동대로 155 (성내동),BUNSIK,/static/restaurant-photos/gimbap.webp,010-2222-0157,owner00157@example.com,우동,4500,김밥,4000,치즈김밥,4500
+송파동 그릴하우스,"송파구 송파동의 양식 가게. 안심 스테이크, 구운 채소 등을 준비합니다.",서울특별시 송파구 백제고분로 168 (송파동),WESTERN,/static/restaurant-photos/steak.webp,010-2222-0158,owner00158@example.com,안심 스테이크,29000,구운 채소,8500,버섯 수프,7500
+역삼동 커피바,"강남구 역삼동의 카페 가게. 바닐라라떼, 자몽 에이드 등을 준비합니다.",서울특별시 강남구 테헤란로 10 (역삼동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0159,owner00159@example.com,바닐라라떼,5500,자몽 에이드,5500,레몬 파운드,4800
+윤슬한식당,"강북구 미아동의 한식 가게. 갈비탕, 삼겹살 (1인분) 등을 준비합니다.",서울특별시 강북구 솔샘로 23 (미아동),KOREAN,/static/restaurant-photos/galbitang.webp,010-2222-0160,owner00160@example.com,갈비탕,15000,삼겹살 (1인분),16500,제육볶음,11000
+수유동 사천주방,"강북구 수유동의 중식 가게. 마파두부밥, 가지볶음 등을 준비합니다.",서울특별시 강북구 도봉로 36 (수유동),CHINESE,/static/restaurant-photos/mapo.webp,010-2222-0161,owner00161@example.com,마파두부밥,10500,가지볶음,14500,산라탕,10000
+작은 한상,"노원구 공릉동의 한식 가게. 해물파전, 비빔밥 등을 준비합니다.",서울특별시 노원구 공릉로 49 (공릉동),KOREAN,/static/restaurant-photos/jeon.webp,010-2222-0162,owner00162@example.com,해물파전,13500,비빔밥,9000,부대찌개,11000
+잠실동 오븐피자,"송파구 잠실동의 양식 가게. 마르게리타 피자, 루콜라 피자 등을 준비합니다.",서울특별시 송파구 올림픽로 62 (잠실동),WESTERN,/static/restaurant-photos/pizza.webp,010-2222-0163,owner00163@example.com,마르게리타 피자,16000,루콜라 피자,18500,레몬 소다,5000
+한남동 카츠집,"용산구 한남동의 일식 가게. 치즈 돈카츠, 등심 돈카츠 등을 준비합니다.",서울특별시 용산구 대사관로 75 (한남동),JAPANESE,/static/restaurant-photos/cutlet.webp,010-2222-0164,owner00164@example.com,치즈 돈카츠,13500,등심 돈카츠,11500,미니 우동,4500
+목동 연탄포차,"양천구 목동의 주점 가게. 숯불 닭발, 주먹밥 등을 준비합니다.",서울특별시 양천구 목동동로 88 (목동),PUB,/static/restaurant-photos/pub.webp,010-2222-0165,owner00165@example.com,숯불 닭발,16500,주먹밥,4500,계란찜,6500
+연희동 치즈케이크,"서대문구 연희동의 카페 가게. 치즈케이크, 자몽 에이드 등을 준비합니다.",서울특별시 서대문구 연희로 101 (연희동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0166,owner00166@example.com,치즈케이크,6500,자몽 에이드,5500,아메리카노,4000
+행당동 교자관,"성동구 행당동의 중식 가게. 군만두, 물만두 등을 준비합니다.",서울특별시 성동구 왕십리로 114 (행당동),CHINESE,/static/restaurant-photos/mandu.webp,010-2222-0167,owner00167@example.com,군만두,8000,물만두,7500,우육면,12000
+구름 스시,"서대문구 창천동의 일식 가게. 돈카츠, 냉소바 등을 준비합니다.",서울특별시 서대문구 연세로 127 (창천동),JAPANESE,/static/restaurant-photos/soba.webp,010-2222-0168,owner00168@example.com,돈카츠,10500,냉소바,9000,우동,8000
+소소 한식당,"마포구 망원동의 한식 가게. 비빔밥, 된장찌개 등을 준비합니다.",서울특별시 마포구 포은로 140 (망원동),KOREAN,/static/restaurant-photos/bibimbap.webp,010-2222-0169,owner00169@example.com,비빔밥,10000,된장찌개,8500,해물파전,14000
+시흥동 브런치 카페,"금천구 시흥동의 카페 가게. 시저 샐러드, 잠봉 샌드위치 등을 준비합니다.",서울특별시 금천구 시흥대로 153 (시흥동),CAFE,/static/restaurant-photos/caesar.webp,010-2222-0170,owner00170@example.com,시저 샐러드,11000,잠봉 샌드위치,9500,플랫화이트,5000
+마곡동 일본가정식,"강서구 마곡동의 일식 가게. 규동, 가라아게 정식 등을 준비합니다.",서울특별시 강서구 마곡중앙로 166 (마곡동),JAPANESE,/static/restaurant-photos/japan.webp,010-2222-0171,owner00171@example.com,규동,11000,가라아게 정식,12500,미소국,2500
+다정 밥상,"강북구 수유동의 한식 가게. 감자탕, 불고기 정식 등을 준비합니다.",서울특별시 강북구 도봉로 8 (수유동),KOREAN,/static/restaurant-photos/bulgogi.webp,010-2222-0172,owner00172@example.com,감자탕,13000,불고기 정식,13000,제육볶음,11500
+마루 파스타,"양천구 목동의 양식 가게. 리조또, 크림 파스타 등을 준비합니다.",서울특별시 양천구 목동동로 21 (목동),WESTERN,/static/restaurant-photos/trattoria.webp,010-2222-0173,owner00173@example.com,리조또,15000,크림 파스타,13500,토마토 파스타,13500
+성내동 경양식당,"강동구 성내동의 일식 가게. 오므라이스, 함박 정식 등을 준비합니다.",서울특별시 강동구 강동대로 34 (성내동),JAPANESE,/static/restaurant-photos/omurice.webp,010-2222-0174,owner00174@example.com,오므라이스,11000,함박 정식,14500,멜론 소다,4500
+고척동 브뤼셀 프리츠,"구로구 고척동의 세계 음식 가게. 벨기에식 감자튀김, 홍합 스튜 등을 준비합니다.",서울특별시 구로구 경인로 47 (고척동),WORLD,/static/restaurant-photos/fries.webp,010-2222-0175,owner00175@example.com,벨기에식 감자튀김,7500,홍합 스튜,15500,와플,6500
+불광동 소바,"은평구 불광동의 일식 가게. 냉소바, 온소바 등을 준비합니다.",서울특별시 은평구 불광로 60 (불광동),JAPANESE,/static/restaurant-photos/soba.webp,010-2222-0176,owner00176@example.com,냉소바,10500,온소바,10500,유부초밥,5500
+노을 그릴,"동작구 상도동의 양식 가게. 리조또, 까르보나라 등을 준비합니다.",서울특별시 동작구 상도로 73 (상도동),WESTERN,/static/restaurant-photos/grillroom.webp,010-2222-0177,owner00177@example.com,리조또,14000,까르보나라,13000,치즈 돈까스,11000
+초록 라멘,"노원구 상계동의 일식 가게. 규동, 연어덮밥 등을 준비합니다.",서울특별시 노원구 상계로 86 (상계동),JAPANESE,/static/restaurant-photos/japan.webp,010-2222-0178,owner00178@example.com,규동,9000,연어덮밥,14000,냉소바,8500
+들꽃 분식집,"강동구 성내동의 분식 가게. 참치김밥, 튀김 모둠 등을 준비합니다.",서울특별시 강동구 강동대로 99 (성내동),BUNSIK,/static/restaurant-photos/bunsik.webp,010-2222-0179,owner00179@example.com,참치김밥,4000,튀김 모둠,3500,치즈김밥,4500
+장안동 해물짬뽕,"동대문구 장안동의 중식 가게. 해물짬뽕, 삼선볶음밥 등을 준비합니다.",서울특별시 동대문구 장한로 112 (장안동),CHINESE,/static/restaurant-photos/jjambbong.webp,010-2222-0180,owner00180@example.com,해물짬뽕,11000,삼선볶음밥,10000,유린기,18500
+이음 타이,"금천구 시흥동의 세계 음식 가게. 쌀국수, 나시고랭 등을 준비합니다.",서울특별시 금천구 시흥대로 125 (시흥동),WORLD,/static/restaurant-photos/pho.webp,010-2222-0181,owner00181@example.com,쌀국수,9500,나시고랭,11000,케밥,9000
+미소 주막,"중랑구 상봉동의 주점 가게. 어묵탕, 해물파전 등을 준비합니다.",서울특별시 중랑구 망우로 138 (상봉동),PUB,/static/restaurant-photos/pub.webp,010-2222-0182,owner00182@example.com,어묵탕,13000,해물파전,13500,치즈 계란말이,11000
+도담술집,"구로구 고척동의 주점 가게. 두부김치, 치즈 계란말이 등을 준비합니다.",서울특별시 구로구 경인로 151 (고척동),PUB,/static/restaurant-photos/tofu.webp,010-2222-0183,owner00183@example.com,두부김치,12000,치즈 계란말이,10000,오돌뼈,14500
+신림동 반점,"관악구 신림동의 중식 가게. 간짜장, 볶음밥 등을 준비합니다.",서울특별시 관악구 신림로 164 (신림동),CHINESE,/static/restaurant-photos/jajang.webp,010-2222-0184,owner00184@example.com,간짜장,8500,볶음밥,8500,군만두,6000
+제기동 밥상,"동대문구 제기동의 한식 가게. 부대찌개, 해물파전 등을 준비합니다.",서울특별시 동대문구 약령중앙로 177 (제기동),KOREAN,/static/restaurant-photos/budae.webp,010-2222-0185,owner00185@example.com,부대찌개,11000,해물파전,13000,냉면,9000
+잠실동 스시,"송파구 잠실동의 일식 가게. 모둠초밥, 연어초밥 등을 준비합니다.",서울특별시 송파구 올림픽로 19 (잠실동),JAPANESE,/static/restaurant-photos/sushi.webp,010-2222-0186,owner00186@example.com,모둠초밥,18000,연어초밥,17000,차완무시,4500
+화곡동 선술집,"강서구 화곡동의 주점 가게. 치즈 계란말이, 닭꼬치 등을 준비합니다.",서울특별시 강서구 화곡로 32 (화곡동),PUB,/static/restaurant-photos/cheeseegg.webp,010-2222-0187,owner00187@example.com,치즈 계란말이,12500,닭꼬치,9500,매실 하이볼,8000
+이태원동 생맥주집,"용산구 이태원동의 주점 가게. 감자튀김, 수제 소시지 등을 준비합니다.",서울특별시 용산구 이태원로 45 (이태원동),PUB,/static/restaurant-photos/fries.webp,010-2222-0188,owner00188@example.com,감자튀김,8500,수제 소시지,14500,생맥주,5500
+응암동 테라스 카페,"은평구 응암동의 카페 가게. 브런치 크림 파스타, 에그 토스트 등을 준비합니다.",서울특별시 은평구 응암로 58 (응암동),CAFE,/static/restaurant-photos/cream.webp,010-2222-0189,owner00189@example.com,브런치 크림 파스타,13500,에그 토스트,8500,콜드브루,5000
+구로동 티룸,"구로구 구로동의 카페 가게. 자몽 에이드, 얼그레이 티 등을 준비합니다.",서울특별시 구로구 디지털로 71 (구로동),CAFE,/static/restaurant-photos/cafe.webp,010-2222-0190,owner00190@example.com,자몽 에이드,5500,얼그레이 티,6000,스콘,4500
+윤슬 분식,"서초구 서초동의 분식 가게. 참치김밥, 튀김 모둠 등을 준비합니다.",서울특별시 서초구 서초대로 84 (서초동),BUNSIK,/static/restaurant-photos/bunsik.webp,010-2222-0191,owner00191@example.com,참치김밥,5500,튀김 모둠,4500,라볶이,5500
+행당동 아르헨티나 그릴,"성동구 행당동의 세계 음식 가게. 치미추리 안심 스테이크, 엠파나다 등을 준비합니다.",서울특별시 성동구 왕십리로 97 (행당동),WORLD,/static/restaurant-photos/steak.webp,010-2222-0192,owner00192@example.com,치미추리 안심 스테이크,26500,엠파나다,7500,구운 채소,6500
+신정동 작은 주막,"양천구 신정동의 주점 가게. 어묵탕, 감자전 등을 준비합니다.",서울특별시 양천구 신정로 110 (신정동),PUB,/static/restaurant-photos/fishpot.webp,010-2222-0193,owner00193@example.com,어묵탕,15000,감자전,13000,생막걸리,5000
+연희동 카츠집,"서대문구 연희동의 일식 가게. 치즈 돈카츠, 등심 돈카츠 등을 준비합니다.",서울특별시 서대문구 연희로 123 (연희동),JAPANESE,/static/restaurant-photos/cutlet.webp,010-2222-0194,owner00194@example.com,치즈 돈카츠,13500,등심 돈카츠,11500,미니 우동,4500
+단골 백반,"강남구 신사동의 한식 가게. 부대찌개, 불고기 정식 등을 준비합니다.",서울특별시 강남구 도산대로 136 (신사동),KOREAN,/static/restaurant-photos/budae.webp,010-2222-0195,owner00195@example.com,부대찌개,10000,불고기 정식,12000,순두부찌개,8000
+마곡동 한잔상회,"강서구 마곡동의 주점 가게. 두부김치, 골뱅이 소면 등을 준비합니다.",서울특별시 강서구 마곡중앙로 149 (마곡동),PUB,/static/restaurant-photos/tofu.webp,010-2222-0196,owner00196@example.com,두부김치,16000,골뱅이 소면,19000,유자 하이볼,7500
+소소 반점,"도봉구 방학동의 중식 가게. 탕수육, 울면 등을 준비합니다.",서울특별시 도봉구 방학로 162 (방학동),CHINESE,/static/restaurant-photos/tangsuyuk.webp,010-2222-0197,owner00197@example.com,탕수육,17500,울면,7500,마파두부밥,9500
+불광동 연탄포차,"은평구 불광동의 주점 가게. 숯불 닭발, 주먹밥 등을 준비합니다.",서울특별시 은평구 불광로 175 (불광동),PUB,/static/restaurant-photos/pub.webp,010-2222-0198,owner00198@example.com,숯불 닭발,16500,주먹밥,4500,계란찜,6500
+창동 사천주방,"도봉구 창동의 중식 가게. 마파두부밥, 가지볶음 등을 준비합니다.",서울특별시 도봉구 노해로 17 (창동),CHINESE,/static/restaurant-photos/mapo.webp,010-2222-0199,owner00199@example.com,마파두부밥,10500,가지볶음,14500,산라탕,10000
+미소 백반,"중구 신당동의 한식 가게. 설렁탕, 삼겹살 (1인분) 등을 준비합니다.",서울특별시 중구 다산로 30 (신당동),KOREAN,/static/restaurant-photos/seolleongtang.webp,010-2222-0200,owner00200@example.com,설렁탕,11000,삼겹살 (1인분),15000,김치찌개,9000

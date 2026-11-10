@@ -1,0 +1,187 @@
+.log-panel {
+  margin:16px auto calc(90px + env(safe-area-inset-bottom));
+  max-width:480px;
+  background:#14181f;
+  color:#d7dde6;
+  border-radius:12px;
+  font:12px/1.6 Consolas, "D2Coding", monospace;
+  box-shadow:0 20px 60px #1f29372e;
+  overflow:hidden;
+}
+
+.log-panel summary {
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  padding:12px 16px;
+  cursor:pointer;
+  background:#1d232c;
+  border-bottom:1px solid #2a313c;
+}
+
+.log-panel summary small {
+  color:#8b95a5;
+  font-size:11px;
+}
+
+.log-title {
+  font-weight:700;
+  color:#fff;
+}
+
+.log-panel {
+  position:relative;
+}
+
+.log-clear {
+  position:absolute;
+  top:8px;
+  right:12px;
+  margin:0;
+}
+
+.log-clear button {
+  font:inherit;
+  font-size:11px;
+  color:#d7dde6;
+  background:transparent;
+  border:1px solid #3a4250;
+  border-radius:6px;
+  padding:3px 10px;
+  cursor:pointer;
+}
+
+.log-clear button:hover {
+  color:#fff;
+  border-color:#8b95a5;
+}
+
+.demo-switch {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  padding:10px 16px;
+  border-bottom:1px solid #2a313c;
+  background:#1a1f27;
+}
+
+.demo-switch span {
+  color:#8b95a5;
+  font-size:11px;
+  margin-right:4px;
+}
+
+.demo-switch form {
+  margin:0;
+}
+
+.demo-switch button {
+  font:inherit;
+  font-size:11px;
+  color:#14181f;
+  background:#d7dde6;
+  border:0;
+  border-radius:999px;
+  padding:3px 10px;
+  cursor:pointer;
+}
+
+.demo-switch button:hover {
+  background:#fff;
+}
+
+.log-lines {
+  list-style:none;
+  margin:0;
+  padding:8px 0;
+  max-height:40vh;
+  overflow-y:auto;
+}
+
+.log-lines li {
+  display:grid;
+  grid-template-columns:auto auto minmax(0,1fr);
+  gap:8px;
+  padding:3px 16px;
+}
+
+.log-lines time {
+  color:#7d8796;
+}
+
+.log-level {
+  color:#7fb2e5;
+}
+
+.log-text {
+  overflow-wrap:anywhere;
+}
+
+.log-warn .log-level,
+.log-warn .log-text {
+  color:#f0c36d;
+}
+
+.log-error {
+  background:#3a1d1d;
+}
+
+.log-error .log-level,
+.log-error .log-text {
+  color:#ff8f86;
+}
+
+.log-code {
+  display:inline-block;
+  padding:0 6px;
+  margin:0 2px;
+  border-radius:4px;
+  font-weight:700;
+  color:#14181f;
+}
+
+.code-1xx,
+.code-3xx {
+  background:#7fb2e5;
+}
+
+.code-2xx {
+  background:#6fcf97;
+}
+
+.code-4xx {
+  background:#f0a35e;
+}
+
+.code-5xx {
+  background:#ff6b6b;
+  color:#fff;
+}
+
+.log-empty {
+  color:#7d8796;
+}
+
+@media (min-width:1100px) {
+  .log-panel {
+    position:fixed;
+    top:24px;
+    right:24px;
+    bottom:24px;
+    width:min(560px, calc(50vw - 280px));
+    max-width:none;
+    margin:0;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .log-panel[open] .log-lines {
+    max-height:none;
+    flex:1;
+  }
+
+  .log-panel:not([open]) {
+    bottom:auto;
+  }
+}

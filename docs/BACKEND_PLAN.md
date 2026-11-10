@@ -4,7 +4,7 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 
 - 기준 문서: [README](../README.md), [ARCHITECTURE](ARCHITECTURE.md), [TEAM_CONVENTIONS](TEAM_CONVENTIONS.md), [ROADMAP](ROADMAP.md), [WORKFLOW](WORKFLOW.md)
 - 테이블 기준: [ARCHITECTURE 3장 ERD](ARCHITECTURE.md#3-데이터-모델-erd) (2026-10-28 확정)
-- 상태: 2026-10-28 개정. 6인 역할(A~F) 분담을 담당 1~5로 정리하고, `src/<도메인>/` 4계층 구조와 확정 ERD를 반영함. UI · CI · Redis는 제외 (Jinja2 화면은 2026-11-02 회의에서 다시 포함, 담당 5). ERD 수정 반영(운영자 소속 → `restaurants.owner_id`, 예약 요청 중복 방지 테이블 삭제, 로그아웃 필수). 2026-11-06 dev `aa03231` 기준으로 공용 부품 현재 상태와 담당 1 진행 상황 갱신
+- 10월 담당 배정과 학습 순서는 원래 계획입니다. 아래 공용 부품 표와 API 경로는 11월 10일 구현 기준입니다. [발표 흐름](../demo/SCENARIO.md)
 
 ## 1. 범위
 
@@ -20,7 +20,6 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | CI | 설정 비용 대비 학습 효과 작음 | PR 전에 로컬에서 테스트 실행, 결과를 PR에 기록 |
 | Redis 캐시 | 결정에 따라 제외 | 모든 조회를 DB에서 바로 읽음 |
 | Alembic 마이그레이션 | 단순하게 가기 위해 | lifespan에서 `create_all` + 시드 |
-| 회원가입 | 핵심 흐름 밖 | 시드 계정 로그인. **선택 과제** (담당 1) |
 | 예약 요청 중복 방지 (`idempotency_records`) | 재시도·상태 관리 개념이 추가로 필요 | **ERD에서 삭제**. 같은 슬롯 중복 예약 규칙으로 일부 방어 |
 | 운영자 소속 테이블 (`restaurant_members`) | 식당 하나에 운영자 한 명이면 충분 | **ERD에서 삭제**. `restaurants.owner_id`로 대체 |
 | 독립 세션 동시성 테스트 | 테스트 환경 구성이 어려움 | 행 락 코드 + 순차 테스트. 재현 테스트는 **선택 과제** |
@@ -43,11 +42,11 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | **담당 2 · 김태양** | `src/restaurant/` | `restaurants` · `menus` | `GET /restaurants` · `GET /restaurants/{id}` · `PATCH /owner/restaurants/{id}` | `Page[T]` · 공통 에러 형식 · `Restaurant.is_owned_by` |
 | **담당 3 · 이영민** | `src/slot/` | `reservation_slots` | `GET /restaurants/{id}/availability` | `TimeSlot` 도메인 규칙 · lifespan 시드 |
 | **담당 4 · 김민지** | `src/reservation/` (쓰기) | `reservations` | `POST /reservations` · `POST /reservations/{id}/cancel` | `ReservationOut` · `Reservation` 도메인 규칙 |
-| **담당 5 · 최지훈** | `src/owner/` + `src/reservation/` (조회) + `src/web.py`·`web_data.py`·`templates/`·`static/` (화면) | 없음 (다른 테이블을 JOIN해 조회) | `GET /users/me/reservations` · `GET /reservations/{id}` · `GET /owner/restaurants` · `GET /owner/restaurants/{id}/reservations` · Jinja2 화면 (운영자: `/ui` 로그인 · `/ui/owner/restaurants` · `/ui/owner/restaurants/{id}/reservations`, 식당 목록·상세는 식당 부품 뒤) | `require_owner` (운영자 역할 검사) |
+| **담당 5 · 최지훈** | `src/owner/` + `src/reservation/` (조회) + `src/web.py`·`web_data.py`·`templates/`·`static/` (화면) | 없음 (다른 테이블을 JOIN해 조회) | `GET /users/me/reservations` · `GET /reservations/{id}` · `GET /owner/restaurants` · `GET /owner/restaurants/{id}/reservations` · Jinja2 화면 (운영자: `/ui` 로그인 · `/ui/owner/restaurants` · `/ui/owner/restaurants/{id}/reservations`, 손님·관리자 화면은 [화면 가이드](JINJA2_TEMPLATE_GUIDE.md) 참고) | `require_owner` (운영자 역할 검사) |
 
-모든 경로 앞에는 `/api/v1`이 붙습니다. 담당 4는 트랜잭션이 들어가는 쓰기 2개에 집중하고, 예약 조회는 담당 5가 같은 모듈 안 별도 파일(`query_*.py`)로 만듭니다 ([ARCHITECTURE 2장](ARCHITECTURE.md#2-폴더-구조와-담당)).
+JSON API 경로 앞에는 `/api/v1`이 붙습니다. 담당 4는 트랜잭션이 들어가는 쓰기 2개에 집중하고, 예약 조회는 담당 5가 같은 모듈 안 별도 파일(`query_*.py`)로 만듭니다 ([ARCHITECTURE 2장](ARCHITECTURE.md#2-폴더-구조와-담당)).
 
-`common/database.py`, `common/config.py`, `main.py` 뼈대는 지원 작업(에이전트 활용)으로 준비하고, 각자 자기 라우터와 ORM 모델을 `main.py`에 등록합니다.
+`common/database.py`, `main.py` 뼈대는 지원 작업(에이전트 활용)으로 준비하고, 각자 자기 라우터와 ORM 모델을 `main.py`에 등록합니다.
 
 ### 서로 기다리는 공용 부품
 
@@ -62,30 +61,17 @@ FastAPI를 배우면서 배운 개념을 바로 자기 모듈에 적용하는 �
 | 소유 확인 `Restaurant.is_owned_by(user_id)` | 담당 2 | 2 · 5 | D5 | `restaurant.owner_id == user.user_id`를 직접 비교 |
 | `ReservationOut` 응답 스키마 + `Reservation.can_cancel()` | 담당 4 | 4 · 5 | D5 | 4장의 필드 표를 그대로 따름 |
 
-### 공용 부품 현재 상태 (2026-11-06, dev `aa03231` 기준)
+### 공용 부품과 연결된 기능
 
-| 부품 | 상태 | 위치 (들어온 PR) |
+| 담당 | 현재 구현 | 발표에서 따라갈 위치 |
 | --- | --- | --- |
-| 응답 봉투 `APIResponse[T]` (`ok`·`fail`) | 있음 | `common/schemas.py` (#3) |
-| 에러 코드표 `ErrorCode`·`CommonErrorCode` | 있음 | `common/errors.py` (#3) |
-| 요청 로그·처리 시간·CORS 미들웨어, 요청 id | 있음 | `common/middleware.py`, `common/context.py` (#3) |
-| ORM 공용 `Base` | 있음 | `common/model.py` (#3) |
-| `AsyncSession` 의존성 `get_session` | 있음 | `common/database.py` (#3) |
-| `User`(UUID id를 `create()`에서 부여, `create`·`change_password`·`change_owner_role`)·`Role`(`ADMIN` 포함), `Email` 값 객체, `UserRepository` 인터페이스와 구현체 `SQLAlchemyUserRepository`(`find_by_id`·`find_by_email`·`save`=merge), `UserModel`, 비밀번호 해시, `UnitOfWork` 포트·`SQLAlchemyUnitOfWork`, `UserService`(`signUp`·`change_role`), `create_user_service` | 있음 | `user/`, `container.py` (#3, #8, #14, #18, #22) |
-| auth·user 라우터 (`/api/v1/auth`, `/api/v1/users`) | `POST /auth/login`은 본문 없음. `POST /users` 회원가입은 있지만 `main.py`의 `wire_dependencies(app)` 호출이 주석이라 지금은 500 | `*/presentation/routers/v1/router.py`, `container.py`, `main.py` (#3, #25) |
-| `ReservationModel`(`user_id` UUID), `Reservation`(`create`·`cancel`, 재취소 409 `ALREADY_CANCELLED`), `ReservationOut` | 있음 | `reservation/` (#4, #15) |
-| `require_owner` | 있음 (`get_authenticated_user`·`is_owner()` 사용). 실제 요청에서는 `get_authenticated_user` 구현 뒤 동작 | `owner/presentation/dependencies.py` (#2, #7, #16) |
-| 운영자 식당 목록, 운영자 식당 예약 목록 창구·매니저·창고, `create_owner_service` | 있음 (아직 없는 `reservation.infrastructure.repository`와 식당 부품을 import해서 `import container`·owner 라우터 불러오기 실패, `main.py` 미등록) | `owner/`, `container.py` (#7, #16) |
-| `get_authenticated_user` → `AuthenticatedUser`(`user_id`·`role`·`is_owner()`·`is_customer()`·`is_admin()`), `require_admin` | VO와 `require_admin`은 있음, `get_authenticated_user`는 자리만 있음 (`NotImplementedError`) | `auth/domain/value_object.py`, `auth/presentation/dependencies.py` (#8, #14, #22) |
-| `AppError` 계열 예외 + 공통 에러 핸들러 (422 문구 한국어, `HTTPException`도 봉투로) | 있음 | `common/errors.py`, `common/error_handlers.py` (#8, #12) |
-| `TimeSlot` 규칙, 슬롯 예외 3개(409), `seoul_day_range` | 있음 | `slot/domain/` (#6, #8, #10) |
-| `Page[T]`, `PageParams`, `page_params` | 있음 | `common/pagination.py` (#21) |
-| 내 예약 목록·예약 상세 (창구·매니저·창고·`create_reservation_query_service`) | 있음 (위와 같은 import 문제로 라우터 불러오기 실패, `main.py` 미등록) | `reservation/` (#16, #19) |
-| 슬롯 모델 `ReservationSlotModel`, `SlotRepository`·`SQLAlchemySlotRepository` | 있음 (`restaurants` 모델이 없어 `reservation_slots.restaurant_id` FK 해석 실패) | `slot/` (#24) |
-| `TokenBlacklistModel`, `Restaurant`·`RestaurantModel` | 없음 | 각 모듈 예정 |
-| `Reservation.can_cancel(user_id)` (본인·확정 상태만, 시작 여부는 서비스가 확인) | 있음 | `reservation/domain/reservation.py` (#23) |
-| `ReservationOut.from_domain()` | 없음 | `reservation/` 예정 |
-| lifespan `create_all` + 시드 | 없음 (`main.py`에 lifespan이 없음. `common/model.py`의 `init_models`는 user·reservation·slot 모델을 import만 함) | `main.py`, `src/seed.py` 예정 |
+| 1 | 고객 회원가입, JWT 로그인·내 정보, 로그인 시도 제한, 로그아웃 토큰 차단 | `auth/`, `user/`, `common/middleware.py` |
+| 2 | 공개 식당 목록·상세, 식당 수정·메뉴 관리, 공통 페이지와 오류 응답 | `restaurant/`, `common/pagination.py`, `common/error_handlers.py` |
+| 3 | 슬롯의 잔여석·인원 검증, 날짜별 빈자리 조회, 앱 시작 시 테이블과 기본 시드 준비 | `slot/`, `src/main.py`, `src/seed.py` |
+| 4 | 예약·취소·입장·노쇼, 슬롯 행 락과 좌석 변경을 포함한 트랜잭션 | `reservation/application/service.py`, `reservation/domain/reservation.py` |
+| 5 | 내 예약·운영자 조회와 CSV, 손님·운영자·관리자 화면, 시연용 관리자 식당 검색·갱신 | `owner/`, `reservation/presentation/query_router.py`, `browse/`, `admin/`, `web.py`, `demo/` |
+
+[담당 5의 요청·응답 표](API_SPEC.md#담당-5-조회-api와-빈자리-조회) · [화면과 서비스 연결](JINJA2_TEMPLATE_GUIDE.md)
 
 ## 3. 다 같이 배우는 공통 기초 (D1~D3)
 
@@ -121,21 +107,20 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **도메인**: 시드로 넣은 고객·운영자 계정으로 로그인하고, 보호된 API가 "지금 요청한 사람이 누구인지" 알 수 있게 합니다. 로그아웃하면 그 토큰을 블랙리스트에 넣어 더 이상 쓰지 못하게 합니다. 모든 팀원이 이 결과를 씁니다. 앱 전체에 걸리는 미들웨어(요청 로그·처리 시간, CORS)도 맡습니다.
 
-**테이블** — `users`: `id`, `email`(UQ), `password_hash`, `name`, `phone`, `role`(`CUSTOMER`·`OWNER`·`ADMIN`), `created_at`, `updated_at`, `deleted_at` / `token_blacklist`: `id`, `user_id`(FK), `token_jti`(UQ), `expires_at`, `created_at`
+**테이블** — `users`: `id`, `email`(UQ), `password_hash`, `name`, `phone`, `role`(`CUSTOMER`·`OWNER`·`ADMIN`), `created_at`, `updated_at`, `deleted_at` / `token_blacklist`: `id`, `user_id`(FK), `token_jti`(UQ), `expired_at`, `created_at`
 
 | API | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
-| `POST /auth/login` | 폼 `username`(이메일) · `password` | 200 `{access_token, token_type: "bearer", expires_in}` (봉투 없이 최상위, OAuth2 표준) | 422 형식 오류 · 401 이메일·비밀번호 불일치 |
+| `POST /users` | JSON `email`·`password`·`name`·`phone` | 201 손님 계정 | 400 중복 가입 · 422 형식 오류 |
+| `POST /auth/login` | 폼 `username`(이메일) · `password` | 200 `{access_token, token_type: "bearer", expires_in}` (봉투 없이 최상위, OAuth2 표준) | 422 형식 오류 · 401 이메일·비밀번호 불일치 · 429 시도 제한 |
 | `GET /users/me` | `Authorization: Bearer …` | 200 `data: {id, email, name, phone, role}` | 401 토큰 없음·만료 |
 | `get_authenticated_user` (의존성) | 토큰 | `AuthenticatedUser` (`user_id`, `role`) | 401 (블랙리스트 토큰, 탈퇴 `deleted_at` 계정도 401) |
 | `POST /auth/logout` | `Authorization: Bearer …` | 204 (이 토큰은 이후 401) | 401 토큰 없음·만료·이미 로그아웃 |
-| `POST /users` (선택, 회원가입) | JSON `name`·`email`·`password`·`phone` | 201 `data: {id, email, name, phone, role}` | 422 형식·규칙 위반 · 400 `DUPLICATED_USER_ERROR` 이미 가입된 이메일 |
-| `require_admin` (의존성, #22) | 토큰 | 관리자 `AuthenticatedUser` | 401 · 403 관리자 아님 |
 
 **계층별 파일** (라우터는 두 모듈 모두 `presentation/routers/v1/router.py`):
 
-- `auth/`: `application/service.py`(로그인·로그아웃, 예정) · `infrastructure/models.py`(`TokenBlacklistModel`, 예정), `repository.py`(예정), `security.py`(JWT·`jti`, 예정. 비밀번호 해시는 `user/infrastructure/security.py`의 `BcryptPasswordHasher`를 씀) · `presentation/routers/v1/router.py`(`/auth`), `schemas.py`(비어 있음), `dependencies.py`(`get_authenticated_user` 자리, `require_admin`) · `domain/value_object.py`(`AuthenticatedUser`, `AuthRole`)
-- `user/`: `domain/user.py`, `value_object.py`(`Email`), `repository.py`(`UserRepository` 인터페이스), `hasher.py`(`PasswordHasher` 인터페이스), `exceptions.py` · `application/service.py`(`signUp`·`change_role`, 내 정보 조회 예정), `unit_of_work.py`(`UnitOfWork` 포트) · `infrastructure/models.py`(`UserModel`), `repositories.py`, `unit_of_work.py`, `security.py` · `presentation/routers/v1/router.py`(`/users`), `schemas.py`, `dependencies.py`
+- `auth/`: `application/service.py`(로그인·로그아웃) · `infrastructure/models.py`(`TokenBlackListModel`), `repository.py`, `security.py`(JWT·`jti`) · `presentation/routers/v1/router.py`(`/auth`), `schemas.py`, `dependencies.py`(`get_authenticated_user`) · `domain/value_object.py`(`AuthenticatedUser`, `AuthRole`)
+- `user/`: `domain/user.py`, `repository.py`(`UserRepository` 인터페이스) · `application/service.py`(내 정보 조회) · `infrastructure/models.py`(`UserModel`), `repositories.py` · `presentation/routers/v1/router.py`(`/users`), `schemas.py`
 - `common/middleware.py`
 
 `auth` 서비스는 로그인할 때 `user` 모듈의 레포지토리로 사용자를 조회합니다 (ARCHITECTURE 2장의 다른 모듈 `domain`·`infrastructure` 참조 규칙).
@@ -159,40 +144,25 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 4. `GET /users/me` — 응답에 `password_hash`가 없는지 테스트
 5. 요청 로그·처리 시간 미들웨어, CORS (D5)
 6. `POST /auth/logout` + `token_blacklist`, `get_authenticated_user`에 블랙리스트 확인 추가, lifespan에서 만료된 행 정리 (D6)
-7. **선택**: 회원가입 — 계획의 `POST /auth/signup` 대신 `POST /users`로 만듦 (#18, #25)
+7. 손님 회원가입 `POST /users` → 201, 가입 화면 `/ui/signup`
 
 **테스트**: 올바른 계정 로그인 → 200 / 틀린 비밀번호 → 401 / 로그아웃한 토큰으로 `GET /users/me` → 401
 
-**진행 상황 (2026-11-06, dev `aa03231` 기준)**
-
-| 단계 | 상태 |
-| --- | --- |
-| 1. `users` 모델 · 시드 계정 4개 | `UserModel` 완료 (#14). 시드 행은 아직 담당 3에게 넘기지 않음 |
-| 2. `POST /auth/login` | 시작 전 (라우터 자리만 있고 본문은 `pass`, JWT 설정·발급 코드 없음) |
-| 3. `get_authenticated_user` | 자리만 있음 (`NotImplementedError`). `AuthenticatedUser` VO는 완료 (#14) |
-| 4. `GET /users/me` | 시작 전 |
-| 5. 미들웨어 · CORS | 완료 (#3) |
-| 6. 로그아웃 · `token_blacklist` · 만료 행 정리 | 시작 전 |
-| 7. 회원가입 (선택) | 서비스·저장소·UoW·라우터 완료 (#18, #25). `wire_dependencies` 연결 전이라 500 |
-| 추가: 관리자 역할 (#22) | `ADMIN`, `require_admin`, `change_role` 도메인·서비스 완료. 전용 테스트와 HTTP API는 아직 |
-
-알려진 한계: 비밀번호 길이 상한이 없어 72바이트를 넘으면 bcrypt 5.0이 오류를 냄, `Email` 정규식이 `+`가 들어간 이메일을 거부함 (#8 리뷰 지적, 아직 그대로).
-
 ### 담당 2 (김태양) · 식당 · 메뉴 (`src/restaurant/`)
 
-**도메인**: 누구나 보는 식당 목록·상세와 메뉴, 그리고 운영자만 쓰는 식당 정보 수정입니다. "이 식당의 주인인가"(`Restaurant.is_owned_by`)도 식당의 규칙이라 담당 2가 만듭니다. 팀 전체가 쓰는 **공통 응답 형식**(목록 `Page[T]`, 에러 응답)도 맡습니다. 공통 실습 기준 예제를 이어받습니다.
+**도메인**: 누구나 보는 식당 목록·상세와 메뉴, 그리고 관리자 또는 해당 식당 운영자가 쓰는 식당·메뉴 수정입니다. "이 식당의 주인인가"(`Restaurant.is_owned_by`)도 식당의 규칙이라 담당 2가 만듭니다. 팀 전체가 쓰는 **공통 응답 형식**(목록 `Page[T]`, 에러 응답)도 맡습니다. 공통 실습 기준 예제를 이어받습니다.
 
-**테이블** — `restaurants`: `id`, `owner_id`(FK → `users.id`·IX·NOT NULL), `name`, `description`, `address`, `cuisine`, `image_url`, `status`, `phone`, `created_at`, `updated_at`, `deleted_at` / `menus`: `id`, `restaurant_id`(FK·IX), `name`, `description`, `price`, `created_at`, `updated_at`
+**테이블** — `restaurants`: `id`, `owner_id`(FK → `users.id`·IX·NOT NULL), `name`, `description`, `address`, `cuisine`, `image_url`, `phone`, `created_at`, `updated_at`, `deleted_at` / `menus`: `id`, `restaurant_id`(FK·IX), `name`, `description`, `price`, `created_at`, `updated_at`
 
 | API | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
 | `GET /restaurants` | `q`(이름 검색) · `cuisine` · `sort`(`id` 기본 · `name`) · `page`(기본 1) · `page_size`(기본 20, 최대 100) | 200 `Page[RestaurantSummary]` | 422 |
 | `GET /restaurants/{id}` | 경로 id | 200 `RestaurantDetail` (메뉴 포함) | 422 · 404 |
-| `PATCH /owner/restaurants/{id}` | 토큰 + `{name?, description?, address?, phone?, status?}` | 200 `RestaurantDetail` | 422 · 401 · 403 운영자 아님·남의 식당 · 404 없는 식당 |
+| `PATCH /owner/restaurants/{id}` | 토큰 + `{name?, description?, address?, phone?}` | 200 `RestaurantDetail` | 422 · 401 · 403 운영자 아님·남의 식당 · 404 없는 식당 |
 
-`RestaurantSummary` = `id, name, cuisine, image_url, status` / `RestaurantDetail` = 여기에 `description, address, phone, menus[{id, name, description, price}]`. `deleted_at`이 있는 식당은 목록·상세에서 404로 숨깁니다.
+`RestaurantSummary` = `id, name, cuisine, image_url` / `RestaurantDetail` = 여기에 `description, address, phone, menus[{id, name, description, price}]`. `deleted_at`이 있는 식당은 목록·상세에서 404로 숨깁니다.
 
-**계층별 파일**: `domain/restaurant.py`(`Restaurant`, `Menu`, 수정 가능 필드 규칙, `is_owned_by`) · `application/service.py` · `infrastructure/models.py`, `repository.py` · `presentation/router.py`, `owner_router.py`, `schemas.py` · `common/pagination.py`, `common/errors.py`, `common/error_handlers.py`
+**계층별 파일**: `domain/restaurant.py`(`Restaurant`, `Menu`, 수정 가능 필드 규칙, `is_owned_by`) · `application/service.py` · `infrastructure/models.py`, `repository.py` · `presentation/routers/v1/router.py`, `presentation/schemas.py` · `common/pagination.py`, `common/errors.py`, `common/error_handlers.py`
 
 **배우고 바로 적용하기**
 
@@ -253,20 +223,20 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 **도메인**: 예약을 만들고 취소합니다. 슬롯 인원을 바꾸는 유일한 쓰기라서 **트랜잭션과 행 락**을 배우는 담당입니다. 취소 규칙은 `Reservation` 도메인 객체에 둡니다.
 
-**테이블** — `reservations`: `id`, `user_id`(FK·IX), `slot_id`(FK·IX), `party_size`, `contact_phone`(선택), `status`(`CONFIRMED` · `CANCELLED`), `created_at`, `updated_at`, `cancelled_at`
+**테이블** — `reservations`: `id`, `user_id`(FK·IX), `slot_id`(FK·IX), `party_size`, `contact_phone`(선택), `status`(`CONFIRMED` · `CANCELLED`), `created_at`, `updated_at`, `cancelled_at`, `cancelled_by`, `cancel_reason`, `cancel_note`, `checked_in_at`
 
 | API | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
 | `POST /reservations` | 토큰 + `{slot_id, party_size, contact_phone?}` | 201 `ReservationOut` | 422 · 401 · 404 슬롯 없음 · 409 `SLOT_SOLD_OUT` / `PARTY_SIZE_EXCEEDED` / `SLOT_ALREADY_STARTED` / `DUPLICATE_RESERVATION` |
 | `POST /reservations/{id}/cancel` | 토큰 | 200 `ReservationOut` | 401 · 404 없음·남의 예약 · 409 `ALREADY_CANCELLED` / `CANCELLATION_NOT_ALLOWED` |
 
-`ReservationOut` = `id, user_id, slot_id, restaurant_id, starts_at, ends_at, party_size, contact_phone, status, created_at, cancelled_at, can_cancel` — 예약 + 슬롯으로 만듭니다.
+`ReservationOut`은 예약·슬롯 정보에 취소자·사유·메모, 입장 시각, `can_cancel`·`can_check_in`·`can_mark_no_show`를 포함합니다. 내부 메모는 손님에게 `null`입니다.
 
-`can_cancel = 요청한 사람이 예약자 AND status = CONFIRMED AND 슬롯 시작 전` — `Reservation.can_cancel()` 하나로 계산하고 `cancel()`도 같은 판단을 씁니다. 운영자가 보면 항상 `false`입니다.
+`can_cancel`은 확정 상태, 시작 전, 보는 사람의 취소 권한(예약자·식당 소유자·관리자)으로 계산합니다. 관리자 취소 API의 시간·메모 규칙은 [예약 규칙](ARCHITECTURE.md#4-예약-규칙)을 따릅니다.
 
 **예약 생성 순서 (한 트랜잭션)**: 슬롯 행 락(담당 3 레포지토리) → 같은 슬롯 `CONFIRMED` 예약 확인 → `TimeSlot.reserve()` → 예약 INSERT · 슬롯 저장 → 커밋. 어디서든 실패하면 전부 롤백.
 
-**취소 순서 (한 트랜잭션)**: 예약 조회 → 본인인지 확인(아니면 404) → 슬롯 행 락 → 예약 행 락 → `Reservation.cancel()` → `TimeSlot.release()` → 커밋. 락 순서는 생성과 같게 **슬롯 → 예약**.
+**취소 순서**는 권한 확인 → 슬롯 행 락 → 예약 행 락 → 취소 사유와 상태 기록 → 시작 전이면 좌석 복구 → 커밋입니다.
 
 **계층별 파일**: [ARCHITECTURE 2장](ARCHITECTURE.md#2-폴더-구조와-담당) `reservation` 파일표의 담당 4 항목
 
@@ -290,15 +260,15 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 ### 담당 5 (최지훈) · 예약 조회 · 운영자 (`src/owner/` + `src/reservation/` 조회)
 
-**도메인**: 고객은 자기 예약만, 운영자는 자기 식당 예약만 보게 합니다. **인증(누구인가)과 인가(볼 수 있는가)를 구분**하는 담당입니다. 운영자 역할 검사 `require_owner`를 만들어 모든 운영자 API에 공유합니다.
+**도메인**: 고객은 자기 예약만, 운영자는 자기 식당 예약만 보게 합니다. **인증(누구인가)과 인가(볼 수 있는가)를 구분**하는 담당입니다. 운영자 전용 조회는 `require_owner`로 역할을 확인합니다. 식당·메뉴 수정은 관리자 또는 식당 소유자 권한을 확인합니다.
 
 **테이블** — 자기 테이블 없음. `restaurants.owner_id`(담당 2)와 `reservations`·`reservation_slots`(담당 4·3)를 JOIN해 조회합니다.
 
 | API | 요청 | 성공 | 실패 |
 | --- | --- | --- | --- |
 | `GET /users/me/reservations` | 토큰 · `page` · `status`(선택) | 200 `Page[ReservationOut]` (내 것만, 이용 시각 최신순) | 422 · 401 |
-| `GET /reservations/{id}` | 토큰 | 200 `ReservationOut` (본인 또는 그 식당 운영자) | 401 · 404 없음·관련 없음 |
-| `GET /owner/restaurants` | 토큰 · `page` | 200 `Page[RestaurantSummary]` (내 식당만, `WHERE owner_id = 나`) | 401 · 403 고객 |
+| `GET /reservations/{id}` | 토큰 | 200 `ReservationOut` (본인·해당 식당 운영자·관리자) | 401 · 404 없음·관련 없음 |
+| `GET /owner/restaurants` | 토큰 · `page` | 200 `Page[RestaurantOut]` (내 식당만, `WHERE owner_id = 나`) | 401 · 403 고객 |
 | `GET /owner/restaurants/{id}/reservations` | 토큰 · `date`(선택) · `page` | 200 `Page[ReservationOut]` | 422 · 401 · 403 고객·남의 식당 · 404 없는 식당 |
 | `require_owner` (의존성) | 토큰 | 운영자 `AuthenticatedUser` | 401 · 403 고객 |
 
@@ -319,7 +289,7 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 1. `require_owner` 의존성 → **D5까지 공유** (담당 2의 PATCH가 사용)
 2. `GET /owner/restaurants` (`WHERE owner_id = 나`) → `GET /owner/restaurants/{id}/reservations` (담당 2의 `is_owned_by`로 소유 확인)
 3. `GET /users/me/reservations` → `GET /reservations/{id}`
-4. Jinja2 화면 (2026-11-02 추가): 먼저 운영자 화면 틀(`/ui` 로그인 → `/ui/owner/restaurants` → `/ui/owner/restaurants/{id}/reservations`, `feat/web-pages`)을 만들고, 식당 부품이 들어오면 식당 목록 `/`(검색, 한 쪽 20개, 이전/다음) → 식당 상세 `/web/restaurants/{id}` → 에러 화면. 데이터는 매니저(서비스)로 읽고, `main.py`·`pyproject.toml`을 고치기 전에 팀에 알림
+4. 손님 식당 목록 `/ui/restaurants`(10곳씩) → 식당 상세·예약 → 내 예약, 운영자 예약 조회와 관리자 상호 검색을 연결합니다. [역할별 화면 경로](JINJA2_TEMPLATE_GUIDE.md)
 
 **테스트 2개**: 운영자 A가 자기 식당 예약 조회 → 200 / 운영자 A가 운영자 B 식당 예약 조회 → 403 (+ 고객이 운영자 API 호출 → 403)
 
@@ -349,6 +319,6 @@ FastAPI 공식 SQL 튜토리얼은 SQLModel을 쓰지만, 이 프로젝트는 **
 
 ## 7. 팀이 확인할 것
 
-- `restaurants.status` 값(예: `OPEN`·`CLOSED`)과, `CLOSED` 식당의 슬롯 예약을 막을지 (지금은 표시용)
-- 에러 코드 이름 — 409 코드는 [ARCHITECTURE 4장](ARCHITECTURE.md#4-예약-규칙)에 있음. 공통 코드(`UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `INTERNAL_SERVER_ERROR`, `SERVICE_UNAVAILABLE`)는 `common/errors.py`의 `CommonErrorCode`로 들어옴 (PR #3). 남은 것: `AppError` 예외 모양과 409 코드를 어디에 둘지
+- 식당 운영 상태(OPEN/CLOSED)는 현재 식당 모델과 API에 없습니다. 예약 가능 여부는 시간대의 시작 시각·잔여석·인원 규칙으로 설명합니다.
+- 슬롯·예약 도메인 예외가 공통 핸들러를 통해 어떤 HTTP 상태로 전달되는지 확인합니다. [응답·오류 코드](API_SPEC.md#에러-코드)
 - 모듈 골격 정리 (커밋 5fff636에서 시작) — 완료: `database.py`는 `src/common/`으로 옮겼고, `common`·`auth`·`reservation` 모듈이 생김. `src/owner/domain/`은 비워 둠

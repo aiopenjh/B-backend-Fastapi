@@ -1,7 +1,8 @@
 # [담당1 - 강성수]
+import asyncio
 import uuid
 
-from user.application.unit_of_work import ConflictError, UnitOfWork
+from common.unit_of_work import ConflictError, UnitOfWork
 from user.domain.exceptions import DuplicatedUserError, UserNotFoundError
 from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
@@ -16,7 +17,7 @@ class UserService:
         self.uow = uow
         self.hasher = hasher
 
-    async def signUp(
+    async def sign_up(
         self, email: str, raw_password: str, name: str, phone: str
     ) -> User:
 
@@ -24,7 +25,12 @@ class UserService:
         if await self.repo.find_by_email(user_email) is not None:
             raise DuplicatedUserError()
 
-        user = User.create(
+        # User.create 안에서 bcrypt 해시(약 0.25초)를 한다. 그동안 DB 연결을 붙잡지 않게
+        # 읽기 트랜잭션을 끝내고, 이벤트 루프를 막지 않게 스레드에서 만든다.
+        # 그 사이 같은 이메일 가입은 commit의 UNIQUE 충돌로 잡힌다
+        await self.uow.release()
+        user = await asyncio.to_thread(
+            User.create,
             email=user_email,
             raw_password=raw_password,
             name=name,
@@ -50,3 +56,10 @@ class UserService:
         saved = await self.repo.save(user)
         await self.uow.commit()
         return saved
+
+    async def get_user(self, user_id: uuid.UUID) -> User:
+        user = await self.repo.find_by_id(user_id)
+        if user is None or not user.is_active():
+            raise UserNotFoundError()
+
+        return user
