@@ -138,7 +138,9 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
         if not (is_page and request.url.path.startswith("/ui")):
             return response
         body = b"".join([chunk async for chunk in response.body_iterator])
-        demo_on = request.cookies.get(DEMO_COOKIE) == DEMO_TOKEN
+        # 관리자 화면이 200으로 열렸다면 지금 사람은 관리자 → 시연 모드를 바로 켬 (예전 쿠키가 남아 있어도)
+        admin_page = request.url.path.startswith("/ui/admin") and response.status_code == 200
+        demo_on = admin_page or request.cookies.get(DEMO_COOKIE) == DEMO_TOKEN
         panel = views.get_template("log_panel.html").render(
             log_panel=recent_logs, style=STYLE, accounts=ACCOUNTS if demo_on else None, back=request.url.path,
         )
@@ -150,7 +152,10 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
             # 시연용: 마감·자리 부족 시간도 눌리게 열어 둠 → 누르면 서버가 409(SLOT_SOLD_OUT 등)로 막는 걸 보여 줌
             page = CLOSED_SLOT.sub(r"\1", page)
         headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
-        return Response(page, status_code=response.status_code, headers=headers)
+        page_response = Response(page, status_code=response.status_code, headers=headers)
+        if admin_page and request.cookies.get(DEMO_COOKIE) != DEMO_TOKEN:
+            page_response.set_cookie(DEMO_COOKIE, DEMO_TOKEN, max_age=DEMO_HOURS * 3600, httponly=True, samesite="lax", path="/")
+        return page_response
 
 
 def demo_mode(request: Request, response: Response) -> None:
