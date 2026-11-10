@@ -34,20 +34,6 @@ class FakePasswordHasher(PasswordHasher):
         return self.hash(raw_password) == hashed_password
 
 
-class FakeUnitOfWork(UnitOfWork):
-    """commit 호출 횟수를 세는 가짜 UoW. conflict=True면 commit에서 충돌을 낸다"""
-
-    def __init__(self, conflict: bool = False) -> None:
-        self.commits = 0
-        self.conflict = conflict
-
-    async def commit(self) -> None:
-        if self.conflict:
-            raise ConflictError()
-
-        self.commits += 1
-
-
 class InMemoryUserRepository(UserRepository):
     def __init__(self) -> None:
         self.users: dict[uuid.UUID, User] = {}
@@ -64,19 +50,44 @@ class InMemoryUserRepository(UserRepository):
 
 
 class InMemoryBlackListRepository(TokenBlackListRepository):
+    """add는 대기열에만 넣고, FakeUnitOfWork.commit이 불려야 확정된다."""
+
     def __init__(self) -> None:
         self.jtis: set[str] = set()
         self.saved: list[BlackListToken] = []
+        self.pending: list[BlackListToken] = []
 
     async def add(self, token: BlackListToken) -> None:
-        self.jtis.add(token.jti)
-        self.saved.append(token)
+        self.pending.append(token)
 
     async def is_blacklisted(self, jti: str) -> bool:
         return jti in self.jtis
 
     async def cleanup_expired(self, current_time: datetime) -> None:
         pass
+
+
+class FakeUnitOfWork(UnitOfWork):
+    """commit 호출 횟수를 세는 가짜 UoW. conflict=True면 commit에서 충돌을 낸다"""
+
+    def __init__(
+        self, blacklist: InMemoryBlackListRepository, conflict: bool = False
+    ) -> None:
+        self.blacklist = blacklist
+        self.commits = 0
+        self.conflict = conflict
+
+    async def commit(self) -> None:
+        if self.conflict:
+            self.blacklist.pending.clear()
+            raise ConflictError()
+
+        for token in self.blacklist.pending:
+            self.blacklist.jtis.add(token.jti)
+            self.blacklist.saved.append(token)
+
+        self.blacklist.pending.clear()
+        self.commits += 1
 
 
 @pytest.fixture
@@ -95,8 +106,8 @@ def blacklist() -> InMemoryBlackListRepository:
 
 
 @pytest.fixture
-def uow() -> FakeUnitOfWork:
-    return FakeUnitOfWork()
+def uow(blacklist: InMemoryBlackListRepository) -> FakeUnitOfWork:
+    return FakeUnitOfWork(blacklist=blacklist)
 
 
 @pytest.fixture
@@ -261,7 +272,7 @@ async def test_logout_conflict_at_commit_becomes_unauthorized(
         hasher=hasher,
         token_provider=JwtTokenProvider(secret_key=SECRET),
         blacklist_repo=blacklist,
-        uow=FakeUnitOfWork(conflict=True),
+        uow=FakeUnitOfWork(blacklist=blacklist, conflict=True),
     )
 
     issued = await service.login("owner@example.com", PASSWORD)
