@@ -36,7 +36,5 @@
 
   {% if ui_user and in_own_space %}
     <span class="preview-chip">{{ role_names.get(ui_user.role, ui_user.role) }} 로그인 중</span>
-  {% elif not ui_user %}
-    <span class="preview-chip">로그인 전</span>
   {% endif %}
 </header>
