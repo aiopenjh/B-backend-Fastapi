@@ -45,7 +45,7 @@ from user.infrastructure.repositories import (
 )  # 담당 1: 회원 창고
 from user.infrastructure.security import BcryptPasswordHasher  # 담당 1: 비밀번호 암호화
 from user.infrastructure.unit_of_work import SQLAlchemyUnitOfWork  # 담당 1: 변경 확정
-from user.presentation.dependencies import user_repository, user_service
+from user.presentation.dependencies import user_service
 
 password_hasher: PasswordHasher = BcryptPasswordHasher()
 
@@ -175,7 +175,6 @@ def create_reservation_service(
 def wire_dependencies(app: FastAPI) -> None:
     app.dependency_overrides.update(
         {
-            user_repository: create_user_repository,  # 담당1
             user_service: create_user_service,  # 담당1
             auth_service: create_auth_service,  # 담당1
         }

@@ -23,7 +23,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def sign_up(
     request: SignUpUserRequest, service: Annotated[UserService, Depends(user_service)]
 ) -> APIResponse[UserResponse]:
-    user = await service.signUp(
+    user = await service.sign_up(
         email=request.email,
         raw_password=request.password,
         name=request.name,

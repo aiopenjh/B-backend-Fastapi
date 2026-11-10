@@ -63,7 +63,7 @@ def service(repo, uow, hasher) -> UserService:
 
 
 async def test_sign_up_saves_user_with_normalized_email(service, repo):
-    user = await service.signUp(
+    user = await service.sign_up(
         "  Alice@Example.COM ", VALID_PASSWORD, "김철수", "010-1234-5678"
     )
 
@@ -73,10 +73,10 @@ async def test_sign_up_saves_user_with_normalized_email(service, repo):
 
 
 async def test_sign_up_rejects_email_already_registered_ignoring_case(service, repo):
-    await service.signUp("alice@example.com", VALID_PASSWORD, "김철수", "010-1234-5678")
+    await service.sign_up("alice@example.com", VALID_PASSWORD, "김철수", "010-1234-5678")
 
     with pytest.raises(DuplicatedUserError):
-        await service.signUp(
+        await service.sign_up(
             "ALICE@example.com", VALID_PASSWORD, "김영희", "010-9876-5432"
         )
 
@@ -85,20 +85,20 @@ async def test_sign_up_rejects_email_already_registered_ignoring_case(service, r
 
 async def test_sign_up_with_invalid_email_saves_nothing(service, repo):
     with pytest.raises(InvalidInputError):
-        await service.signUp("not-an-email", VALID_PASSWORD, "김철수", "010-1234-5678")
+        await service.sign_up("not-an-email", VALID_PASSWORD, "김철수", "010-1234-5678")
 
     assert repo.users == {}
 
 
 async def test_sign_up_commits_once(service, uow):
-    await service.signUp("alice@example.com", VALID_PASSWORD, "고길동", "010-1234-5678")
+    await service.sign_up("alice@example.com", VALID_PASSWORD, "고길동", "010-1234-5678")
 
     assert uow.commits == 1
 
 
 async def test_rejected_sign_up_does_not_commit(service, uow):
     with pytest.raises(InvalidInputError):
-        await service.signUp("not-an-email", VALID_PASSWORD, "고길동", "010-1234-5678")
+        await service.sign_up("not-an-email", VALID_PASSWORD, "고길동", "010-1234-5678")
 
     assert uow.commits == 0
 
@@ -107,11 +107,11 @@ async def test_conflict_at_commit_becomes_duplicated_user(repo, hasher):
     service = UserService(repo=repo, uow=FakeUnitOfWork(conflict=True), hasher=hasher)
 
     with pytest.raises(DuplicatedUserError):
-        await service.signUp("test@test.org", VALID_PASSWORD, "고길동", "010-1234-5678")
+        await service.sign_up("test@test.org", VALID_PASSWORD, "고길동", "010-1234-5678")
 
 
 async def test_get_user_success_returns_saved_user(service, repo):
-    saved = await service.signUp(
+    saved = await service.sign_up(
         "alice@example.com", VALID_PASSWORD, "고길동", "010-1234-5678"
     )
 
@@ -124,7 +124,7 @@ async def test_get_user_fail_unknown_id(service):
 
 
 async def test_get_user_fail_deleted_user(service):
-    saved = await service.signUp(
+    saved = await service.sign_up(
         "alice@example.com", VALID_PASSWORD, "고길동", "010-1234-5678"
     )
 

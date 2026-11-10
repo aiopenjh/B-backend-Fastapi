@@ -114,6 +114,17 @@ async def test_authenticated_user_fail_with_invalid_toke(client):
     assert response.json()["code"] == "UNAUTHORIZED"
 
 
+async def test_401_carries_www_authenticate_with_or_without_token(client):
+    # 토큰이 없을 때와 잘못된 토큰일 때 같은 헤더로 재인증을 알린다
+    no_token = await client.get("/protected")
+    bad_token = await client.get(
+        "/protected", headers={"Authorization": "Bearer not-a-valid-token"}
+    )
+
+    assert no_token.headers["www-authenticate"] == "Bearer"
+    assert bad_token.headers["www-authenticate"] == "Bearer"
+
+
 async def test_logout_success_returns_204_without_body(client):
     response = await client.post(
         LOGOUT_URL, headers={"Authorization": f"Bearer {VALID_TOKEN}"}
