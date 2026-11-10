@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, urlparse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "src"))  # 팀 코드(src)를 import 할 수 있게
@@ -122,3 +122,9 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(LogPanelMiddleware)  # 마지막에 붙인 것이 가장 바깥 → 팀 로그가 먼저 찍힘
+
+
+@app.get("/", include_in_schema=False)
+async def go_to_screens() -> RedirectResponse:
+    """시연용: 주소창에 127.0.0.1:8000만 쳐도 404 대신 식당 둘러보기 화면으로"""
+    return RedirectResponse("/ui/restaurants", status_code=307)
