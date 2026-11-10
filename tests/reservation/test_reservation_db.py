@@ -2,7 +2,7 @@
 import asyncio
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from dotenv import load_dotenv
@@ -14,18 +14,17 @@ from common.errors import NotFoundError
 from common.model import Base, init_models
 from common.schemas import SEOUL
 from common.unit_of_work import ConflictError
+from container import expire_no_shows_once
 from reservation.application.service import ReservationService
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
+    AlreadyCheckedInError,
     DuplicateReservationError,
 )
-from reservation.domain.reservation import Reservation
+from reservation.domain.reservation import CancelledBy, CancelReason, Reservation
 from reservation.infrastructure.models import ReservationModel
 from reservation.infrastructure.repositories import SQLAlchemyReservationRepository
-from restaurant.application.service import RestaurantService
-from restaurant.domain.exceptions import RestaurantNotFoundError
 from restaurant.infrastructure.models import RestaurantModel
-from restaurant.infrastructure.repository import RestaurantRepository
 from slot.domain.exceptions import SlotSoldOut
 from slot.infrastructure.models import ReservationSlotModel
 from slot.infrastructure.repositories import SQLAlchemySlotRepository
@@ -44,6 +43,7 @@ pytestmark = pytest.mark.skipif(
 NOW = datetime(2030, 1, 1, 12, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2030, 1, 1, 18, 0, tzinfo=SEOUL)
 ENDS_AT = datetime(2030, 1, 1, 19, 0, tzinfo=SEOUL)
+GRACE = timedelta(minutes=15)  # 노쇼 유예 시간
 
 
 @pytest.fixture
@@ -98,14 +98,11 @@ async def add_slot(
 
 def make_service(session) -> ReservationService:
     # 요청 하나 = 세션 하나. 앱의 create_reservation_service와 같은 조립
-    uow = SQLAlchemyUnitOfWork(session)
     return ReservationService(
         reservation_repo=SQLAlchemyReservationRepository(session),
         slot_repo=SQLAlchemySlotRepository(session),
-        restaurant_service=RestaurantService(
-            repo=RestaurantRepository(session), uow=uow
-        ),
-        uow=uow,
+        uow=SQLAlchemyUnitOfWork(session),
+        no_show_grace=GRACE,
     )
 
 
@@ -126,11 +123,30 @@ async def reserve(
         )
 
 
-async def cancel(session_factory, user: AuthenticatedUser, reservation_id: int):
+async def cancel(
+    session_factory,
+    user: AuthenticatedUser | None,
+    reservation_id: int,
+    now: datetime = NOW,
+    by: CancelledBy = CancelledBy.CUSTOMER,
+    reason: CancelReason = CancelReason.CUSTOMER_REQUEST,
+    note: str | None = None,
+):
     async with session_factory() as session:
         return await make_service(session).cancel(
-            user=user, reservation_id=reservation_id, now=NOW
+            user=user,
+            reservation_id=reservation_id,
+            now=now,
+            by=by,
+            reason=reason,
+            note=note,
         )
+
+
+async def read_reservation(session_factory, reservation_id: int) -> ReservationModel:
+    """새 연결로 예약 한 줄을 그대로 읽는다 (DB에 실제로 뭐가 저장됐는지 확인용)"""
+    async with session_factory() as session:
+        return await session.get(ReservationModel, reservation_id)
 
 
 async def open_connections(session_factory, count: int) -> None:
@@ -253,7 +269,13 @@ async def test_owner_cancels_reservation_of_own_restaurant(session_factory):
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
     owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
 
-    await cancel(session_factory, owner, created.id)
+    await cancel(
+        session_factory,
+        owner,
+        created.id,
+        by=CancelledBy.OWNER,
+        reason=CancelReason.PHONE_REQUEST,
+    )
 
     # 그 식당 운영자가 취소하면 진짜 DB에도 취소가 저장되고 자리가 돌아온다.
     assert await read_slot(session_factory, slot_id) == (0, 0)
@@ -307,7 +329,14 @@ async def test_admin_cancels_any_reservation(session_factory):
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
     admin = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
 
-    await cancel(session_factory, admin, created.id)
+    await cancel(
+        session_factory,
+        admin,
+        created.id,
+        by=CancelledBy.ADMIN,
+        reason=CancelReason.OTHER,
+        note="관리자 정리",
+    )
 
     # 관리자가 취소하면 진짜 DB에도 취소가 저장되고 자리가 돌아온다.
     assert await read_slot(session_factory, slot_id) == (0, 0)
@@ -322,7 +351,13 @@ async def test_other_owner_cancel_is_not_found(session_factory):
     )
 
     with pytest.raises(NotFoundError):
-        await cancel(session_factory, other_owner, created.id)
+        await cancel(
+            session_factory,
+            other_owner,
+            created.id,
+            by=CancelledBy.OWNER,
+            reason=CancelReason.PHONE_REQUEST,
+        )
 
     # 다른 식당 운영자는 404로 막히고, 예약과 자리는 그대로다.
     assert await read_slot(session_factory, slot_id) == (2, 1)
@@ -336,13 +371,26 @@ async def test_deleted_restaurant_owner_cannot_cancel_but_admin_can(session_fact
     owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
     admin = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
 
-    # 식당이 삭제되면 식당 창고가 식당을 안 꺼내서, 운영자는 404다.
-    with pytest.raises(RestaurantNotFoundError):
-        await cancel(session_factory, owner, created.id)
+    # 식당이 삭제되면 식당 주인을 못 찾아서(삭제된 식당은 안 꺼냄), 운영자는 404다.
+    with pytest.raises(NotFoundError):
+        await cancel(
+            session_factory,
+            owner,
+            created.id,
+            by=CancelledBy.OWNER,
+            reason=CancelReason.PHONE_REQUEST,
+        )
     assert await read_slot(session_factory, slot_id) == (2, 1)
 
     # 관리자는 식당을 보지 않아서 그래도 취소할 수 있다.
-    await cancel(session_factory, admin, created.id)
+    await cancel(
+        session_factory,
+        admin,
+        created.id,
+        by=CancelledBy.ADMIN,
+        reason=CancelReason.OTHER,
+        note="관리자 정리",
+    )
     assert await read_slot(session_factory, slot_id) == (0, 0)
 
 
@@ -362,3 +410,145 @@ async def test_contact_phone_is_saved_in_one_shape(session_factory):
             )
         )
     assert saved == "010-1234-5678"
+
+
+async def test_owner_no_show_is_saved_and_keeps_seats(session_factory):
+    slot_id, owner_id = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
+    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+
+    await cancel(
+        session_factory,
+        owner,
+        created.id,
+        now=STARTS_AT + GRACE,
+        by=CancelledBy.OWNER,
+        reason=CancelReason.NO_SHOW,
+    )
+
+    # 노쇼는 상태 CANCELLED + 이유 NO_SHOW로 저장되고, 이미 지난 자리라 좌석은 그대로 2명이다.
+    saved = await read_reservation(session_factory, created.id)
+    assert saved.status == "CANCELLED"
+    assert saved.cancelled_by == "OWNER"
+    assert saved.cancel_reason == "NO_SHOW"
+    reserved, _ = await read_slot(session_factory, slot_id)
+    assert reserved == 2
+
+
+async def test_check_in_is_saved_and_blocks_no_show(session_factory):
+    slot_id, owner_id = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
+    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+
+    async with session_factory() as session:
+        await make_service(session).check_in(
+            user=owner, reservation_id=created.id, now=STARTS_AT
+        )
+
+    # 입장 시각이 진짜 DB에 저장되고, 그 예약은 노쇼로 처리할 수 없다.
+    saved = await read_reservation(session_factory, created.id)
+    assert saved.checked_in_at == STARTS_AT
+    with pytest.raises(AlreadyCheckedInError):
+        await cancel(
+            session_factory,
+            owner,
+            created.id,
+            now=STARTS_AT + GRACE,
+            by=CancelledBy.OWNER,
+            reason=CancelReason.NO_SHOW,
+        )
+
+
+async def test_admin_cancel_note_is_saved(session_factory):
+    slot_id, _ = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
+    admin = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
+
+    await cancel(
+        session_factory,
+        admin,
+        created.id,
+        by=CancelledBy.ADMIN,
+        reason=CancelReason.SYSTEM_ERROR,
+        note="중복 결제 정리",
+    )
+
+    saved = await read_reservation(session_factory, created.id)
+    assert saved.cancelled_by == "ADMIN"
+    assert saved.cancel_reason == "SYSTEM_ERROR"
+    assert saved.cancel_note == "중복 결제 정리"
+
+
+async def test_restaurant_owner_of_query(session_factory):
+    slot_id, owner_id = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
+
+    # 예약 -> 슬롯 -> 식당을 이어서 주인 id를 꺼낸다. 없는 예약·삭제된 식당은 None
+    async with session_factory() as session:
+        repo = SQLAlchemyReservationRepository(session)
+        assert await repo.restaurant_owner_of(created.id) == owner_id
+        assert await repo.restaurant_owner_of(999) is None
+
+    await delete_restaurant_of(session_factory, owner_id)
+    async with session_factory() as session:
+        repo = SQLAlchemyReservationRepository(session)
+        assert await repo.restaurant_owner_of(created.id) is None
+
+
+async def test_expire_no_shows_on_real_db(session_factory):
+    slot_id, owner_id = await add_slot(session_factory, capacity=10)
+    no_show_user = await add_user(session_factory)
+    came_user = await add_user(session_factory)
+    cancelled_user = await add_user(session_factory)
+    no_show, _ = await reserve(session_factory, no_show_user, slot_id, party_size=2)
+    came, _ = await reserve(session_factory, came_user, slot_id, party_size=2)
+    cancelled, _ = await reserve(session_factory, cancelled_user, slot_id, party_size=2)
+    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    async with session_factory() as session:
+        await make_service(session).check_in(
+            user=owner, reservation_id=came.id, now=STARTS_AT
+        )
+    await cancel(
+        session_factory,
+        AuthenticatedUser(user_id=cancelled_user, role=AuthRole.CUSTOMER),
+        cancelled.id,
+    )
+
+    # 15분 전에는 대상이 없고, 15분이 지나면 입장 안 한 확정 예약 1건만 찾는다
+    async with session_factory() as session:
+        repo = SQLAlchemyReservationRepository(session)
+        assert (
+            await repo.list_no_show_ids(STARTS_AT + GRACE - timedelta(seconds=1), GRACE)
+            == []
+        )
+        assert await repo.list_no_show_ids(STARTS_AT + GRACE, GRACE) == [no_show.id]
+
+    async with session_factory() as session:
+        handled = await make_service(session).expire_no_shows(STARTS_AT + GRACE)
+
+    assert handled == 1
+    saved = await read_reservation(session_factory, no_show.id)
+    assert saved.cancelled_by == "SYSTEM"
+    assert saved.cancel_reason == "NO_SHOW"
+    assert (await read_reservation(session_factory, came.id)).status == "CONFIRMED"
+    # 좌석: 6명 예약 - 손님 취소 2명(시작 전이라 반납) = 4명, 노쇼 2명은 반납 안 함
+    reserved, _ = await read_slot(session_factory, slot_id)
+    assert reserved == 4
+
+
+async def test_expire_no_shows_once_uses_container_wiring(session_factory):
+    # 자동 반복이 부르는 container.expire_no_shows_once가 진짜 DB에서 노쇼를 처리하는지
+    slot_id, _ = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
+
+    handled = await expire_no_shows_once(session_factory, STARTS_AT + GRACE)
+
+    assert handled == 1
+    saved = await read_reservation(session_factory, created.id)
+    assert saved.cancelled_by == "SYSTEM"
+    assert saved.cancel_reason == "NO_SHOW"

@@ -8,7 +8,12 @@ from pydantic import BaseModel, Field, field_validator
 from auth.domain.value_object import AuthenticatedUser
 from common.errors import InvalidInputError
 from common.schemas import SEOUL
-from reservation.domain.reservation import Reservation, ReservationStatus
+from reservation.domain.reservation import (
+    CancelledBy,
+    CancelReason,
+    Reservation,
+    ReservationStatus,
+)
 from reservation.domain.value_object import ContactPhone
 from slot.domain.time_slot import TimeSlot
 
@@ -84,6 +89,23 @@ class ReservationOut(BaseModel):
             description="취소 가능 여부. 보는 사람이 예약자 본인·관리자·그 식당 운영자이고, 확정 상태이고, 슬롯 시작 전이면 true"
         ),
     ]
+    cancelled_by: Annotated[
+        CancelledBy | None,
+        Field(
+            description="누가 취소했나 (CUSTOMER, OWNER, ADMIN, SYSTEM=자동 노쇼). 취소 전에는 null"
+        ),
+    ] = None
+    cancel_reason: Annotated[
+        CancelReason | None,
+        Field(description="왜 취소했나 (NO_SHOW면 노쇼). 취소 전에는 null"),
+    ] = None
+    cancel_note: Annotated[
+        str | None, Field(description="취소 메모 (관리자는 필수)")
+    ] = None
+    checked_in_at: Annotated[
+        datetime | None,
+        Field(description="운영자가 입장 확인한 시각 (Asia/Seoul). 안 왔으면 null"),
+    ] = None
 
     @classmethod
     def from_domain(
@@ -98,6 +120,7 @@ class ReservationOut(BaseModel):
         viewer는 보는 사람(역할까지), restaurant_owner_id는 그 식당 주인. 운영자에게 버튼을 보여 줄 때만 필요하다."""
         # DB에서 꺼낸 시각은 UTC라서, 응답에서는 같은 순간을 서울 시계(+09:00)로 다시 읽어 내보낸다
         cancelled_at = reservation.cancelled_at
+        checked_in_at = reservation.checked_in_at
         return cls(
             id=reservation.id,
             user_id=reservation.user_id,
@@ -116,4 +139,33 @@ class ReservationOut(BaseModel):
                 now=now,
                 restaurant_owner_id=restaurant_owner_id,
             ),
+            cancelled_by=reservation.cancelled_by,
+            cancel_reason=reservation.cancel_reason,
+            cancel_note=reservation.cancel_note,
+            checked_in_at=checked_in_at.astimezone(SEOUL) if checked_in_at else None,
         )
+
+
+class ReservationCancelRequest(BaseModel):
+    """운영자·관리자 취소 신청서. 어떤 이유를 쓸 수 있는지는 도메인이 역할별로 판단한다 (안 맞으면 422)."""
+
+    reason: Annotated[
+        CancelReason,
+        Field(
+            examples=["PHONE_REQUEST"],
+            description="취소 이유. 운영자: PHONE_REQUEST, RESTAURANT_ISSUE, OTHER, NO_SHOW / 관리자: SYSTEM_ERROR, OTHER",
+        ),
+    ]
+    note: Annotated[
+        str | None,
+        Field(max_length=100, description="메모 (100자 이하). 관리자는 필수"),
+    ] = None
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def strip_note(cls, value: object) -> object:
+        # 앞뒤 공백을 지우고, 공백만 남으면 메모 없음(None)으로 본다
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
