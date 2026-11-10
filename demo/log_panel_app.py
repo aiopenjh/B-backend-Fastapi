@@ -9,9 +9,10 @@
 - 시연·테스트용이다. 로그에 내부 정보가 있으니 배포에는 쓰지 않는다.
 """
 
+import hashlib
 import logging
+import os
 import re
-import secrets
 import sys
 from collections import deque
 from dataclasses import dataclass
@@ -36,9 +37,11 @@ from container import create_auth_service
 from main import app  # 팀 앱 그대로 (위에서 src 경로를 넣은 뒤에 가져옴)
 from web_auth import COOKIE_NAME, COOKIE_PATH, home_url
 
-# 시연 계정 바꾸기: 관리자로 로그인하면 켜지는 "시연 모드" 쿠키. 값은 서버를 켤 때마다 새로 만듦 (밖에서 흉내 못 내게)
+# 시연 계정 바꾸기: 관리자로 로그인하면 켜지는 "시연 모드" 쿠키.
+# 값은 .env의 비밀 키로 만들어서 서버를 다시 켜도 그대로 (비밀 키를 모르면 흉내 못 냄)
 DEMO_COOKIE = "demo_switch"
-DEMO_TOKEN = secrets.token_hex(16)
+DEMO_TOKEN = hashlib.sha256(f"demo-switch:{os.getenv('JWT_SECRET_KEY', '')}".encode()).hexdigest()
+DEMO_HOURS = 12  # 시연 모드 유지 시간 (브라우저를 껐다 켜도 유지)
 ACCOUNTS = {"admin": ("관리자", seed.ADMIN[0], seed.ADMIN_PASSWORD)} | {
     email.split("@")[0].replace(".", "_"): (name, email, seed.SEED_PASSWORD)
     for email, name, _, _ in sorted(seed.USERS, key=lambda user: user[3] != "OWNER")  # 운영자 먼저, 그다음 손님
@@ -155,7 +158,7 @@ def demo_mode(request: Request, response: Response) -> None:
     if request.method != "POST":
         return
     if request.url.path == "/ui/login" and response.headers.get("location", "").endswith("/ui/admin/owners"):
-        response.set_cookie(DEMO_COOKIE, DEMO_TOKEN, httponly=True, samesite="lax", path="/")
+        response.set_cookie(DEMO_COOKIE, DEMO_TOKEN, max_age=DEMO_HOURS * 3600, httponly=True, samesite="lax", path="/")
     elif request.url.path == "/ui/logout":
         response.delete_cookie(DEMO_COOKIE, path="/")
 
