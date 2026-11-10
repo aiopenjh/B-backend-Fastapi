@@ -124,42 +124,47 @@ def make_reservation() -> Reservation:
 def test_can_be_cancelled_by_reservation_owner():
     me = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)
 
-    assert make_reservation().can_be_cancelled_by(me, RESTAURANT) is True
+    assert make_reservation().can_be_cancelled_by(me, RESTAURANT.owner_id) is True
 
 
 # 다른 손님은 취소할 수 없다
 def test_cannot_be_cancelled_by_other_customer():
     other = AuthenticatedUser(user_id=OTHER_USER_ID, role=AuthRole.CUSTOMER)
 
-    assert make_reservation().can_be_cancelled_by(other, RESTAURANT) is False
+    assert make_reservation().can_be_cancelled_by(other, RESTAURANT.owner_id) is False
 
 
 # 그 식당의 운영자는 손님 예약을 취소할 수 있다
 def test_can_be_cancelled_by_restaurant_owner():
     owner = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)
 
-    assert make_reservation().can_be_cancelled_by(owner, RESTAURANT) is True
+    assert make_reservation().can_be_cancelled_by(owner, RESTAURANT.owner_id) is True
 
 
 # 다른 식당의 운영자는 취소할 수 없다
 def test_cannot_be_cancelled_by_other_restaurant_owner():
     other_owner = AuthenticatedUser(user_id=OTHER_OWNER_ID, role=AuthRole.OWNER)
 
-    assert make_reservation().can_be_cancelled_by(other_owner, RESTAURANT) is False
+    assert (
+        make_reservation().can_be_cancelled_by(other_owner, RESTAURANT.owner_id)
+        is False
+    )
 
 
 # 운영자 역할이 아니면 식당 주인 id와 같아도 운영자로 보지 않는다
 def test_cannot_be_cancelled_by_customer_with_owner_id():
     not_owner = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.CUSTOMER)
 
-    assert make_reservation().can_be_cancelled_by(not_owner, RESTAURANT) is False
+    assert (
+        make_reservation().can_be_cancelled_by(not_owner, RESTAURANT.owner_id) is False
+    )
 
 
 # 관리자는 어느 식당 예약이든 취소할 수 있다
 def test_can_be_cancelled_by_admin():
     admin = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
 
-    assert make_reservation().can_be_cancelled_by(admin, RESTAURANT) is True
+    assert make_reservation().can_be_cancelled_by(admin, RESTAURANT.owner_id) is True
 
 
 # 그 식당 운영자가 보면 손님 예약도 취소 버튼이 보인다

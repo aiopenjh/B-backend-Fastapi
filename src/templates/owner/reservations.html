@@ -94,6 +94,7 @@
           <td data-label="연락처">{{ reservation.contact_phone or '미입력' }}</td>
           <td data-label="상태">
             {% if reservation.status == 'CONFIRMED' %}<span class="badge badge-confirmed"><span></span>예약 확정</span>
+            {% elif reservation.status == 'CANCELLED' and reservation.cancel_reason == 'NO_SHOW' %}<span class="badge"><span></span>노쇼</span>
             {% elif reservation.status == 'CANCELLED' %}<span class="badge"><span></span>취소</span>
             {% else %}{{ reservation.status }}{% endif %}
           </td>

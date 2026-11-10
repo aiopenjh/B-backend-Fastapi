@@ -16,7 +16,7 @@ from restaurant.presentation.schemas import RestaurantOut # 담당 2 : 식당 �
 from restaurant.presentation.routers.v1.router import BIGINT_MAX # 담당 2 : DB 번호 상한
 from reservation.presentation.schemas import ReservationOut # 담당 4 : 민지님
 from auth.domain.value_object import AuthenticatedUser # 담당 1 : 회원
-from container import create_owner_service # 담당 5: 매니저 공장
+from container import NO_SHOW_GRACE, create_owner_service # 담당 5: 매니저 공장, 담당 4: 노쇼 유예 시간
 from slot.domain.day_range import SEOUL, seoul_now # 담당3 : 서울시간대, 지금 시각
 
 
@@ -81,7 +81,7 @@ async def list_restaurant_reservations(
     now = seoul_now()
     return APIResponse.ok(data=Page(
         # 보는 사람 = 운영자. 매니저가 내 식당인지 이미 확인했으니 식당 주인 = 나 (손님 예약도 취소 가능)
-        items=[ReservationOut.from_domain(r, s, owner, now, restaurant_owner_id=owner.user_id) for r, s in items],
+        items=[ReservationOut.from_domain(r, s, owner, now, restaurant_owner_id=owner.user_id, no_show_grace=NO_SHOW_GRACE) for r, s in items],
         page=page.page,
         page_size=page.page_size,
         total=total,

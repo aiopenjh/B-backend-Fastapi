@@ -1,6 +1,6 @@
-# [담당 4] 예약 서비스 테스트 : 가짜 저장소로 예약 생성.취소 흐름 확인
+# [담당 4] 예약 서비스 테스트 : 가짜 저장소로 예약 생성.취소.노쇼.입장 확인 흐름 확인
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -11,13 +11,19 @@ from common.unit_of_work import ConflictError, UnitOfWork
 from reservation.application.service import ReservationService
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
+    AlreadyCheckedInError,
     CancellationNotAllowedError,
+    CancelNoteRequiredError,
     DuplicateReservationError,
+    NoShowTooEarlyError,
 )
 from reservation.domain.repository import ReservationRepository
-from reservation.domain.reservation import Reservation, ReservationStatus
-from restaurant.domain.exceptions import RestaurantNotFoundError
-from restaurant.domain.restaurant import Restaurant
+from reservation.domain.reservation import (
+    CancelledBy,
+    CancelReason,
+    Reservation,
+    ReservationStatus,
+)
 from slot.domain.exceptions import SlotSoldOut
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
@@ -30,6 +36,10 @@ class InMemoryReservationRepository(ReservationRepository):
         self.reservations: list[Reservation] = []
         self.lock_log = lock_log  # 잠근 순서를 적는 기록장 (슬롯 저장소와 같이 씀)
         self.conflict = False  # True면 DB 규칙(확정 예약은 사람, 슬롯당 하나)이 막은 상황을 흉내 낸다.
+        self.restaurant_owner_id: uuid.UUID | None = (
+            None  # 예약이 속한 식당의 주인 (None이면 식당 없음·삭제)
+        )
+        self.slot_starts_at: datetime | None = None  # 노쇼 대상 찾기용 슬롯 시작 시각
 
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
         return any(
@@ -56,6 +66,21 @@ class InMemoryReservationRepository(ReservationRepository):
 
     async def save(self, reservation: Reservation) -> None:
         pass  # 같은 객체를 들고 있어서 따로 반영할 게 없음
+
+    async def restaurant_owner_of(self, reservation_id: int) -> uuid.UUID | None:
+        if await self.get(reservation_id) is None:
+            return None
+        return self.restaurant_owner_id
+
+    async def list_no_show_ids(self, now: datetime, grace: timedelta) -> list[int]:
+        return [
+            r.id
+            for r in self.reservations
+            if r.status is ReservationStatus.CONFIRMED
+            and r.checked_in_at is None
+            and self.slot_starts_at is not None
+            and self.slot_starts_at <= now - grace
+        ]
 
 
 class InMemorySlotRepository(SlotRepository):
@@ -93,19 +118,6 @@ class FakeUnitOfWork(UnitOfWork):
         self.commits += 1
 
 
-class FakeRestaurantService:
-    """식당 번호로 식당을 꺼내 주는 가짜 식당 매니저 (취소 권한 확인용)"""
-
-    def __init__(self, restaurants: list[Restaurant]) -> None:
-        self.restaurants = restaurants
-
-    async def get_restaurant(self, restaurant_id: int) -> Restaurant:
-        for restaurant in self.restaurants:
-            if restaurant.id == restaurant_id:
-                return restaurant
-        raise RestaurantNotFoundError()  # 진짜 식당 매니저와 같은 404
-
-
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 OTHER_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000002")
 OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
@@ -118,13 +130,11 @@ OWNER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)  # 1번 식당 
 OTHER_OWNER = AuthenticatedUser(user_id=OTHER_OWNER_ID, role=AuthRole.OWNER)
 ADMIN = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
 
-# 1번 식당 (7번 슬롯이 이 식당 것)
-RESTAURANT = Restaurant(
-    id=1, owner_id=OWNER_ID, name="테스트 식당", address="서울 중구", cuisine="한식"
-)
 NOW = datetime(2026, 12, 3, 17, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2026, 12, 3, 18, 0, tzinfo=SEOUL)
 ENDS_AT = datetime(2026, 12, 3, 19, 0, tzinfo=SEOUL)
+GRACE = timedelta(minutes=15)  # 노쇼 유예 시간
+NO_SHOW_TIME = STARTS_AT + GRACE  # 이때부터 노쇼로 볼 수 있다
 
 
 @pytest.fixture
@@ -148,7 +158,10 @@ def lock_log() -> list[str]:
 
 @pytest.fixture
 def reservation_repo(lock_log) -> InMemoryReservationRepository:
-    return InMemoryReservationRepository(lock_log)
+    repo = InMemoryReservationRepository(lock_log)
+    repo.restaurant_owner_id = OWNER_ID  # 7번 슬롯은 OWNER의 1번 식당 것
+    repo.slot_starts_at = STARTS_AT
+    return repo
 
 
 @pytest.fixture
@@ -161,8 +174,8 @@ def service(reservation_repo, slot, uow, lock_log) -> ReservationService:
     return ReservationService(
         reservation_repo=reservation_repo,
         slot_repo=InMemorySlotRepository([slot], lock_log),
-        restaurant_service=FakeRestaurantService([RESTAURANT]),
         uow=uow,
+        no_show_grace=GRACE,
     )
 
 
@@ -328,14 +341,22 @@ async def test_create_db_conflict_raises_duplicate(service, reservation_repo, uo
 
 
 async def test_owner_cancels_reservation_of_own_restaurant(service, slot, uow):
-    # 1번 식당 주인은 그 식당 슬롯의 손님 예약을 취소할 수 있고, 자리도 반납된다.
+    # 1번 식당 주인은 그 식당 손님 예약을 전화 요청으로 취소할 수 있고, 시작 전이라 자리도 반납된다.
     created, _ = await service.create(
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
 
-    cancelled, _ = await service.cancel(user=OWNER, reservation_id=created.id, now=NOW)
+    cancelled, _ = await service.cancel(
+        user=OWNER,
+        reservation_id=created.id,
+        now=NOW,
+        by=CancelledBy.OWNER,
+        reason=CancelReason.PHONE_REQUEST,
+    )
 
     assert cancelled.status is ReservationStatus.CANCELLED
+    assert cancelled.cancelled_by is CancelledBy.OWNER
+    assert cancelled.cancel_reason is CancelReason.PHONE_REQUEST
     assert slot.reserved_guests == 2
     assert uow.commits == 2
 
@@ -347,46 +368,205 @@ async def test_other_owner_cancel_raises_not_found(service, slot, uow):
     )
 
     with pytest.raises(NotFoundError):
-        await service.cancel(user=OTHER_OWNER, reservation_id=created.id, now=NOW)
+        await service.cancel(
+            user=OTHER_OWNER,
+            reservation_id=created.id,
+            now=NOW,
+            by=CancelledBy.OWNER,
+            reason=CancelReason.PHONE_REQUEST,
+        )
 
     assert created.status is ReservationStatus.CONFIRMED
     assert slot.reserved_guests == 4
     assert uow.commits == 1
 
 
-async def test_admin_cancels_any_reservation(service, slot, uow):
-    # 관리자는 어느 식당 예약이든 취소할 수 있다.
+async def test_owner_cannot_cancel_through_customer_path(service, slot, uow):
+    # 손님 취소(기본값)로 부르면 운영자도 내 예약만 된다. 손님 예약은 운영자 주소로 해야 한다
     created, _ = await service.create(
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
 
-    cancelled, _ = await service.cancel(user=ADMIN, reservation_id=created.id, now=NOW)
+    with pytest.raises(NotFoundError):
+        await service.cancel(user=OWNER, reservation_id=created.id, now=NOW)
 
-    assert cancelled.status is ReservationStatus.CANCELLED
+    assert created.status is ReservationStatus.CONFIRMED
+
+
+async def test_owner_cancel_when_restaurant_is_gone_raises_not_found(
+    service, reservation_repo, uow
+):
+    # 식당이 삭제돼 주인을 못 찾으면 운영자는 404다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    reservation_repo.restaurant_owner_id = None
+
+    with pytest.raises(NotFoundError):
+        await service.cancel(
+            user=OWNER,
+            reservation_id=created.id,
+            now=NOW,
+            by=CancelledBy.OWNER,
+            reason=CancelReason.PHONE_REQUEST,
+        )
+
+    assert uow.commits == 1
+
+
+async def test_admin_cancels_any_reservation_with_note(service, slot, uow):
+    # 관리자는 어느 식당 예약이든 메모를 남기고 취소할 수 있다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    cancelled, _ = await service.cancel(
+        user=ADMIN,
+        reservation_id=created.id,
+        now=NOW,
+        by=CancelledBy.ADMIN,
+        reason=CancelReason.SYSTEM_ERROR,
+        note="중복 결제 정리",
+    )
+
+    assert cancelled.cancelled_by is CancelledBy.ADMIN
+    assert cancelled.cancel_note == "중복 결제 정리"
     assert slot.reserved_guests == 2
     assert uow.commits == 2
 
 
-async def test_admin_cancel_after_slot_started_raises_not_allowed(service, slot, uow):
-    # 관리자도 슬롯이 시작된 뒤에는 취소할 수 없다 (시각 규칙은 누구에게나 같다).
+async def test_admin_cancel_without_note_is_rejected(service, slot, uow):
+    # 관리자가 메모 없이 취소하면 422이고, 예약과 자리는 그대로다.
     created, _ = await service.create(
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
 
-    with pytest.raises(CancellationNotAllowedError):
-        await service.cancel(user=ADMIN, reservation_id=created.id, now=STARTS_AT)
+    with pytest.raises(CancelNoteRequiredError):
+        await service.cancel(
+            user=ADMIN,
+            reservation_id=created.id,
+            now=NOW,
+            by=CancelledBy.ADMIN,
+            reason=CancelReason.OTHER,
+        )
 
     assert created.status is ReservationStatus.CONFIRMED
     assert slot.reserved_guests == 4
     assert uow.commits == 1
 
 
-async def test_owner_cancel_unknown_reservation_raises_not_found(service, uow):
-    # 운영자·관리자도 없는 예약 번호면 404가 난다.
-    with pytest.raises(NotFoundError):
-        await service.cancel(user=OWNER, reservation_id=999, now=NOW)
+async def test_admin_cancel_after_start_keeps_seats(service, slot, uow):
+    # 관리자는 시작 후에도 취소할 수 있지만, 이미 지난 자리라 좌석은 돌려주지 않는다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
 
-    assert uow.commits == 0
+    cancelled, _ = await service.cancel(
+        user=ADMIN,
+        reservation_id=created.id,
+        now=STARTS_AT,
+        by=CancelledBy.ADMIN,
+        reason=CancelReason.OTHER,
+        note="손님 요청",
+    )
+
+    assert cancelled.status is ReservationStatus.CANCELLED
+    assert slot.reserved_guests == 4
+    assert uow.commits == 2
+
+
+async def test_admin_cancels_even_if_restaurant_is_gone(service, reservation_repo):
+    # 식당이 삭제돼도 관리자는 식당을 보지 않고 취소할 수 있다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    reservation_repo.restaurant_owner_id = None
+
+    cancelled, _ = await service.cancel(
+        user=ADMIN,
+        reservation_id=created.id,
+        now=NOW,
+        by=CancelledBy.ADMIN,
+        reason=CancelReason.OTHER,
+        note="식당 폐업",
+    )
+
+    assert cancelled.status is ReservationStatus.CANCELLED
+
+
+async def test_owner_marks_no_show_and_keeps_seats(service, slot, uow):
+    # 시작 15분 뒤 운영자가 노쇼로 처리하면 취소(이유 NO_SHOW)되고, 좌석은 돌려주지 않는다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    cancelled, _ = await service.cancel(
+        user=OWNER,
+        reservation_id=created.id,
+        now=NO_SHOW_TIME,
+        by=CancelledBy.OWNER,
+        reason=CancelReason.NO_SHOW,
+    )
+
+    assert cancelled.cancel_reason is CancelReason.NO_SHOW
+    assert slot.reserved_guests == 4
+    assert uow.commits == 2
+
+
+async def test_owner_no_show_too_early_is_rejected(service, uow):
+    # 유예 시간 전에는 노쇼로 처리할 수 없다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    with pytest.raises(NoShowTooEarlyError):
+        await service.cancel(
+            user=OWNER,
+            reservation_id=created.id,
+            now=NO_SHOW_TIME - timedelta(seconds=1),
+            by=CancelledBy.OWNER,
+            reason=CancelReason.NO_SHOW,
+        )
+
+    assert uow.commits == 1
+
+
+async def test_owner_checks_in_then_no_show_is_rejected(service, uow):
+    # 운영자가 입장 확인한 예약은 노쇼로 처리할 수 없다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    checked, _ = await service.check_in(
+        user=OWNER, reservation_id=created.id, now=STARTS_AT
+    )
+    assert checked.checked_in_at == STARTS_AT
+
+    with pytest.raises(AlreadyCheckedInError):
+        await service.cancel(
+            user=OWNER,
+            reservation_id=created.id,
+            now=NO_SHOW_TIME,
+            by=CancelledBy.OWNER,
+            reason=CancelReason.NO_SHOW,
+        )
+
+    assert uow.commits == 2  # 예약 1번 + 입장 확인 1번
+
+
+async def test_other_owner_cannot_check_in(service, uow):
+    # 다른 식당 주인은 입장 확인을 할 수 없다 (404).
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    with pytest.raises(NotFoundError):
+        await service.check_in(
+            user=OTHER_OWNER, reservation_id=created.id, now=STARTS_AT
+        )
+
+    assert created.checked_in_at is None
+    assert uow.commits == 1
 
 
 async def test_owner_cancel_locks_slot_before_reservation(service, lock_log):
@@ -396,26 +576,36 @@ async def test_owner_cancel_locks_slot_before_reservation(service, lock_log):
     )
     lock_log.clear()
 
-    await service.cancel(user=OWNER, reservation_id=created.id, now=NOW)
+    await service.cancel(
+        user=OWNER,
+        reservation_id=created.id,
+        now=NOW,
+        by=CancelledBy.OWNER,
+        reason=CancelReason.PHONE_REQUEST,
+    )
 
     assert lock_log == ["slot", "reservation"]
 
 
-async def test_admin_cancels_even_if_restaurant_is_gone(
-    reservation_repo, slot, uow, lock_log
-):
-    # 식당이 삭제돼 조회되지 않아도, 관리자는 식당을 보지 않고 취소할 수 있다.
-    service = ReservationService(
-        reservation_repo=reservation_repo,
-        slot_repo=InMemorySlotRepository([slot], lock_log),
-        restaurant_service=FakeRestaurantService([]),  # 식당이 하나도 없음
-        uow=uow,
-    )
-    created, _ = await service.create(
+async def test_expire_no_shows_handles_only_due_and_not_checked_in(service, slot):
+    # 자동 노쇼: 시작 15분 지남 + 입장 안 함 예약만 처리하고, 입장한 예약은 건너뛴다.
+    no_show, _ = await service.create(
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
+    came, _ = await service.create(
+        user_id=OTHER_USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    await service.check_in(user=OWNER, reservation_id=came.id, now=STARTS_AT)
 
-    cancelled, _ = await service.cancel(user=ADMIN, reservation_id=created.id, now=NOW)
+    # 아직 15분 전이면 아무것도 안 한다
+    assert await service.expire_no_shows(NO_SHOW_TIME - timedelta(seconds=1)) == 0
 
-    assert cancelled.status is ReservationStatus.CANCELLED
-    assert slot.reserved_guests == 2
+    handled = await service.expire_no_shows(NO_SHOW_TIME)
+
+    assert handled == 1
+    assert no_show.cancelled_by is CancelledBy.SYSTEM
+    assert no_show.cancel_reason is CancelReason.NO_SHOW
+    assert came.status is ReservationStatus.CONFIRMED  # 입장한 손님은 그대로
+    assert slot.reserved_guests == 6  # 노쇼여도 좌석은 안 돌려줌 (2 + 2 + 2)
+    # 두 번 돌려도 이미 처리된 건 다시 처리하지 않는다
+    assert await service.expire_no_shows(NO_SHOW_TIME) == 0
