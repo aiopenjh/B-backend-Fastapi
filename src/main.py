@@ -1,5 +1,4 @@
 import asyncio
-import os
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
@@ -23,7 +22,7 @@ from reservation.presentation.router import admin_router as reservation_admin_ro
 from reservation.presentation.router import owner_router as reservation_owner_router
 from slot.presentation.router import router as slot_router
 from seed import seed
-from container import run_no_show_loop  # 담당 4: 자동 노쇼 반복
+from container import env_seconds, run_no_show_loop  # 담당 4: 자동 노쇼 반복
 
 logger = get_logger(__name__)
 
@@ -42,8 +41,9 @@ async def lifespan(app: FastAPI):
     # [담당1] 만료된 로그아웃 토큰(블랙리스트) 정리
     await purge_expired_tokens(AsyncSessionLocal)
 
-    # [담당4] 자동 노쇼: NO_SHOW_CHECK_SECONDS(기본 30초)마다 노쇼 대상을 처리한다. 0이면 끔
-    no_show_interval = int(os.getenv("NO_SHOW_CHECK_SECONDS", "30"))
+    # [담당4] 자동 노쇼: NO_SHOW_CHECK_SECONDS(초)마다 노쇼 대상을 처리한다. 기본 0 = 꺼짐
+    # 화면에 입장 버튼이 생기기 전에 켜면, 온 손님도 입장 기록이 없어 15분 뒤 노쇼가 되니 그때 .env에서 켠다 (예: 30)
+    no_show_interval = env_seconds("NO_SHOW_CHECK_SECONDS", 0)
     no_show_task = (
         asyncio.create_task(run_no_show_loop(AsyncSessionLocal, no_show_interval))
         if no_show_interval > 0

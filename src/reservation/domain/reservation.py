@@ -178,6 +178,46 @@ class Reservation:
             and self._has_cancel_right(viewer, restaurant_owner_id)
         )
 
+    def can_check_in(
+        self,
+        viewer: AuthenticatedUser,
+        now: datetime,
+        slot_starts_at: datetime,
+        slot_ends_at: datetime,
+        restaurant_owner_id: uuid.UUID | None = None,
+    ) -> bool:
+        """입장 버튼을 보여 줄지 확인만 한다. 그 식당 운영자이고, 확정·미입장이고, 입장 시간(시작 30분 전 ~ 끝나기 전)이면 True."""
+        return (
+            self._is_restaurant_owner(viewer, restaurant_owner_id)
+            and self.status is ReservationStatus.CONFIRMED
+            and self.checked_in_at is None
+            and slot_starts_at - CHECK_IN_OPENS_BEFORE <= now < slot_ends_at
+        )
+
+    def can_mark_no_show(
+        self,
+        viewer: AuthenticatedUser,
+        now: datetime,
+        slot_starts_at: datetime,
+        grace: timedelta = DEFAULT_NO_SHOW_GRACE,
+        restaurant_owner_id: uuid.UUID | None = None,
+    ) -> bool:
+        """노쇼 버튼을 보여 줄지 확인만 한다. 그 식당 운영자이고, 확정·미입장이고, 시작 + 유예 시간이 지났으면 True."""
+        return (
+            self._is_restaurant_owner(viewer, restaurant_owner_id)
+            and self.status is ReservationStatus.CONFIRMED
+            and self.checked_in_at is None
+            and now >= slot_starts_at + grace
+        )
+
+    def can_see_cancel_note(
+        self, viewer: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
+    ) -> bool:
+        """취소 메모(내부용)를 볼 수 있나. 관리자와 그 식당 운영자만 True (손님에게는 숨긴다)."""
+        return viewer.is_admin() or self._is_restaurant_owner(
+            viewer, restaurant_owner_id
+        )
+
     def can_be_cancelled_by(
         self, user: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
     ) -> bool:
@@ -188,9 +228,19 @@ class Reservation:
         self, user: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
     ) -> bool:
         # 버튼(can_cancel)과 진짜 취소(can_be_cancelled_by)가 같은 판단을 쓰도록 한 곳에 둔다
-        # 식당 주인을 모르면(None) 운영자 권한은 주지 않는다
         return (
             self.user_id == user.user_id
             or user.is_admin()
-            or (user.is_owner() and restaurant_owner_id == user.user_id)
+            or self._is_restaurant_owner(user, restaurant_owner_id)
+        )
+
+    @staticmethod
+    def _is_restaurant_owner(
+        user: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
+    ) -> bool:
+        # 운영자 역할이고 그 식당 주인이어야 한다. 식당 주인을 모르면(None) 운영자 권한은 주지 않는다
+        return (
+            user.is_owner()
+            and restaurant_owner_id is not None
+            and restaurant_owner_id == user.user_id
         )

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Path, status
 from auth.domain.value_object import AuthenticatedUser
 from auth.presentation.dependencies import get_authenticated_user, require_admin
 from common.schemas import APIResponse
-from container import create_reservation_service
+from container import NO_SHOW_GRACE, create_reservation_service
 from owner.presentation.dependencies import require_owner
 from reservation.application.service import ReservationService
 from reservation.domain.reservation import CancelledBy
@@ -124,7 +124,12 @@ async def owner_cancel_reservation(
     # 매니저가 내 식당인지 이미 확인했으니 식당 주인 = 나
     return APIResponse.ok(
         data=ReservationOut.from_domain(
-            reservation, slot, owner, now, restaurant_owner_id=owner.user_id
+            reservation,
+            slot,
+            owner,
+            now,
+            restaurant_owner_id=owner.user_id,
+            no_show_grace=NO_SHOW_GRACE,
         )
     )
 
@@ -158,7 +163,12 @@ async def owner_check_in(
     )
     return APIResponse.ok(
         data=ReservationOut.from_domain(
-            reservation, slot, owner, now, restaurant_owner_id=owner.user_id
+            reservation,
+            slot,
+            owner,
+            now,
+            restaurant_owner_id=owner.user_id,
+            no_show_grace=NO_SHOW_GRACE,
         )
     )
 

@@ -1,6 +1,6 @@
 # [담당 4] 예약 요청.응답 모양 : 손님이 보내는 예약 신청서와 API로 내보내는 예약 정보
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated
 
 from pydantic import BaseModel, Field, field_validator
@@ -9,6 +9,7 @@ from auth.domain.value_object import AuthenticatedUser
 from common.errors import InvalidInputError
 from common.schemas import SEOUL
 from reservation.domain.reservation import (
+    DEFAULT_NO_SHOW_GRACE,
     CancelledBy,
     CancelReason,
     Reservation,
@@ -100,12 +101,27 @@ class ReservationOut(BaseModel):
         Field(description="왜 취소했나 (NO_SHOW면 노쇼). 취소 전에는 null"),
     ] = None
     cancel_note: Annotated[
-        str | None, Field(description="취소 메모 (관리자는 필수)")
+        str | None,
+        Field(
+            description="취소 메모 (내부용). 관리자와 그 식당 운영자에게만 보이고, 손님에게는 null"
+        ),
     ] = None
     checked_in_at: Annotated[
         datetime | None,
         Field(description="운영자가 입장 확인한 시각 (Asia/Seoul). 안 왔으면 null"),
     ] = None
+    can_check_in: Annotated[
+        bool,
+        Field(
+            description="입장 버튼 표시 여부. 그 식당 운영자이고, 확정·미입장이고, 시작 30분 전 ~ 끝나기 전이면 true"
+        ),
+    ] = False
+    can_mark_no_show: Annotated[
+        bool,
+        Field(
+            description="노쇼 버튼 표시 여부. 그 식당 운영자이고, 확정·미입장이고, 시작 + 유예 시간이 지났으면 true"
+        ),
+    ] = False
 
     @classmethod
     def from_domain(
@@ -115,9 +131,10 @@ class ReservationOut(BaseModel):
         viewer: AuthenticatedUser,
         now: datetime,
         restaurant_owner_id: uuid.UUID | None = None,
+        no_show_grace: timedelta = DEFAULT_NO_SHOW_GRACE,
     ) -> ReservationOut:
-        """도메인 Reservation + TimeSlot -> 응답 DTO. 시각 칸은 서울 시간으로 바꿔 넣고, can_cancel은 도메인에 물어서 채운다.
-        viewer는 보는 사람(역할까지), restaurant_owner_id는 그 식당 주인. 운영자에게 버튼을 보여 줄 때만 필요하다."""
+        """도메인 Reservation + TimeSlot -> 응답 DTO. 시각 칸은 서울 시간으로 바꿔 넣고, 버튼 표시·메모 공개는 도메인에 물어서 채운다.
+        viewer는 보는 사람(역할까지), restaurant_owner_id는 그 식당 주인. 운영자에게 버튼·메모를 보여 줄 때 필요하다."""
         # DB에서 꺼낸 시각은 UTC라서, 응답에서는 같은 순간을 서울 시계(+09:00)로 다시 읽어 내보낸다
         cancelled_at = reservation.cancelled_at
         checked_in_at = reservation.checked_in_at
@@ -141,8 +158,19 @@ class ReservationOut(BaseModel):
             ),
             cancelled_by=reservation.cancelled_by,
             cancel_reason=reservation.cancel_reason,
-            cancel_note=reservation.cancel_note,
+            # 내부 메모는 관리자·그 식당 운영자에게만. 손님에게는 숨긴다
+            cancel_note=(
+                reservation.cancel_note
+                if reservation.can_see_cancel_note(viewer, restaurant_owner_id)
+                else None
+            ),
             checked_in_at=checked_in_at.astimezone(SEOUL) if checked_in_at else None,
+            can_check_in=reservation.can_check_in(
+                viewer, now, slot.starts_at, slot.ends_at, restaurant_owner_id
+            ),
+            can_mark_no_show=reservation.can_mark_no_show(
+                viewer, now, slot.starts_at, no_show_grace, restaurant_owner_id
+            ),
         )
 
 

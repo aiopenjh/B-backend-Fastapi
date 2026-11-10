@@ -1,6 +1,7 @@
 # [담당 4] 예약 실제 DB 테스트 : 진짜 PostgreSQL로 예약 생성, 꽉 찬 슬롯, 동시 예약, 취소 확인
 import asyncio
 import os
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -552,3 +553,140 @@ async def test_expire_no_shows_once_uses_container_wiring(session_factory):
     saved = await read_reservation(session_factory, created.id)
     assert saved.cancelled_by == "SYSTEM"
     assert saved.cancel_reason == "NO_SHOW"
+
+
+async def test_owner_no_show_and_auto_no_show_at_once_handle_once(session_factory):
+    # 운영자 노쇼 버튼과 자동 노쇼가 같은 순간에 와도 한 번만 처리되고, 좌석은 그대로다
+    slot_id, owner_id = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
+    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    await open_connections(session_factory, 2)
+
+    results = await asyncio.gather(
+        cancel(
+            session_factory,
+            owner,
+            created.id,
+            now=STARTS_AT + GRACE,
+            by=CancelledBy.OWNER,
+            reason=CancelReason.NO_SHOW,
+        ),
+        expire_no_shows_once(session_factory, STARTS_AT + GRACE),
+        return_exceptions=True,
+    )
+
+    owner_result, auto_handled = results
+    # 운영자가 이기면 자동은 0건(건너뜀), 자동이 이기면 운영자는 409(이미 취소됨)
+    if isinstance(owner_result, Exception):
+        assert isinstance(owner_result, AlreadyCancelledError)
+        assert auto_handled == 1
+    else:
+        assert auto_handled == 0
+    saved = await read_reservation(session_factory, created.id)
+    assert saved.cancel_reason == "NO_SHOW"
+    reserved, _ = await read_slot(session_factory, slot_id)
+    assert reserved == 2
+
+
+async def test_two_auto_no_show_runs_at_once_handle_once(session_factory):
+    # 서버가 두 대라 자동 노쇼가 동시에 두 번 돌아도, 예약마다 한 번만 처리된다
+    slot_id, _ = await add_slot(session_factory, capacity=10)
+    users = [await add_user(session_factory) for _ in range(3)]
+    for user in users:
+        await reserve(session_factory, user, slot_id, party_size=2)
+    await open_connections(session_factory, 2)
+
+    handled = await asyncio.gather(
+        expire_no_shows_once(session_factory, STARTS_AT + GRACE),
+        expire_no_shows_once(session_factory, STARTS_AT + GRACE),
+    )
+
+    assert sum(handled) == 3  # 3건을 두 번 처리하지 않고 합쳐서 3건
+    reserved, confirmed = await read_slot(session_factory, slot_id)
+    assert confirmed == 0
+    assert reserved == 6  # 노쇼는 좌석을 안 돌려준다
+
+
+async def test_check_in_and_auto_no_show_at_once_never_both(session_factory):
+    # 입장 확인과 자동 노쇼가 동시에 와도 둘 중 하나만 된다 (입장했는데 노쇼인 예약은 없다)
+    slot_id, owner_id = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
+    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    await open_connections(session_factory, 2)
+
+    async def check_in():
+        async with session_factory() as session:
+            return await make_service(session).check_in(
+                user=owner, reservation_id=created.id, now=STARTS_AT + GRACE
+            )
+
+    check_in_result, auto_handled = await asyncio.gather(
+        check_in(),
+        expire_no_shows_once(session_factory, STARTS_AT + GRACE),
+        return_exceptions=True,
+    )
+
+    saved = await read_reservation(session_factory, created.id)
+    if isinstance(check_in_result, Exception):
+        # 자동 노쇼가 먼저: 입장 확인은 이미 취소된 예약이라 409, 입장 기록 없음
+        assert isinstance(check_in_result, AlreadyCancelledError)
+        assert auto_handled == 1
+        assert saved.status == "CANCELLED" and saved.checked_in_at is None
+    else:
+        # 입장 확인이 먼저: 자동 노쇼는 건너뜀, 확정 + 입장 기록 있음
+        assert auto_handled == 0
+        assert saved.status == "CONFIRMED" and saved.checked_in_at is not None
+
+
+async def test_hundred_requests_on_one_slot_load(session_factory):
+    # 부하: 정원 10명 슬롯에 100명이 1명씩 동시에 예약한다 (앱과 같은 연결 묶음: 기본 15개)
+    slot_id, _ = await add_slot(session_factory, capacity=10)
+    other_slot_id, _ = await add_slot(
+        session_factory, capacity=10
+    )  # 상관없는 다른 슬롯
+    users = [await add_user(session_factory) for _ in range(100)]
+    other_user = await add_user(session_factory)
+    await open_connections(session_factory, 15)  # 연결 묶음을 미리 다 열어 둔다
+
+    async def timed(coro):
+        started = time.perf_counter()
+        try:
+            return await coro, time.perf_counter() - started
+        except Exception as error:  # noqa: BLE001 - 실패도 걸린 시간과 같이 모아서 아래에서 종류를 검사한다
+            return error, time.perf_counter() - started
+
+    started = time.perf_counter()
+    results = await asyncio.gather(
+        *(
+            timed(reserve(session_factory, user, slot_id, party_size=1))
+            for user in users
+        ),
+        timed(reserve(session_factory, other_user, other_slot_id, party_size=1)),
+    )
+    total = time.perf_counter() - started
+
+    *crowd, (other_result, other_seconds) = results
+    successes = [r for r, _ in crowd if not isinstance(r, Exception)]
+    sold_out = [r for r, _ in crowd if isinstance(r, SlotSoldOut)]
+    unexpected = [
+        r
+        for r, _ in crowd
+        if isinstance(r, Exception) and not isinstance(r, SlotSoldOut)
+    ]
+    slowest = max(seconds for _, seconds in crowd)
+    print(
+        f"\n[부하] 100명 동시 예약: 전체 {total:.2f}초, 가장 늦은 요청 {slowest:.2f}초, "
+        f"성공 {len(successes)}, 자리 없음 {len(sold_out)}, 그 밖의 에러 {len(unexpected)}, "
+        f"다른 슬롯 예약 {other_seconds:.2f}초"
+    )
+
+    # 정확히 정원(10명)만 성공하고, 나머지 90명은 409 자리 없음이다. 500(그 밖의 에러)은 0개
+    assert len(successes) == 10
+    assert len(sold_out) == 90
+    assert unexpected == []
+    assert await read_slot(session_factory, slot_id) == (10, 10)
+    # 몰린 슬롯 때문에 다른 슬롯 예약이 실패하지 않는다 (연결 대기 30초 안에 끝남)
+    assert not isinstance(other_result, Exception)
+    assert slowest < 30

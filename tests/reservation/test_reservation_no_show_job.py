@@ -30,3 +30,25 @@ async def test_loop_keeps_running_after_error_and_stops_on_cancel(monkeypatch):
     stopped_at = len(calls)
     await asyncio.sleep(0.05)
     assert len(calls) == stopped_at
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, 900),
+        ("", 900),
+        ("   ", 900),
+        ("600", 600),
+        ("0", 0),
+        ("abc", 900),
+        ("-5", 900),
+    ],
+)
+def test_env_seconds_falls_back_to_default(monkeypatch, raw, expected):
+    # 환경변수가 비었거나 숫자가 아니거나 음수면 앱이 죽지 않고 기본값을 쓴다
+    if raw is None:
+        monkeypatch.delenv("NO_SHOW_TEST_SECONDS", raising=False)
+    else:
+        monkeypatch.setenv("NO_SHOW_TEST_SECONDS", raw)
+
+    assert container.env_seconds("NO_SHOW_TEST_SECONDS", 900) == expected

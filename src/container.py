@@ -162,8 +162,24 @@ def create_restaurant_service(
     return RestaurantService(repo=RestaurantRepository(session), uow=uow)
 
 
-# 담당 4 : 노쇼 유예 시간 (시작 후 이만큼 지나야 노쇼). 환경변수 NO_SHOW_GRACE_SECONDS, 기본 15분
-NO_SHOW_GRACE = timedelta(seconds=int(os.getenv("NO_SHOW_GRACE_SECONDS", "900")))
+# 담당 4 : 노쇼 유예 시간 (시작 후 이만큼 지나야 노쇼). 환경변수 NO_SHOW_GRACE_SECONDS(초), 기본 15분
+def env_seconds(name: str, default: int) -> int:
+    """환경변수에서 초(정수)를 읽는다. 비었거나 숫자가 아니거나 음수면 기본값을 쓰고, 잘못된 값은 경고 로그를 남긴다 (앱이 켜지다 죽지 않게)"""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("%s=%r 은(는) 숫자가 아니라 기본값 %d초를 씁니다", name, raw, default)
+        return default
+    if value < 0:
+        logger.warning("%s=%d 은(는) 음수라 기본값 %d초를 씁니다", name, value, default)
+        return default
+    return value
+
+
+NO_SHOW_GRACE = timedelta(seconds=env_seconds("NO_SHOW_GRACE_SECONDS", 900))
 
 
 # 담당 4 : 예약 매니저 공장 (생성, 취소, 노쇼, 입장 확인)

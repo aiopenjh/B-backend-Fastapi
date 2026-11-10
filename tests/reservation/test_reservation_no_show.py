@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.schemas import SEOUL
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
@@ -235,3 +236,62 @@ def test_check_in_twice_or_cancelled_is_rejected():
         cancelled.check_in(
             now=STARTS_AT, slot_starts_at=STARTS_AT, slot_ends_at=ENDS_AT
         )
+
+
+OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
+OWNER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)  # 이 식당 주인
+OTHER_OWNER = AuthenticatedUser(
+    user_id=uuid.UUID("00000000-0000-4000-8000-000000000004"), role=AuthRole.OWNER
+)
+ADMIN = AuthenticatedUser(
+    user_id=uuid.UUID("00000000-0000-4000-8000-000000000005"), role=AuthRole.ADMIN
+)
+CUSTOMER = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)  # 예약한 손님
+
+
+# 입장 버튼은 그 식당 운영자에게, 입장 시간 안에, 확정·미입장 예약에만 보인다
+def test_can_check_in_only_for_restaurant_owner_in_window():
+    reservation = make_reservation()
+
+    assert reservation.can_check_in(OWNER, STARTS_AT, STARTS_AT, ENDS_AT, OWNER_ID)
+    for viewer in (CUSTOMER, OTHER_OWNER, ADMIN):
+        assert not reservation.can_check_in(
+            viewer, STARTS_AT, STARTS_AT, ENDS_AT, OWNER_ID
+        )
+    # 시간 밖이면 안 보인다 (31분 전, 끝난 뒤)
+    assert not reservation.can_check_in(
+        OWNER, STARTS_AT - timedelta(minutes=31), STARTS_AT, ENDS_AT, OWNER_ID
+    )
+    assert not reservation.can_check_in(OWNER, ENDS_AT, STARTS_AT, ENDS_AT, OWNER_ID)
+    # 이미 입장했으면 안 보인다
+    reservation.check_in(now=STARTS_AT, slot_starts_at=STARTS_AT, slot_ends_at=ENDS_AT)
+    assert not reservation.can_check_in(OWNER, STARTS_AT, STARTS_AT, ENDS_AT, OWNER_ID)
+
+
+# 노쇼 버튼은 그 식당 운영자에게, 시작 + 15분부터, 확정·미입장 예약에만 보인다
+def test_can_mark_no_show_only_for_restaurant_owner_after_grace():
+    reservation = make_reservation()
+    due = STARTS_AT + GRACE
+
+    assert reservation.can_mark_no_show(OWNER, due, STARTS_AT, GRACE, OWNER_ID)
+    assert not reservation.can_mark_no_show(
+        OWNER, due - timedelta(seconds=1), STARTS_AT, GRACE, OWNER_ID
+    )
+    for viewer in (CUSTOMER, OTHER_OWNER, ADMIN):
+        assert not reservation.can_mark_no_show(viewer, due, STARTS_AT, GRACE, OWNER_ID)
+    # 식당 주인을 모르면(None) 운영자로 보지 않는다
+    assert not reservation.can_mark_no_show(OWNER, due, STARTS_AT, GRACE, None)
+
+    reservation.check_in(now=STARTS_AT, slot_starts_at=STARTS_AT, slot_ends_at=ENDS_AT)
+    assert not reservation.can_mark_no_show(OWNER, due, STARTS_AT, GRACE, OWNER_ID)
+
+
+# 취소 메모는 관리자와 그 식당 운영자만 볼 수 있다 (손님·다른 운영자는 못 봄)
+def test_can_see_cancel_note():
+    reservation = make_reservation()
+
+    assert reservation.can_see_cancel_note(ADMIN, OWNER_ID)
+    assert reservation.can_see_cancel_note(OWNER, OWNER_ID)
+    assert not reservation.can_see_cancel_note(CUSTOMER, OWNER_ID)
+    assert not reservation.can_see_cancel_note(OTHER_OWNER, OWNER_ID)
+    assert not reservation.can_see_cancel_note(OWNER, None)

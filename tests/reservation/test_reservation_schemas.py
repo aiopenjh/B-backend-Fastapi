@@ -1,13 +1,18 @@
 # [담당 4] 예약 응답 스키마 테스트 : API 명세 예시, from_domain 변환, can_cancel 값
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
 
 from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.schemas import SEOUL
-from reservation.domain.reservation import Reservation, ReservationStatus
+from reservation.domain.reservation import (
+    CancelledBy,
+    CancelReason,
+    Reservation,
+    ReservationStatus,
+)
 from reservation.presentation.schemas import ReservationCreate, ReservationOut
 from slot.domain.time_slot import TimeSlot
 
@@ -319,3 +324,79 @@ def test_reservation_create_formats_contact_phone(contact_phone, expected):
     body = ReservationCreate(slot_id=7, party_size=2, contact_phone=contact_phone)
 
     assert body.contact_phone == expected
+
+
+def make_cancelled_with_note() -> tuple[Reservation, TimeSlot]:
+    reservation, slot = make_confirmed()
+    reservation.cancel(
+        slot_starts_at=STARTS_AT,
+        now=NOW,
+        by=CancelledBy.ADMIN,
+        reason=CancelReason.OTHER,
+        note="내부 메모: 블랙리스트 확인",
+    )
+    return reservation, slot
+
+
+# 취소 메모는 내부용이라 손님(예약한 본인)에게는 숨긴다
+def test_from_domain_hides_cancel_note_from_customer():
+    reservation, slot = make_cancelled_with_note()
+
+    out = ReservationOut.from_domain(
+        reservation, slot, RESERVER, NOW, restaurant_owner_id=RESTAURANT_OWNER_ID
+    )
+
+    assert out.cancel_note is None
+    assert out.cancel_reason is CancelReason.OTHER  # 이유는 손님도 볼 수 있다
+
+
+# 관리자와 그 식당 운영자는 취소 메모를 본다
+def test_from_domain_shows_cancel_note_to_admin_and_owner():
+    reservation, slot = make_cancelled_with_note()
+
+    to_admin = ReservationOut.from_domain(reservation, slot, ADMIN, NOW)
+    to_owner = ReservationOut.from_domain(
+        reservation,
+        slot,
+        RESTAURANT_OWNER,
+        NOW,
+        restaurant_owner_id=RESTAURANT_OWNER_ID,
+    )
+
+    assert to_admin.cancel_note == "내부 메모: 블랙리스트 확인"
+    assert to_owner.cancel_note == "내부 메모: 블랙리스트 확인"
+
+
+# 응답에 입장·노쇼 버튼 표시가 들어간다 (그 식당 운영자에게만 true)
+def test_from_domain_check_in_and_no_show_flags():
+    reservation, slot = make_confirmed()
+    at_start = STARTS_AT
+    after_grace = STARTS_AT + timedelta(minutes=15)
+
+    owner_at_start = ReservationOut.from_domain(
+        reservation,
+        slot,
+        RESTAURANT_OWNER,
+        at_start,
+        restaurant_owner_id=RESTAURANT_OWNER_ID,
+    )
+    owner_after = ReservationOut.from_domain(
+        reservation,
+        slot,
+        RESTAURANT_OWNER,
+        after_grace,
+        restaurant_owner_id=RESTAURANT_OWNER_ID,
+    )
+    customer_after = ReservationOut.from_domain(
+        reservation,
+        slot,
+        RESERVER,
+        after_grace,
+        restaurant_owner_id=RESTAURANT_OWNER_ID,
+    )
+
+    assert owner_at_start.can_check_in is True
+    assert owner_at_start.can_mark_no_show is False  # 아직 15분 안 지남
+    assert owner_after.can_mark_no_show is True
+    assert customer_after.can_check_in is False
+    assert customer_after.can_mark_no_show is False
