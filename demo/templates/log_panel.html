@@ -7,6 +7,17 @@
     <span class="log-title">서버 로그</span>
     <small>최근 {{ log_panel.size }}줄 · 화면을 열 때마다 갱신</small>
   </summary>
+  {% if accounts %}
+  <div class="demo-switch">
+    <span>시연 계정 바꾸기</span>
+    {% for key, account in accounts.items() %}
+    <form method="post" action="/demo/switch">
+      <input type="hidden" name="who" value="{{ key }}">
+      <button type="submit">{{ account[0] }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
   <ol class="log-lines">
     {% for line in log_panel.latest() %}
     <li class="log-{{ line.tone }}">

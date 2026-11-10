@@ -29,6 +29,41 @@
   color:#fff;
 }
 
+.demo-switch {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  padding:10px 16px;
+  border-bottom:1px solid #2a313c;
+  background:#1a1f27;
+}
+
+.demo-switch span {
+  color:#8b95a5;
+  font-size:11px;
+  margin-right:4px;
+}
+
+.demo-switch form {
+  margin:0;
+}
+
+.demo-switch button {
+  font:inherit;
+  font-size:11px;
+  color:#14181f;
+  background:#d7dde6;
+  border:0;
+  border-radius:999px;
+  padding:3px 10px;
+  cursor:pointer;
+}
+
+.demo-switch button:hover {
+  background:#fff;
+}
+
 .log-lines {
   list-style:none;
   margin:0;

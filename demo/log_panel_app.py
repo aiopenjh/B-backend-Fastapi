@@ -11,22 +11,38 @@
 
 import logging
 import re
+import secrets
 import sys
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import parse_qs, urlparse
 
+from fastapi import Depends, Form
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "src"))  # 팀 코드(src)를 import 할 수 있게
 
+import seed  # 시드 계정 (이메일·비밀번호) — 계정 바꾸기에서만 읽음
+from auth.application.service import AuthService  # 담당 1 로그인 매니저 (그대로 부름)
+from common.errors import AppError
+from container import create_auth_service
 from main import app  # 팀 앱 그대로 (위에서 src 경로를 넣은 뒤에 가져옴)
+from web_auth import COOKIE_NAME, COOKIE_PATH, home_url
+
+# 시연 계정 바꾸기: 관리자로 로그인하면 켜지는 "시연 모드" 쿠키. 값은 서버를 켤 때마다 새로 만듦 (밖에서 흉내 못 내게)
+DEMO_COOKIE = "demo_switch"
+DEMO_TOKEN = secrets.token_hex(16)
+ACCOUNTS = {"admin": ("관리자", seed.ADMIN[0], seed.ADMIN_PASSWORD)} | {
+    email.split("@")[0].replace(".", "_"): (name, email, seed.SEED_PASSWORD)
+    for email, name, _, _ in sorted(seed.USERS, key=lambda user: user[3] != "OWNER")  # 운영자 먼저, 그다음 손님
+}
 
 LOGIN_PAGES = {"/ui", "/ui/login"}  # 로그인 폼이 있는 화면
 DETAIL_PAGE = re.compile(r"^/ui/restaurants/\d+$")  # 식당 상세(예약하기) 화면
@@ -114,11 +130,15 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)  # 안쪽 팀 미들웨어가 이 요청 로그를 이미 남긴 뒤
         explain(request, response)
+        demo_mode(request, response)
         is_page = response.headers.get("content-type", "").startswith("text/html")
         if not (is_page and request.url.path.startswith("/ui")):
             return response
         body = b"".join([chunk async for chunk in response.body_iterator])
-        panel = views.get_template("log_panel.html").render(log_panel=recent_logs, style=STYLE)
+        demo_on = request.cookies.get(DEMO_COOKIE) == DEMO_TOKEN
+        panel = views.get_template("log_panel.html").render(
+            log_panel=recent_logs, style=STYLE, accounts=ACCOUNTS if demo_on else None, back=request.url.path,
+        )
         page = body.decode("utf-8").replace("</body>", panel + "\n</body>", 1)
         if request.url.path in LOGIN_PAGES:
             # 시연용: 브라우저의 이메일 형식 검사를 꺼서 엉터리 값도 서버까지 가게 함 (로그에 401이 찍힘)
@@ -128,6 +148,41 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
             page = CLOSED_SLOT.sub(r"\1", page)
         headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
         return Response(page, status_code=response.status_code, headers=headers)
+
+
+def demo_mode(request: Request, response: Response) -> None:
+    """관리자가 화면으로 로그인하면 시연 모드를 켜고, 로그아웃하면 끈다"""
+    if request.method != "POST":
+        return
+    if request.url.path == "/ui/login" and response.headers.get("location", "").endswith("/ui/admin/owners"):
+        response.set_cookie(DEMO_COOKIE, DEMO_TOKEN, httponly=True, samesite="lax", path="/")
+    elif request.url.path == "/ui/logout":
+        response.delete_cookie(DEMO_COOKIE, path="/")
+
+
+@app.post("/demo/switch", include_in_schema=False)
+async def switch_account(
+    request: Request,
+    auth: Annotated[AuthService, Depends(create_auth_service)],
+    who: Annotated[str, Form()],
+):
+    """시연용: 시연 모드일 때만, 시드 계정으로 진짜 로그인해서 화면 로그인 쿠키를 바꿔 끼움"""
+    if request.cookies.get(DEMO_COOKIE) != DEMO_TOKEN or who not in ACCOUNTS:
+        return Response("시연 모드가 아니에요. 관리자로 로그인해 주세요.", status_code=403)
+    name, email, password = ACCOUNTS[who]
+    try:
+        issued = await auth.login(email=email, password=password)
+        user = await auth.authenticate(token=issued.access_token)
+    except AppError:
+        logger.warning("시연 계정 바꾸기 실패 401 %s", name)
+        return RedirectResponse("/ui", status_code=303)
+    logger.warning("시연 계정 바꾸기 → %s (%s)", name, user.role)
+    response = RedirectResponse(home_url(request, user), status_code=303)
+    response.set_cookie(
+        COOKIE_NAME, issued.access_token, max_age=issued.expires_in,
+        httponly=True, samesite="lax", path=COOKIE_PATH, secure=request.url.scheme == "https",
+    )
+    return response
 
 
 app.add_middleware(LogPanelMiddleware)  # 마지막에 붙인 것이 가장 바깥 → 팀 로그가 먼저 찍힘
