@@ -16,8 +16,12 @@ from user.domain.value_object import Email
 
 from common.errors import InvalidInputError
 
+# 72는 bcrypt 입력 한도(바이트). 허용 문자를 ASCII로만 두어 글자 수 = 바이트 수가 되게 한다.
+# \d는 전각·아랍 숫자 같은 유니코드 숫자도 받으므로 0-9로 적는다
+PASSWORD_MAX_LENGTH = 72
 PASSWORD_REGEX = re.compile(
-    r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$"
+    r"(?=.*[A-Za-z])(?=.*[0-9])(?=.*[@$!%*#?&])"
+    rf"[A-Za-z0-9@$!%*#?&]{{8,{PASSWORD_MAX_LENGTH}}}"
 )
 
 
@@ -90,15 +94,21 @@ class User:
         self.password_hash = hasher.hash(new_password)
         self.updated_at = datetime.now(UTC)
 
-    def change_owner_role(self, new_role: Role) -> None:
+    def change_owner_role(self, new_role: Role | str) -> None:
         """관리자가 CUSTOMER <-> OWNER 사이에서 역할을 바꾼다"""
-        if self.role is Role.ADMIN or new_role not in ASSIGNABLE_ROLES:
+        # 문자열이 들어와도 Role로 바꿔 저장한다. 그대로 두면 저장할 때 .value에서 깨진다
+        try:
+            role = Role(new_role)
+        except ValueError:
             raise InvalidRoleChangeError()
 
-        if self.role is new_role:
+        if self.role == Role.ADMIN or role not in ASSIGNABLE_ROLES:
+            raise InvalidRoleChangeError()
+
+        if self.role == role:
             return
 
-        self.role = new_role
+        self.role = role
         self.updated_at = datetime.now(UTC)
 
     @staticmethod
@@ -110,11 +120,12 @@ class User:
 
     @staticmethod
     def _validate_password(raw_password: str) -> None:
-        if not PASSWORD_REGEX.match(raw_password):
+        # fullmatch: match + "$"는 끝의 "\n"을 통과시켜 줄바꿈까지 해시에 들어간다
+        if not PASSWORD_REGEX.fullmatch(raw_password):
             raise InvalidInputError(
                 errors={
                     "password": [
-                        "비밀번호는 8자 이상이어야 하며 영문, 숫자, 특수문자를 포함해야 합니다."
+                        "비밀번호는 8자 이상 72자 이하이며 영문, 숫자, 특수문자를 포함해야 합니다."
                     ]
                 }
             )

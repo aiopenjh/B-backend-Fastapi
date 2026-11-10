@@ -27,8 +27,12 @@ def _fail(
     errors: dict[str, list[str]] | None = None,
 ) -> JSONResponse:
     body = APIResponse.fail(error_code, message=message, errors=errors)
+    # [담당1] 401은 토큰이 없든 잘못됐든 같은 재인증 헤더를 붙임 (RFC 6750)
+    headers = {"WWW-Authenticate": "Bearer"} if error_code.status == 401 else None
     return JSONResponse(
-        status_code=error_code.status, content=body.model_dump(mode="json")
+        status_code=error_code.status,
+        content=body.model_dump(mode="json"),
+        headers=headers,
     )
 
 
