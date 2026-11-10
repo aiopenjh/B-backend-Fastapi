@@ -30,6 +30,7 @@ from container import (
     create_auth_service,  # 담당 1: 로그인 매니저 공장
     create_browse_service,  # 담당 5: 손님 둘러보기 매니저 공장
     create_reservation_query_service,  # 담당 5: 예약 조회 매니저 공장
+    create_reservation_service,  # 담당 4: 예약 매니저 공장 (#46)
     create_restaurant_service,  # 담당 2: 식당 매니저 공장
     create_slot_service,  # 담당 3: 빈자리 매니저 공장 (#44)
 )
@@ -56,7 +57,6 @@ from web_data import (
     OwnerUIQueries,
     PageResult,
     get_owner_ui_queries,
-    get_reservation_service,
 )
 
 SRC_DIR = Path(__file__).resolve().parent
@@ -92,7 +92,7 @@ Blank = BeforeValidator(lambda value: value or None)
 Auth = Annotated[AuthService, Depends(create_auth_service)]
 Admin = Annotated[AdminService, Depends(create_admin_service)]
 Browse = Annotated[BrowseService, Depends(create_browse_service)]
-Booking = Annotated[ReservationService, Depends(get_reservation_service)]
+Booking = Annotated[ReservationService, Depends(create_reservation_service)]
 MyReservations = Annotated[ReservationQueryService, Depends(create_reservation_query_service)]
 
 # 예약하기 실패를 손님이 읽는 문구로 (오류 코드 → 문구)

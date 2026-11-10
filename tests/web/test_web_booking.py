@@ -10,6 +10,7 @@ from auth.domain.value_object import AuthenticatedUser, AuthRole
 from container import (
     create_browse_service,
     create_reservation_query_service,
+    create_reservation_service,
     create_restaurant_service,
     create_slot_service,
 )
@@ -20,7 +21,6 @@ from slot.domain.exceptions import SlotSoldOut
 from slot.domain.time_slot import TimeSlot
 from web import register_web
 from web_auth import get_ui_user
-from web_data import get_reservation_service
 
 CUSTOMER = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.CUSTOMER)
 ADMIN = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
@@ -85,7 +85,7 @@ def make_client(booking, user):
     app.dependency_overrides[create_slot_service] = FakeSlots
     app.dependency_overrides[create_browse_service] = FakeBrowse
     app.dependency_overrides[create_reservation_query_service] = FakeMyReservations
-    app.dependency_overrides[get_reservation_service] = lambda: booking
+    app.dependency_overrides[create_reservation_service] = lambda: booking
     app.dependency_overrides[get_ui_user] = login_as(user)
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 

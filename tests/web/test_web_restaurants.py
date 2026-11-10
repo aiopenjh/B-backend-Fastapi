@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from container import (
     create_browse_service,
     create_reservation_query_service,
+    create_reservation_service,
     create_restaurant_service,
     create_slot_service,
 )
@@ -20,7 +21,6 @@ from slot.domain.day_range import SEOUL, seoul_now
 from slot.domain.time_slot import TimeSlot
 from web import register_web
 from web_auth import get_ui_user
-from web_data import get_reservation_service
 
 RESTAURANT = Restaurant(
     id=1,
@@ -117,7 +117,7 @@ def client(fakes) -> httpx.AsyncClient:
     app.dependency_overrides[create_slot_service] = lambda: slots
     app.dependency_overrides[create_browse_service] = lambda: browse
     app.dependency_overrides[create_reservation_query_service] = lambda: None
-    app.dependency_overrides[get_reservation_service] = lambda: None
+    app.dependency_overrides[create_reservation_service] = lambda: None
     app.dependency_overrides[get_ui_user] = not_logged_in  # 쿠키 로그인 없이
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
