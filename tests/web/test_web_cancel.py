@@ -15,6 +15,7 @@ from container import (
     create_reservation_query_service,
     create_reservation_service,
     create_restaurant_service,
+    create_user_service,
 )
 from reservation.domain.exceptions import AlreadyCancelledError  # 담당4 이미 취소
 from reservation.domain.reservation import Reservation, ReservationStatus  # 담당4 예약
@@ -78,6 +79,11 @@ class FakeOwnerService:
         return ROWS, len(ROWS)
 
 
+class FakeUsers:
+    async def get_user(self, user_id):
+        return type("User", (), {"name": "손님A", "phone": "010-1111-0001"})()
+
+
 class FakeAdmin:
     async def list_restaurant_reservations(self, restaurant_id, day, page):
         guest = Guest(name="손님A", email="guest@example.com", phone="010-1111-0001")
@@ -104,6 +110,7 @@ def make_client(booking, user):
     app.dependency_overrides[create_restaurant_service] = FakeRestaurants
     app.dependency_overrides[create_owner_service] = FakeOwnerService
     app.dependency_overrides[create_admin_service] = FakeAdmin
+    app.dependency_overrides[create_user_service] = FakeUsers
     app.dependency_overrides[get_ui_user] = login_as(user)
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
@@ -178,6 +185,7 @@ async def test_owner_and_admin_tables_have_cancel_buttons(booking):
         assert page.text.count("/ui/reservations/11/cancel") == 1
         assert "/ui/reservations/12/cancel" not in page.text
     assert "한식" in admin_page.text  # 음식 종류는 한국어로
+    assert "<strong>손님A</strong>" in owner_page.text  # 운영자 표에도 예약자 이름
 
 
 async def test_front_door_goes_to_browse(booking):

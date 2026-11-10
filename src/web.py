@@ -34,6 +34,7 @@ from container import (
     create_reservation_service,  # 담당 4: 예약 매니저 공장 (#46)
     create_restaurant_service,  # 담당 2: 식당 매니저 공장
     create_slot_service,  # 담당 3: 빈자리 매니저 공장 (#44)
+    create_user_service,  # 담당 1: 회원 매니저 공장 (예약 연락처로 내 전화번호)
 )
 from reservation.application.query_service import (
     ReservationQueryService,  # 담당 5: 예약 조회 매니저
@@ -46,6 +47,7 @@ from restaurant.presentation.routers.v1.router import (
 )
 from slot.application.service import SlotService  # 담당 3: 빈자리 매니저
 from slot.domain.day_range import seoul_now  # 담당 3: 서울 지금 시각
+from user.application.service import UserService  # 담당 1: 회원 매니저
 from web_auth import (  # 담당 5: 화면 로그인
     COOKIE_NAME,
     COOKIE_PATH,
@@ -116,6 +118,7 @@ Admin = Annotated[AdminService, Depends(create_admin_service)]
 Browse = Annotated[BrowseService, Depends(create_browse_service)]
 Booking = Annotated[ReservationService, Depends(create_reservation_service)]
 MyReservations = Annotated[ReservationQueryService, Depends(create_reservation_query_service)]
+Users = Annotated[UserService, Depends(create_user_service)]
 
 # 예약하기 실패를 손님이 읽는 문구로 (오류 코드 → 문구)
 BOOKING_ERRORS = {
@@ -375,6 +378,7 @@ async def reserve_submit(
     restaurant_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
     slots: Slots,
     booking: Booking,
+    users: Users,
     slot_id: Annotated[int, Form()],
     party_size: Annotated[int, Form(ge=1, le=20)],
     date: Annotated[Date, Form()],
@@ -399,7 +403,9 @@ async def reserve_submit(
     if slot_id not in {item.slot.id for item in available}:
         return RedirectResponse(back.include_query_params(fail="NOT_THIS_RESTAURANT"), status_code=303)
     try:
-        reservation, _ = await booking.create(user.user_id, slot_id, party_size, None, seoul_now())
+        # 예약 연락처 = 예약한 사람의 회원 전화번호 (사람마다 달라서 운영자·관리자 표에서 구분됨)
+        phone = (await users.get_user(user.user_id)).phone
+        reservation, _ = await booking.create(user.user_id, slot_id, party_size, phone, seoul_now())
     except AppError as error:
         return RedirectResponse(back.include_query_params(fail=error.error_code.name, slot_id=slot_id), status_code=303)
     return RedirectResponse(back.include_query_params(reserved=reservation.id), status_code=303)

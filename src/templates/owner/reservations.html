@@ -52,6 +52,7 @@
           <th scope="col">예약 번호</th>
           <th scope="col">방문 일시</th>
           <th scope="col">인원</th>
+          <th scope="col">예약자</th>
           <th scope="col">연락처</th>
           <th scope="col">상태</th>
           <th scope="col">취소</th>
@@ -68,7 +69,7 @@
           <td><span class="skeleton short"></span></td>
         </tr>
         <tr>
-          <td colspan="5">
+          <td colspan="7">
             <div class="empty-state">
               <span class="empty-symbol" aria-hidden="true">≡</span>
               <h3>예약 내역이 표시될 자리예요</h3>
@@ -80,7 +81,7 @@
         {% elif not reservations %}
         {# 연결됐지만 예약이 없음([]) #}
         <tr>
-          <td colspan="5">
+          <td colspan="7">
             <div class="empty-state">
               <span class="empty-symbol" aria-hidden="true">≡</span>
               <h3>해당 기간의 예약이 없어요</h3>
@@ -94,6 +95,7 @@
           <td data-label="예약 번호"><span class="reservation-id">#{{ reservation.id }}</span></td>
           <td data-label="방문 일시"><time datetime="{{ reservation.starts_at }}">{{ reservation.starts_at|seoul_datetime }}</time></td>
           <td data-label="인원"><strong>{{ reservation.party_size }}</strong>명</td>
+          <td data-label="예약자"><strong>{{ reservation.guest_name or '—' }}</strong></td>
           <td data-label="연락처">{{ reservation.contact_phone or '미입력' }}</td>
           <td data-label="상태">
             {% if reservation.status == 'CONFIRMED' %}<span class="badge badge-confirmed"><span></span>예약 확정</span>

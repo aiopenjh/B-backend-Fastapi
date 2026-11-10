@@ -13,6 +13,7 @@ from container import (
     create_reservation_service,
     create_restaurant_service,
     create_slot_service,
+    create_user_service,
 )
 from reservation.domain.reservation import Reservation, ReservationStatus
 from restaurant.domain.exceptions import RestaurantNotFoundError
@@ -57,9 +58,17 @@ class FakeBooking:
 
     async def create(self, user_id, slot_id, party_size, contact_phone, now):
         self.received = (user_id, slot_id, party_size)
+        self.contact_phone = contact_phone
         if self.sold_out:
             raise SlotSoldOut()
         return RESERVATION, SLOT
+
+
+class FakeUsers:
+    """가짜 회원 매니저: 손님 전화번호"""
+
+    async def get_user(self, user_id):
+        return type("User", (), {"phone": "010-1111-0001"})()
 
 
 class FakeMyReservations:
@@ -87,6 +96,7 @@ def make_client(booking, user):
     app.dependency_overrides[create_browse_service] = FakeBrowse
     app.dependency_overrides[create_reservation_query_service] = FakeMyReservations
     app.dependency_overrides[create_reservation_service] = lambda: booking
+    app.dependency_overrides[create_user_service] = FakeUsers
     app.dependency_overrides[get_ui_user] = login_as(user)
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
@@ -189,3 +199,10 @@ async def test_group_note_shows_max_party_and_phone(booking):
 
     assert "한 번에 최대 4명까지 예약할 수 있어요." in response.text  # 그날 시간대의 최대 인원
     assert "단체는 식당에 전화로 문의해 주세요" in response.text
+
+
+async def test_booking_uses_my_phone_as_contact(booking):
+    async with make_client(booking, CUSTOMER) as client:
+        await client.post("/ui/restaurants/1/reserve", data=FORM)
+
+    assert booking.contact_phone == "010-1111-0001"  # 예약 연락처 = 예약한 사람의 회원 전화번호
