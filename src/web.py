@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BeforeValidator
+from starlette.datastructures import URL
 
 from admin.application.service import AdminService  # 담당 5: 관리자 매니저
 from auth.application.service import AuthService  # 담당 1: 로그인 매니저
@@ -82,6 +83,27 @@ def seoul_time(value: datetime) -> str:
 
 templates.env.filters["seoul_datetime"] = seoul_datetime
 templates.env.filters["seoul_time"] = seoul_time
+
+# 음식 종류 코드 → 화면 글자 (DB 값은 그대로 두고 화면에서만 바꿔 보여 줌, 목록에 없으면 그대로)
+CUISINE_LABELS = {
+    "KOREAN": "한식",
+    "JAPANESE": "일식",
+    "CHINESE": "중식",
+    "WESTERN": "양식",
+    "ITALIAN": "이탈리안",
+    "BUNSIK": "분식",
+    "PUB": "주점",
+    "CAFE": "카페",
+    "WORLD": "세계 음식",
+}
+
+
+def cuisine_label(value: str | None) -> str:
+    """음식 종류 코드를 한국어로 ('KOREAN' → '한식')"""
+    return CUISINE_LABELS.get(value or "", value or "")
+
+
+templates.env.filters["cuisine"] = cuisine_label
 OwnerQueries = Annotated[OwnerUIQueries | None, Depends(get_owner_ui_queries)]
 Restaurants = Annotated[RestaurantService, Depends(create_restaurant_service)]
 Slots = Annotated[SlotService, Depends(create_slot_service)]
@@ -103,6 +125,14 @@ BOOKING_ERRORS = {
     "DUPLICATE_RESERVATION": "이미 예약한 시간이에요.",
     "NOT_THIS_RESTAURANT": "선택한 시간을 찾을 수 없어요. 다시 골라 주세요.",
 }
+
+# 예약 취소 실패를 읽는 문구로 (오류 코드 → 문구). 화면 알림 조각(notice.html)이 씀
+CANCEL_ERRORS = {
+    "ALREADY_CANCELLED": "이미 취소된 예약이에요.",
+    "CANCELLATION_NOT_ALLOWED": "예약 시간이 시작돼서 취소할 수 없어요.",
+    "NOT_FOUND": "취소할 수 있는 예약이 아니에요.",
+}
+templates.env.globals["CANCEL_ERRORS"] = CANCEL_ERRORS
 
 
 def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
@@ -237,6 +267,7 @@ async def reservations_page(
         name="owner/reservations.html",
         context={
             "active_page": "reservations",
+            "now": seoul_now(),
             "restaurant_id": restaurant_id,
             "selected_date": date.isoformat() if date else "",
             "reservations": result.items if result else None,
@@ -427,9 +458,62 @@ async def admin_reservations_page(
         return message_page(request, error.error_code.status, "식당을 찾을 수 없어요", error.message)
     return templates.TemplateResponse(
         request=request, name="admin/reservations.html",
-        context={"active_page": "admin", "restaurant": restaurant, "rows": rows, "total": total,
+        context={"active_page": "admin", "restaurant": restaurant, "rows": rows, "total": total, "now": seoul_now(),
                  "selected_date": date.isoformat() if date else "", "page_size": page_size,
                  "result": PageResult(rows, total, page, page_size)},
+    )
+
+
+# 담당 5: 예약 취소 (손님·운영자·관리자 화면이 같이 씀) — 담당 4 ReservationService.cancel(#54)이 권한을 판단
+@router.post("/reservations/{reservation_id}/cancel", name="ui_cancel")
+async def cancel_submit(
+    request: Request,
+    reservation_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
+    booking: Booking,
+    next: Annotated[str, Form()] = "",
+):
+    user = request.state.ui_user
+    if user is None:
+        return to_login(request)
+    back = URL(safe_next(next) or home_url(request, user))
+    try:
+        # 손님은 내 예약, 운영자는 내 식당 예약, 관리자는 모든 예약. 아니면 404, 이미 취소·시작됨은 409
+        await booking.cancel(user, reservation_id, seoul_now())
+    except AppError as error:
+        return RedirectResponse(back.include_query_params(cancel_fail=error.error_code.name), status_code=303)
+    return RedirectResponse(back.include_query_params(cancelled=reservation_id), status_code=303)
+
+
+# 담당 5: 손님 "내 예약" 화면 — 담당 5 내 예약 조회 매니저 + 취소 버튼
+@router.get("/my/reservations", response_class=HTMLResponse, name="ui_my_reservations")
+async def my_reservations_page(
+    request: Request,
+    my_reservations: MyReservations,
+    service: Restaurants,
+    page: PageNumber = 1,
+    page_size: PageSize = 10,
+):
+    user = request.state.ui_user
+    if user is None:
+        return to_login(request)
+    if moved := staff_redirect(request):
+        return moved
+    items, total = await my_reservations.list_my_reservations(user, None, PageParams(page=page, page_size=page_size))
+    # 예약에는 식당 번호만 있어서, 화면에 쓸 식당 이름을 한 번씩만 꺼내 둔다 (지워진 식당은 이름 없이)
+    names = {}
+    for _, slot in items:
+        if slot.restaurant_id not in names:
+            try:
+                names[slot.restaurant_id] = (await service.get_restaurant(slot.restaurant_id)).name
+            except AppError:
+                names[slot.restaurant_id] = None
+    return templates.TemplateResponse(
+        request=request,
+        name="my/reservations.html",
+        context={
+            "active_page": "my", "items": items, "names": names, "now": seoul_now(),
+            "result": PageResult(items, total, page, page_size),
+        },
     )
 
 

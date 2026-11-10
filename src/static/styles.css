@@ -371,3 +371,37 @@ body .booking-fail {
   background:#fdecea;
   color:#a3271b;
 }
+
+body .my-reservation-list {
+  list-style:none;
+  margin:0;
+  padding:0;
+}
+
+body .my-reservation-list li {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  border-top:1px solid var(--line);
+}
+
+body .my-reservation-list .muted {
+  margin-top:4px;
+}
+
+body .my-reservation-side {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+}
+
+body .cancel-button {
+  background:none;
+  border:0;
+  padding:0;
+  cursor:pointer;
+  color:#a3271b;
+}

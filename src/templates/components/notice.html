@@ -1,0 +1,12 @@
+{# [담당 5] 예약 취소 결과 알림 조각: 취소 뒤 돌아온 주소의 ?cancelled= / ?cancel_fail= 을 읽어 보여 줌 #}
+{% set cancelled = request.query_params.get('cancelled') %}
+{% set cancel_fail = request.query_params.get('cancel_fail') %}
+{% if cancelled %}
+<div class="booking-notice booking-done" role="status">
+  <strong>예약 #{{ cancelled }}을 취소했어요</strong>
+</div>
+{% elif cancel_fail %}
+<div class="booking-notice booking-fail" role="alert">
+  {{ CANCEL_ERRORS.get(cancel_fail, "취소하지 못했어요. 다시 시도해 주세요.") }}
+</div>
+{% endif %}

@@ -35,7 +35,7 @@
       <select id="cuisine" name="cuisine">
         <option value="">전체</option>
         {% for name in cuisines %}
-          <option value="{{ name }}" {% if cuisine == name %}selected{% endif %}>{{ name }}</option>
+          <option value="{{ name }}" {% if cuisine == name %}selected{% endif %}>{{ name|cuisine }}</option>
         {% endfor %}
       </select>
     </div>
@@ -83,7 +83,7 @@
         {% endif %}
       </div>
       <div class="restaurant-content">
-        <span class="subtle-tag">{{ restaurant.cuisine }}</span>
+        <span class="subtle-tag">{{ restaurant.cuisine|cuisine }}</span>
         <h3>{{ restaurant.name }}</h3>
         <p class="address">{{ restaurant.address }}</p>
         <div class="card-bottom">

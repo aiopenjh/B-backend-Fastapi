@@ -16,7 +16,7 @@
 {% else %}
 <div class="page-heading">
   <div>
-    <span class="subtle-tag">{{ restaurant.cuisine }}</span>
+    <span class="subtle-tag">{{ restaurant.cuisine|cuisine }}</span>
     <h1 class="detail-title">{{ restaurant.name }}</h1>
     <p class="muted">{{ restaurant.address }}{% if restaurant.phone %}<span class="separator">·</span>{{ restaurant.phone }}{% endif %}</p>
   </div>
@@ -60,6 +60,7 @@
       <div class="booking-notice booking-done" role="status">
         <strong>예약됐어요</strong>
         <p>{{ done_slot.starts_at|seoul_datetime }} · {{ done_reservation.party_size }}명 · 예약 번호 #{{ done_reservation.id }}</p>
+        <a class="text-link" href="{{ url_for('ui_my_reservations') }}">내 예약 보기</a>
       </div>
     {% elif fail %}
       <div class="booking-notice booking-fail" role="alert">{{ fail }}</div>

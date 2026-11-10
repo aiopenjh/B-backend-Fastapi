@@ -29,7 +29,7 @@ sys.path.insert(0, str(HERE.parent / "src"))  # 팀 코드(src)를 import 할 �
 from main import app  # 팀 앱 그대로 (위에서 src 경로를 넣은 뒤에 가져옴)
 
 LOGIN_PAGES = {"/ui", "/ui/login"}  # 로그인 폼이 있는 화면
-STATUS = re.compile(r"\s([45])\d\d\s")  # 요청 로그 속 4xx·5xx 상태 번호
+STATUS = re.compile(r"(?<=\s)([1-5])\d\d(?=\s|$)")  # 로그 줄 속 HTTP 상태 번호 (200·401·500 …)
 logger = logging.getLogger("demo")
 
 
@@ -39,6 +39,9 @@ class LogLine:
     level: str
     text: str
     tone: str  # ok · warn(4xx) · error(5xx·오류)
+    code: str = ""  # 줄 속 상태 번호 (없으면 빈칸) — 화면에서 이 번호만 색 배지로
+    before: str = ""  # 번호 앞 글자
+    after: str = ""  # 번호 뒤 글자
 
 
 class RecentLogs(logging.Handler):
@@ -54,10 +57,11 @@ class RecentLogs(logging.Handler):
         if record.exc_info and record.exc_info[1] is not None:
             error = record.exc_info[1]
             text += f" → {type(error).__name__}: {error}"  # 터미널의 긴 Traceback 대신 마지막 한 줄만
-        status = STATUS.search(f" {text} ")
+        line = f"{record.name}: {text}"
+        status = STATUS.search(line)
         if record.levelno >= logging.ERROR or (status and status.group(1) == "5"):
             tone = "error"
-        elif record.levelno >= logging.WARNING or status or record.name == "common.error_handlers":
+        elif record.levelno >= logging.WARNING or (status and status.group(1) == "4") or record.name == "common.error_handlers":
             tone = "warn"  # 4xx 요청 줄, 경고, API 오류 코드 줄(FORBIDDEN 등)
         else:
             tone = "ok"
@@ -65,8 +69,11 @@ class RecentLogs(logging.Handler):
             LogLine(
                 time=datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
                 level=record.levelname,
-                text=f"{record.name}: {text}",
+                text=line,
                 tone=tone,
+                code=status.group(0) if status else "",
+                before=line[: status.start()] if status else line,
+                after=line[status.end():] if status else "",
             )
         )
 

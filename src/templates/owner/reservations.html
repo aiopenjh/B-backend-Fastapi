@@ -11,6 +11,8 @@
   <a class="button button-outline" href="{{ url_for('ui_restaurants') }}">← 식당 목록</a>
 </div>
 
+{% include "components/notice.html" %}
+
 <section class="panel" aria-labelledby="reservations-title">
   <div class="panel-heading">
     <div>
@@ -52,6 +54,7 @@
           <th scope="col">인원</th>
           <th scope="col">연락처</th>
           <th scope="col">상태</th>
+          <th scope="col">취소</th>
         </tr>
       </thead>
       <tbody>
@@ -96,6 +99,14 @@
             {% if reservation.status == 'CONFIRMED' %}<span class="badge badge-confirmed"><span></span>예약 확정</span>
             {% elif reservation.status == 'CANCELLED' %}<span class="badge"><span></span>취소</span>
             {% else %}{{ reservation.status }}{% endif %}
+          </td>
+          <td data-label="취소">
+            {% if reservation.status == 'CONFIRMED' and reservation.starts_at > now %}
+            <form method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
+              <input type="hidden" name="next" value="{{ request.url.path }}?{{ request.url.query }}">
+              <button class="text-link cancel-button" type="submit" aria-label="예약 #{{ reservation.id }} 취소">취소</button>
+            </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

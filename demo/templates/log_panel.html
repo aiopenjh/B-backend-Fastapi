@@ -12,7 +12,7 @@
     <li class="log-{{ line.tone }}">
       <time>{{ line.time }}</time>
       <span class="log-level">{{ line.level }}</span>
-      <span class="log-text">{{ line.text }}</span>
+      <span class="log-text">{{ line.before }}{% if line.code %}<span class="log-code code-{{ line.code[0] }}xx">{{ line.code }}</span>{% endif %}{{ line.after }}</span>
     </li>
     {% else %}
     <li class="log-empty">아직 로그가 없어요.</li>

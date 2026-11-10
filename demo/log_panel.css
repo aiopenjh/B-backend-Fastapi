@@ -70,6 +70,33 @@
   color:#ff8f86;
 }
 
+.log-code {
+  display:inline-block;
+  padding:0 6px;
+  margin:0 2px;
+  border-radius:4px;
+  font-weight:700;
+  color:#14181f;
+}
+
+.code-1xx,
+.code-3xx {
+  background:#7fb2e5;
+}
+
+.code-2xx {
+  background:#6fcf97;
+}
+
+.code-4xx {
+  background:#f0a35e;
+}
+
+.code-5xx {
+  background:#ff6b6b;
+  color:#fff;
+}
+
 .log-empty {
   color:#7d8796;
 }
