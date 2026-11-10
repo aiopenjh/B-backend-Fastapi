@@ -58,19 +58,19 @@ class FakeRestaurantService:
 
 
 class FakeBrowseService:
-    """가짜 둘러보기 매니저: 음식 종류·시·도·구 목록, 받은 조건과 섞기 번호를 적어 둠"""
+    """가짜 둘러보기 매니저: 음식 종류·구·동 목록, 받은 조건과 섞기 번호를 적어 둠"""
 
     def __init__(self):
         self.received = None
         self.seeds = []
-        self.districts_for = None
+        self.dongs_for = None
 
-    def list_provinces(self):
-        return ["서울특별시", "경기도"]
-
-    async def list_districts(self, province):
-        self.districts_for = province
+    async def list_districts(self):
         return ["관악구", "종로구"]
+
+    async def list_dongs(self, district):
+        self.dongs_for = district
+        return ["낙원동", "인사동"]
 
     async def list_cuisines(self):
         return ["양식", "한식"]
@@ -78,8 +78,8 @@ class FakeBrowseService:
     async def next_open_day(self, restaurant_id, after):
         return None
 
-    async def list_restaurants(self, province, district, q, cuisine, seed, page):
-        self.received = (province, district, q, cuisine, page.page, page.page_size)
+    async def list_restaurants(self, district, dong, q, cuisine, seed, page):
+        self.received = (district, dong, q, cuisine, page.page, page.page_size)
         self.seeds.append(seed)
         return [RESTAURANT], 12
 
@@ -124,15 +124,16 @@ def client(fakes) -> httpx.AsyncClient:
 
 async def test_browse_page_shows_restaurants_and_passes_filters(client, fakes):
     async with client:
-        response = await client.get("/ui/restaurants?q=테스트&cuisine=&region=&district=관악구&page=2")
+        response = await client.get("/ui/restaurants?q=테스트&cuisine=&district=&dong=낙원동&page=2")
 
     assert response.status_code == 200
     assert "테스트 식당" in response.text
     assert "/ui/restaurants/1" in response.text  # 상세로 가는 링크
-    # 빈 칸은 '안 고름'(None), 지역이 없으면 상세 지역도 무시, 한 페이지 기본 10개
+    # 빈 칸은 '안 고름'(None), 구가 없으면 동도 무시, 한 페이지 기본 10개
     assert fakes[2].received == (None, None, "테스트", None, 2, 10)
-    assert '<option value="한식"' in response.text and '<option value="경기도"' in response.text
-    assert 'id="district" name="district" disabled' in response.text  # 지역을 안 고르면 상세 지역 잠김
+    assert '<option value="한식"' in response.text and '<option value="종로구"' in response.text
+    assert 'id="dong" name="dong" disabled' in response.text  # 구를 안 고르면 동 칸 잠김
+    assert fakes[2].dongs_for is None  # 구를 안 고르면 동 목록은 안 부름
     assert "number-tag" not in response.text  # 식당 개수는 안 보임
 
 
@@ -170,15 +171,16 @@ async def test_missing_restaurant_page_returns_404_screen(client, fakes):
     assert fakes[1].received is None  # 없는 식당이면 빈자리는 안 부름
 
 
-async def test_region_and_district_show_that_area_10_at_a_time(client, fakes):
+async def test_district_and_dong_show_that_area_10_at_a_time(client, fakes):
     async with client:
-        response = await client.get("/ui/restaurants?region=서울특별시&district=관악구&cuisine=한식&page=2")
+        response = await client.get("/ui/restaurants?district=종로구&dong=낙원동&cuisine=한식&page=2")
 
     assert response.status_code == 200
-    assert fakes[2].received == ("서울특별시", "관악구", None, "한식", 2, 10)
-    assert fakes[2].districts_for == "서울특별시"  # 고른 시·도의 구만 상세 지역에
-    assert '<option value="관악구" selected>' in response.text
-    assert "서울특별시 관악구" in response.text
+    assert fakes[2].received == ("종로구", "낙원동", None, "한식", 2, 10)
+    assert fakes[2].dongs_for == "종로구"  # 고른 구의 동만 상세 지역에
+    assert '<option value="종로구" selected>' in response.text
+    assert '<option value="낙원동" selected>' in response.text
+    assert "종로구 낙원동" in response.text  # 제목에 고른 지역
 
 
 async def test_order_is_reshuffled_on_every_load(client, fakes):

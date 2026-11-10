@@ -254,8 +254,8 @@ async def browse_page(
     browse: Browse,
     q: Annotated[str | None, Blank] = None,
     cuisine: Annotated[str | None, Blank] = None,
-    region: Annotated[str | None, Blank] = None,
     district: Annotated[str | None, Blank] = None,
+    dong: Annotated[str | None, Blank] = None,
     seed: Annotated[str | None, Query(pattern=r"^[0-9a-f]{1,16}$")] = None,
     page: PageNumber = 1,
     page_size: PageSize = 10,
@@ -264,11 +264,11 @@ async def browse_page(
         return moved
     # 새로 열 때(새로고침·검색 포함)만 새로 섞고, 쪽을 넘길 때는 링크에 실린 섞기 번호로 같은 순서를 유지
     seed = seed or secrets.token_hex(4)
-    if not region:
-        district = None
-    districts = await browse.list_districts(region) if region else []
+    if not district:
+        dong = None
+    dongs = await browse.list_dongs(district) if district else []
     items, total = await browse.list_restaurants(
-        region, district, q, cuisine, seed, PageParams(page=page, page_size=page_size)
+        district, dong, q, cuisine, seed, PageParams(page=page, page_size=page_size)
     )
     return templates.TemplateResponse(
         request=request,
@@ -276,9 +276,9 @@ async def browse_page(
         context={
             "active_page": "browse", "restaurants": items,
             "result": PageResult(items, total, page, page_size),
-            "cuisines": await browse.list_cuisines(), "provinces": browse.list_provinces(),
-            "districts": districts,
-            "q": q or "", "cuisine": cuisine or "", "region": region or "", "district": district or "",
+            "cuisines": await browse.list_cuisines(), "districts": await browse.list_districts(),
+            "dongs": dongs,
+            "q": q or "", "cuisine": cuisine or "", "district": district or "", "dong": dong or "",
             "page_base": request.url.include_query_params(seed=seed),
         },
     )

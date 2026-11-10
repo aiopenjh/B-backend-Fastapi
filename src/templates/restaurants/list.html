@@ -14,10 +14,10 @@
 <section class="panel" aria-labelledby="browse-title">
   <div class="panel-heading">
     <h2 id="browse-title">
-      {% if district %}
-        {{ region }} {{ district }}
-      {% elif region %}
-        {{ region }}
+      {% if dong %}
+        {{ district }} {{ dong }}
+      {% elif district %}
+        {{ district }}
       {% else %}
         전체 지역
       {% endif %}
@@ -40,27 +40,27 @@
       </select>
     </div>
     <div>
-      <label for="region">지역</label>
-      <select id="region" name="region" onchange="this.form.district.value = ''; this.form.submit()">
-        <option value="">전체</option>
-        {% for name in provinces %}
-          <option value="{{ name }}" {% if region == name %}selected{% endif %}>{{ name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="district">상세 지역</label>
-      <select id="district" name="district" {% if not region %}disabled{% endif %}>
+      <label for="district">지역(구)</label>
+      <select id="district" name="district" onchange="this.form.dong.value = ''; this.form.submit()">
         <option value="">전체</option>
         {% for name in districts %}
           <option value="{{ name }}" {% if district == name %}selected{% endif %}>{{ name }}</option>
         {% endfor %}
       </select>
     </div>
+    <div>
+      <label for="dong">상세 지역(동)</label>
+      <select id="dong" name="dong" {% if not district %}disabled{% endif %}>
+        <option value="">전체</option>
+        {% for name in dongs %}
+          <option value="{{ name }}" {% if dong == name %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <button class="button button-primary" type="submit">검색</button>
     <a class="text-link" href="{{ url_for('ui_browse') }}">초기화</a>
   </form>
-  <p class="filter-help">지역을 고르면 상세 지역(구·시·군)을 고를 수 있어요.</p>
+  <p class="filter-help">구를 고르면 상세 지역(동)을 고를 수 있어요.</p>
 
   {% if not restaurants %}
   <div class="empty-state">

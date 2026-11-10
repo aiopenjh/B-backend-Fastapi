@@ -191,13 +191,13 @@ async def test_broken_cookie_counts_as_not_logged_in(client):
 class FakeBrowseService:
     """가짜 둘러보기 매니저: 목록 없음"""
 
-    def list_provinces(self):
+    async def list_districts(self):
         return []
 
     async def list_cuisines(self):
         return []
 
-    async def list_restaurants(self, province, district, q, cuisine, seed, page):
+    async def list_restaurants(self, district, dong, q, cuisine, seed, page):
         return [], 0
 
 
