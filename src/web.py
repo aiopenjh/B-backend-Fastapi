@@ -256,13 +256,14 @@ async def browse_page(
     cuisine: Annotated[str | None, Blank] = None,
     region: Annotated[str | None, Blank] = None,
     district: Annotated[str | None, Blank] = None,
+    seed: Annotated[str | None, Query(pattern=r"^[0-9a-f]{1,16}$")] = None,
     page: PageNumber = 1,
     page_size: PageSize = 10,
 ):
     if moved := staff_redirect(request):
         return moved
-    # 열 때마다(새로고침 포함) 새로 섞음
-    seed = secrets.token_hex(4)
+    # 새로 열 때(새로고침·검색 포함)만 새로 섞고, 쪽을 넘길 때는 링크에 실린 섞기 번호로 같은 순서를 유지
+    seed = seed or secrets.token_hex(4)
     if not region:
         district = None
     districts = await browse.list_districts(region) if region else []
@@ -278,6 +279,7 @@ async def browse_page(
             "cuisines": await browse.list_cuisines(), "provinces": browse.list_provinces(),
             "districts": districts,
             "q": q or "", "cuisine": cuisine or "", "region": region or "", "district": district or "",
+            "page_base": request.url.include_query_params(seed=seed),
         },
     )
 

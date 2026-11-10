@@ -184,8 +184,22 @@ async def test_region_and_district_show_that_area_10_at_a_time(client, fakes):
 async def test_order_is_reshuffled_on_every_load(client, fakes):
     async with client:
         await client.get("/ui/restaurants")
-        await client.get("/ui/restaurants")
-        again = await client.get("/ui/restaurants?page=2")
+        again = await client.get("/ui/restaurants")
 
-    assert len(set(fakes[2].seeds)) == 3  # 열 때마다 새 섞기 번호
+    assert len(set(fakes[2].seeds)) == 2  # 새로 열 때마다 새 섞기 번호
+    assert f"seed={fakes[2].seeds[-1]}" in again.text  # 다음 쪽 링크에 이번 섞기 번호가 실림
     assert "set-cookie" not in again.headers  # 둘러보기는 쿠키를 쓰지 않음
+
+
+async def test_next_page_keeps_same_order(client, fakes):
+    async with client:
+        await client.get("/ui/restaurants?seed=abc123&page=2")
+
+    assert fakes[2].seeds[-1] == "abc123"  # 쪽을 넘기면 같은 섞기 번호 → 1쪽과 겹치지 않음
+
+
+async def test_bad_seed_is_422(client):
+    async with client:
+        response = await client.get("/ui/restaurants?seed=<script>")
+
+    assert response.status_code == 422
