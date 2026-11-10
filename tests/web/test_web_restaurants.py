@@ -215,3 +215,11 @@ async def test_search_bar_is_above_filters_and_keeps_query(client, fakes):
     assert response.text.index('class="search-bar"') < response.text.index('class="filter-form"')  # 검색창이 필터 위
     assert 'name="q" value="김밥"' in response.text  # 필터를 바꿔도 검색어 유지
     assert '"김밥" 검색' in response.text
+
+
+async def test_detail_shows_photo_when_restaurant_has_one(client, monkeypatch):
+    monkeypatch.setattr(RESTAURANT, "image_url", "https://example.com/photo.jpg")
+    async with client:
+        response = await client.get("/ui/restaurants/1")
+
+    assert 'class="detail-hero"' in response.text and "https://example.com/photo.jpg" in response.text

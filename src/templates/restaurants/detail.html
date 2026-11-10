@@ -14,6 +14,11 @@
 </section>
 
 {% else %}
+{% if restaurant.image_url %}
+<div class="detail-hero">
+  <img src="{{ restaurant.image_url }}" alt="{{ restaurant.name }} 대표 사진">
+</div>
+{% endif %}
 <div class="page-heading">
   <div>
     <span class="subtle-tag">{{ restaurant.cuisine|cuisine }}</span>

@@ -496,3 +496,18 @@ body .field-error {
   font-size:11px;
   color:#b4261a;
 }
+
+body .detail-hero {
+  margin:0 0 16px;
+  height:200px;
+  border-radius:14px;
+  overflow:hidden;
+  background:#e5eaf0;
+}
+
+body .detail-hero img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
