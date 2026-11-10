@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from common.database import get_session  # 공통: 요청마다 DB 연결 하나
+from common.database import engine, get_session  # 공통: DB 엔진, 요청마다 DB 연결 하나
 from common.logger import get_logger  # 공통: 로그
 from slot.domain.day_range import seoul_now  # 담당 3: 지금 시각 (서울)
 
@@ -39,6 +39,11 @@ from reservation.application.service import ReservationService  # 담당 4 : 예
 from reservation.infrastructure.repositories import (
     SQLAlchemyReservationRepository,
 )  # 담당 4 : 예약 창고
+from reservation.infrastructure.time_limits import (
+    DEFAULT_TIME_LIMITS,
+    TimeLimits,
+    register_time_limit_errors,
+)  # 담당 4 : 예약 트랜잭션 시간 제한
 
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.infrastructure.repository import (
@@ -195,6 +200,42 @@ def env_seconds(name: str, default: int) -> int:
 NO_SHOW_GRACE = timedelta(seconds=env_seconds("NO_SHOW_GRACE_SECONDS", 900))
 
 
+# 담당 4 : 예약 트랜잭션 시간 제한 (락 대기·쿼리·멈춘 트랜잭션). 환경변수(초)로 바꿀 수 있고, 기본 3초·5초·10초
+def reservation_time_limits() -> TimeLimits:
+    """환경변수에서 시간 제한을 읽는다. 0(PostgreSQL에서는 무제한)이거나 락 대기가 쿼리 제한보다 길면
+    경고 로그를 남기고 기본값을 쓴다 (앱이 켜지다 죽지 않고, 안전장치도 꺼지지 않게)"""
+    default = DEFAULT_TIME_LIMITS
+    try:
+        return TimeLimits(
+            lock=timedelta(
+                seconds=env_seconds(
+                    "RESERVATION_LOCK_TIMEOUT_SECONDS",
+                    int(default.lock.total_seconds()),
+                )
+            ),
+            statement=timedelta(
+                seconds=env_seconds(
+                    "RESERVATION_STATEMENT_TIMEOUT_SECONDS",
+                    int(default.statement.total_seconds()),
+                )
+            ),
+            idle_in_transaction=timedelta(
+                seconds=env_seconds(
+                    "RESERVATION_IDLE_IN_TRANSACTION_TIMEOUT_SECONDS",
+                    int(default.idle_in_transaction.total_seconds()),
+                )
+            ),
+        )
+    except ValueError as error:
+        logger.warning("예약 시간 제한 환경변수가 잘못돼 기본값을 씁니다: %s", error)
+        return default
+
+
+RESERVATION_TIME_LIMITS = reservation_time_limits()
+# 담당 4 : 시간 제한에 걸린 DB 오류를 예약 에러(409/503)로 바꾸는 훅을 앱 엔진에 단다 (그 오류는 예약 트랜잭션에서만 난다)
+register_time_limit_errors(engine)
+
+
 # 담당 4 : 예약 매니저 공장 (생성, 취소, 노쇼, 입장 확인)
 def create_reservation_service(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -202,7 +243,9 @@ def create_reservation_service(
     uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
 ) -> ReservationService:
     return ReservationService(
-        reservation_repo=SQLAlchemyReservationRepository(session),
+        reservation_repo=SQLAlchemyReservationRepository(
+            session, RESERVATION_TIME_LIMITS
+        ),
         slot_repo=slot_repo,
         uow=uow,
         no_show_grace=NO_SHOW_GRACE,

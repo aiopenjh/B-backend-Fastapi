@@ -2,7 +2,6 @@
 import uuid
 from datetime import datetime, timedelta
 
-from auth.domain.value_object import AuthenticatedUser
 from common.errors import NotFoundError
 from common.unit_of_work import ConflictError, UnitOfWork
 from reservation.domain.exceptions import (
@@ -10,6 +9,7 @@ from reservation.domain.exceptions import (
     AlreadyCheckedInError,
     DuplicateReservationError,
     NoShowTooEarlyError,
+    ReservationBusyError,
 )
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import (
@@ -18,6 +18,7 @@ from reservation.domain.reservation import (
     CancelReason,
     Reservation,
 )
+from reservation.domain.value_object import Actor
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
 
@@ -47,7 +48,10 @@ class ReservationService:
         contact_phone: str | None,
         now: datetime,
     ) -> tuple[Reservation, TimeSlot]:
-        """예약을 만든다. 슬롯 잠금 -> 중복 확인 -> 자리 늘리기 -> 저장 -> commit (한 묶음)."""
+        """예약을 만든다. 시간 제한 -> 슬롯 잠금 -> 중복 확인 -> 자리 늘리기 -> 저장 -> commit (한 묶음)."""
+        # 0. 잠그기 전에 시간 제한부터 건다. 앞 요청이 멈춰도 기다림에 상한이 있다 (넘으면 409 잠시 후 다시)
+        await self.reservation_repo.set_time_limits()
+
         # 1. 슬롯을 잠그고 꺼낸다. 없으면 404
         slot = await self.slot_repo.get_for_update(slot_id)
         if slot is None:
@@ -81,7 +85,7 @@ class ReservationService:
 
     async def cancel(
         self,
-        user: AuthenticatedUser | None,
+        user: Actor | None,
         reservation_id: int,
         now: datetime,
         by: CancelledBy = CancelledBy.CUSTOMER,
@@ -90,6 +94,9 @@ class ReservationService:
     ) -> tuple[Reservation, TimeSlot]:
         """예약을 취소한다. 대상 확인 -> 슬롯 잠금 -> 예약 잠금 -> 취소 -> (시작 전이면) 자리 반납 -> 저장 -> commit (한 묶음).
         기본값은 손님 취소. 운영자·관리자는 창구가 by·reason을 넣어 부르고, 자동 노쇼는 user 없이 SYSTEM으로 부른다."""
+        # 0. 잠그기 전에 시간 제한부터 건다 (생성과 같음)
+        await self.reservation_repo.set_time_limits()
+
         # 1. 잠그기 전에 먼저 꺼내서 어느 슬롯인지 알아내고, 이 사람이 다룰 수 있는 예약인지 본다. 아니면 404
         found = await self.reservation_repo.get(reservation_id)
         if found is None:
@@ -120,9 +127,10 @@ class ReservationService:
         return reservation, slot
 
     async def check_in(
-        self, user: AuthenticatedUser, reservation_id: int, now: datetime
+        self, user: Actor, reservation_id: int, now: datetime
     ) -> tuple[Reservation, TimeSlot]:
-        """손님이 왔다고 기록한다 (그 식당 운영자만). 대상 확인 -> 슬롯 잠금 -> 예약 잠금 -> 입장 기록 -> 저장 -> commit."""
+        """손님이 왔다고 기록한다 (그 식당 운영자만). 시간 제한 -> 대상 확인 -> 슬롯 잠금 -> 예약 잠금 -> 입장 기록 -> 저장 -> commit."""
+        await self.reservation_repo.set_time_limits()
         found = await self.reservation_repo.get(reservation_id)
         if found is None:
             raise NotFoundError()
@@ -156,13 +164,17 @@ class ReservationService:
                 AlreadyCheckedInError,
                 NoShowTooEarlyError,
                 NotFoundError,
+                ReservationBusyError,
             ):
-                continue  # 다른 요청이 먼저 처리한 예약. 오류가 아니라 건너뜀
+                # 다른 요청이 먼저 처리했거나 지금 처리 중인 예약. 오류가 아니라 건너뛴다
+                # commit 없이 트랜잭션을 끝내서, 이 예약 때문에 잡은 잠금을 다음 commit까지 쥐고 있지 않게 한다
+                await self.uow.release()
+                continue
             handled += 1
         return handled
 
     async def _check_target(
-        self, found: Reservation, user: AuthenticatedUser | None, by: CancelledBy
+        self, found: Reservation, user: Actor | None, by: CancelledBy
     ) -> None:
         """누가(by) 이 예약을 다룰 수 있는지 잠그기 전에 본다. 아니면 404 (남의 예약은 있는지조차 숨김)."""
         if by is CancelledBy.SYSTEM:

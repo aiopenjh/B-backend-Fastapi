@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Self
 
-from auth.domain.value_object import AuthenticatedUser
 from common.errors import InvalidInputError
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
@@ -16,7 +15,7 @@ from reservation.domain.exceptions import (
     CheckInNotAllowedError,
     NoShowTooEarlyError,
 )
-from reservation.domain.value_object import ContactPhone
+from reservation.domain.value_object import Actor, ContactPhone
 
 # 시작 후 이만큼 지나도 입장 확인이 없으면 노쇼로 볼 수 있다 (매니저가 환경변수 값으로 바꿔 넘긴다)
 DEFAULT_NO_SHOW_GRACE = timedelta(minutes=15)
@@ -166,7 +165,7 @@ class Reservation:
 
     def can_cancel(
         self,
-        viewer: AuthenticatedUser,
+        viewer: Actor,
         slot_starts_at: datetime,
         now: datetime,
         restaurant_owner_id: uuid.UUID | None = None,
@@ -180,7 +179,7 @@ class Reservation:
 
     def can_check_in(
         self,
-        viewer: AuthenticatedUser,
+        viewer: Actor,
         now: datetime,
         slot_starts_at: datetime,
         slot_ends_at: datetime,
@@ -196,7 +195,7 @@ class Reservation:
 
     def can_mark_no_show(
         self,
-        viewer: AuthenticatedUser,
+        viewer: Actor,
         now: datetime,
         slot_starts_at: datetime,
         grace: timedelta = DEFAULT_NO_SHOW_GRACE,
@@ -211,7 +210,7 @@ class Reservation:
         )
 
     def can_see_cancel_note(
-        self, viewer: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
+        self, viewer: Actor, restaurant_owner_id: uuid.UUID | None
     ) -> bool:
         """취소 메모(내부용)를 볼 수 있나. 관리자와 그 식당 운영자만 True (손님에게는 숨긴다)."""
         return viewer.is_admin() or self._is_restaurant_owner(
@@ -219,13 +218,13 @@ class Reservation:
         )
 
     def can_be_cancelled_by(
-        self, user: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
+        self, user: Actor, restaurant_owner_id: uuid.UUID | None
     ) -> bool:
         """취소 권한만 본다 (상태·시각·이유는 cancel이 본다). 예약자 본인, 관리자, 그 식당의 운영자면 True."""
         return self._has_cancel_right(user, restaurant_owner_id)
 
     def _has_cancel_right(
-        self, user: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
+        self, user: Actor, restaurant_owner_id: uuid.UUID | None
     ) -> bool:
         # 버튼(can_cancel)과 진짜 취소(can_be_cancelled_by)가 같은 판단을 쓰도록 한 곳에 둔다
         return (
@@ -236,7 +235,7 @@ class Reservation:
 
     @staticmethod
     def _is_restaurant_owner(
-        user: AuthenticatedUser, restaurant_owner_id: uuid.UUID | None
+        user: Actor, restaurant_owner_id: uuid.UUID | None
     ) -> bool:
         # 운영자 역할이고 그 식당 주인이어야 한다. 식당 주인을 모르면(None) 운영자 권한은 주지 않는다
         return (

@@ -1,10 +1,9 @@
-# [담당 4] 예약 서비스 테스트 : 가짜 저장소로 예약 생성.취소.노쇼.입장 확인 흐름 확인
+# [담당 4] 예약 서비스 테스트 : 가짜 저장소로 예약 생성.취소.노쇼.입장 확인 흐름, 잠그기 전에 시간 제한 걸기 확인
 import uuid
 from datetime import datetime, timedelta
 
 import pytest
 
-from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.errors import NotFoundError
 from common.schemas import SEOUL
 from common.unit_of_work import ConflictError, UnitOfWork
@@ -24,6 +23,7 @@ from reservation.domain.reservation import (
     Reservation,
     ReservationStatus,
 )
+from reservation.domain.value_object import Actor, ActorRole
 from slot.domain.exceptions import SlotSoldOut
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
@@ -40,6 +40,9 @@ class InMemoryReservationRepository(ReservationRepository):
             None  # 예약이 속한 식당의 주인 (None이면 식당 없음·삭제)
         )
         self.slot_starts_at: datetime | None = None  # 노쇼 대상 찾기용 슬롯 시작 시각
+
+    async def set_time_limits(self) -> None:
+        self.lock_log.append("time_limits")  # 진짜 DB 설정은 없고, 언제 불렸는지만 기록
 
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
         return any(
@@ -109,13 +112,17 @@ class InMemorySlotRepository(SlotRepository):
 
 
 class FakeUnitOfWork(UnitOfWork):
-    """commit이 몇 번 불렸는지 세는 가짜 도장 담당"""
+    """commit·release가 몇 번 불렸는지 세는 가짜 도장 담당"""
 
     def __init__(self) -> None:
         self.commits = 0
+        self.releases = 0  # 확정 없이 트랜잭션을 끝내 잠금을 놓은 횟수
 
     async def commit(self) -> None:
         self.commits += 1
+
+    async def release(self) -> None:
+        self.releases += 1
 
 
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
@@ -124,11 +131,11 @@ OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
 OTHER_OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000004")
 ADMIN_ID = uuid.UUID("00000000-0000-4000-8000-000000000005")
 
-CUSTOMER = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)  # 예약한 손님
-OTHER_CUSTOMER = AuthenticatedUser(user_id=OTHER_USER_ID, role=AuthRole.CUSTOMER)
-OWNER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)  # 1번 식당 주인
-OTHER_OWNER = AuthenticatedUser(user_id=OTHER_OWNER_ID, role=AuthRole.OWNER)
-ADMIN = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
+CUSTOMER = Actor(user_id=USER_ID, role=ActorRole.CUSTOMER)  # 예약한 손님
+OTHER_CUSTOMER = Actor(user_id=OTHER_USER_ID, role=ActorRole.CUSTOMER)
+OWNER = Actor(user_id=OWNER_ID, role=ActorRole.OWNER)  # 1번 식당 주인
+OTHER_OWNER = Actor(user_id=OTHER_OWNER_ID, role=ActorRole.OWNER)
+ADMIN = Actor(user_id=ADMIN_ID, role=ActorRole.ADMIN)
 
 NOW = datetime(2026, 12, 3, 17, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2026, 12, 3, 18, 0, tzinfo=SEOUL)
@@ -312,7 +319,8 @@ async def test_create_locks_slot(service, lock_log):
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
 
-    assert lock_log == ["slot"]
+    # 잠그기 전에 시간 제한부터 건다 (기다림·멈춤에 상한이 있어야 잠금이 영원히 안 남는다)
+    assert lock_log == ["time_limits", "slot"]
 
 
 async def test_cancel_locks_slot_before_reservation(service, lock_log):
@@ -324,7 +332,8 @@ async def test_cancel_locks_slot_before_reservation(service, lock_log):
 
     await service.cancel(user=CUSTOMER, reservation_id=created.id, now=NOW)
 
-    assert lock_log == ["slot", "reservation"]
+    # 시간 제한 -> 슬롯 -> 예약 순서 (시간 제한은 잠금 없이 먼저 읽는 단계보다도 앞)
+    assert lock_log == ["time_limits", "slot", "reservation"]
 
 
 async def test_create_db_conflict_raises_duplicate(service, reservation_repo, uow):
@@ -584,7 +593,8 @@ async def test_owner_cancel_locks_slot_before_reservation(service, lock_log):
         reason=CancelReason.PHONE_REQUEST,
     )
 
-    assert lock_log == ["slot", "reservation"]
+    # 시간 제한 -> 슬롯 -> 예약 순서 (시간 제한은 잠금 없이 먼저 읽는 단계보다도 앞)
+    assert lock_log == ["time_limits", "slot", "reservation"]
 
 
 async def test_expire_no_shows_handles_only_due_and_not_checked_in(service, slot):
@@ -609,3 +619,54 @@ async def test_expire_no_shows_handles_only_due_and_not_checked_in(service, slot
     assert slot.reserved_guests == 6  # 노쇼여도 좌석은 안 돌려줌 (2 + 2 + 2)
     # 두 번 돌려도 이미 처리된 건 다시 처리하지 않는다
     assert await service.expire_no_shows(NO_SHOW_TIME) == 0
+
+
+async def test_check_in_sets_time_limits_before_locking(service, lock_log):
+    # 입장 확인도 잠그기 전에 시간 제한부터 건다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    lock_log.clear()
+
+    await service.check_in(user=OWNER, reservation_id=created.id, now=STARTS_AT)
+
+    assert lock_log == ["time_limits", "slot", "reservation"]
+
+
+async def test_cancel_of_missing_reservation_still_sets_time_limits_first(
+    service, lock_log
+):
+    # 없는 예약이라 404로 끝나도, 시간 제한은 맨 처음에 걸려 있다 (첫 조회도 상한 안에서 돈다).
+    with pytest.raises(NotFoundError):
+        await service.cancel(user=CUSTOMER, reservation_id=999, now=NOW)
+
+    assert lock_log == ["time_limits"]
+
+
+async def test_expire_no_shows_releases_lock_when_skipping(
+    service, reservation_repo, uow, monkeypatch
+):
+    # 자동 노쇼가 건너뛴 예약(그 사이 이미 취소됨)의 잠금은 바로 놓고, 다음 예약은 그대로 처리한다.
+    already, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    due, _ = await service.create(
+        user_id=OTHER_USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    await service.cancel(user=CUSTOMER, reservation_id=already.id, now=NOW)
+    commits_before = uow.commits
+
+    async def stale_ids(now, grace):
+        return [
+            already.id,
+            due.id,
+        ]  # 찾을 때는 확정이었는데 처리하려니 이미 취소된 상황
+
+    monkeypatch.setattr(reservation_repo, "list_no_show_ids", stale_ids)
+
+    handled = await service.expire_no_shows(NO_SHOW_TIME)
+
+    assert handled == 1
+    assert uow.releases == 1  # 건너뛴 1건은 확정 없이 끝내서 잠금을 놓았다
+    assert uow.commits == commits_before + 1  # 처리한 1건만 확정
+    assert due.cancel_reason is CancelReason.NO_SHOW

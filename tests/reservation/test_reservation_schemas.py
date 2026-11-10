@@ -1,4 +1,4 @@
-# [담당 4] 예약 응답 스키마 테스트 : API 명세 예시, from_domain 변환, can_cancel 값
+# [담당 4] 예약 응답 스키마 테스트 : API 명세 예시, from_domain 변환, can_cancel 값, 보는 사람을 Actor로 바꾸기
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -13,6 +13,7 @@ from reservation.domain.reservation import (
     Reservation,
     ReservationStatus,
 )
+from reservation.domain.value_object import Actor
 from reservation.presentation.schemas import ReservationCreate, ReservationOut
 from slot.domain.time_slot import TimeSlot
 
@@ -400,3 +401,32 @@ def test_from_domain_check_in_and_no_show_flags():
     assert owner_after.can_mark_no_show is True
     assert customer_after.can_check_in is False
     assert customer_after.can_mark_no_show is False
+
+
+# from_domain은 로그인한 사람(AuthenticatedUser)을 받아도, 도메인에 물을 때는 예약 쪽 Actor로 바꿔서 묻는다
+@pytest.mark.parametrize("viewer", [RESERVER, GUEST, RESTAURANT_OWNER, ADMIN])
+def test_from_domain_asks_domain_with_actor(viewer, monkeypatch):
+    reservation, slot = make_cancelled_with_note()
+    seen = []
+    original = Reservation.can_see_cancel_note
+
+    def spy(self, who, restaurant_owner_id):
+        seen.append(who)
+        return original(self, who, restaurant_owner_id)
+
+    monkeypatch.setattr(Reservation, "can_see_cancel_note", spy)
+
+    from_login = ReservationOut.from_domain(
+        reservation, slot, viewer, NOW, restaurant_owner_id=RESTAURANT_OWNER_ID
+    )
+    from_actor = ReservationOut.from_domain(
+        reservation,
+        slot,
+        Actor(viewer.user_id, viewer.role),
+        NOW,
+        restaurant_owner_id=RESTAURANT_OWNER_ID,
+    )
+
+    # 도메인은 두 번 모두 진짜 Actor를 받았고, 응답도 똑같다
+    assert [type(who) for who in seen] == [Actor, Actor]
+    assert from_login == from_actor

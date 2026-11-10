@@ -1,4 +1,4 @@
-# [담당 4] 예약 실제 DB 테스트 : 진짜 PostgreSQL로 예약 생성, 꽉 찬 슬롯, 동시 예약, 취소 확인
+# [담당 4] 예약 실제 DB 테스트 : 진짜 PostgreSQL로 예약 생성, 꽉 찬 슬롯, 동시 예약, 취소, 트랜잭션 시간 제한 확인
 import asyncio
 import os
 import time
@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytest
 from dotenv import load_dotenv
 from sqlalchemy import func, select, text, update
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.errors import NotFoundError
 from common.model import Base, init_models
 from common.schemas import SEOUL
@@ -21,10 +21,18 @@ from reservation.domain.exceptions import (
     AlreadyCancelledError,
     AlreadyCheckedInError,
     DuplicateReservationError,
+    ReservationBusyError,
+    ReservationTimeoutError,
 )
 from reservation.domain.reservation import CancelledBy, CancelReason, Reservation
+from reservation.domain.value_object import Actor, ActorRole
 from reservation.infrastructure.models import ReservationModel
 from reservation.infrastructure.repositories import SQLAlchemyReservationRepository
+from reservation.infrastructure.time_limits import (
+    DEFAULT_TIME_LIMITS,
+    TimeLimits,
+    register_time_limit_errors,
+)
 from restaurant.infrastructure.models import RestaurantModel
 from slot.domain.exceptions import SlotSoldOut
 from slot.infrastructure.models import ReservationSlotModel
@@ -45,12 +53,19 @@ NOW = datetime(2030, 1, 1, 12, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2030, 1, 1, 18, 0, tzinfo=SEOUL)
 ENDS_AT = datetime(2030, 1, 1, 19, 0, tzinfo=SEOUL)
 GRACE = timedelta(minutes=15)  # 노쇼 유예 시간
+# 시간 제한 테스트용 짧은 값 (진짜 값 3초·5초·10초를 기다리면 테스트가 느려서)
+SHORT_LIMITS = TimeLimits(
+    lock=timedelta(milliseconds=500),
+    statement=timedelta(seconds=1),
+    idle_in_transaction=timedelta(seconds=1),
+)
 
 
 @pytest.fixture
 async def session_factory():
     """테스트마다 표를 비우고 새로 만든 뒤, 끝나면 연결을 정리한다"""
     engine = create_async_engine(TEST_POSTGRES_URL)
+    register_time_limit_errors(engine)  # 앱처럼 시간 초과 DB 오류를 예약 에러로 바꾼다
     init_models()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
@@ -97,10 +112,12 @@ async def add_slot(
         return slot.id, owner_id
 
 
-def make_service(session) -> ReservationService:
-    # 요청 하나 = 세션 하나. 앱의 create_reservation_service와 같은 조립
+def make_service(
+    session, time_limits: TimeLimits = DEFAULT_TIME_LIMITS
+) -> ReservationService:
+    # 요청 하나 = 세션 하나. 앱의 create_reservation_service와 같은 조립 (시간 제한은 기본값 3초·5초·10초)
     return ReservationService(
-        reservation_repo=SQLAlchemyReservationRepository(session),
+        reservation_repo=SQLAlchemyReservationRepository(session, time_limits),
         slot_repo=SQLAlchemySlotRepository(session),
         uow=SQLAlchemyUnitOfWork(session),
         no_show_grace=GRACE,
@@ -113,9 +130,10 @@ async def reserve(
     slot_id: int,
     party_size: int,
     contact_phone: str | None = None,
+    time_limits: TimeLimits = DEFAULT_TIME_LIMITS,
 ):
     async with session_factory() as session:
-        return await make_service(session).create(
+        return await make_service(session, time_limits).create(
             user_id=user_id,
             slot_id=slot_id,
             party_size=party_size,
@@ -126,7 +144,7 @@ async def reserve(
 
 async def cancel(
     session_factory,
-    user: AuthenticatedUser | None,
+    user: Actor | None,
     reservation_id: int,
     now: datetime = NOW,
     by: CancelledBy = CancelledBy.CUSTOMER,
@@ -233,7 +251,7 @@ async def test_five_requests_for_last_seats_only_one_succeeds(session_factory):
 async def test_cancel_twice_releases_seats_only_once(session_factory):
     slot_id, _ = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
-    me = AuthenticatedUser(user_id=user_id, role=AuthRole.CUSTOMER)
+    me = Actor(user_id=user_id, role=ActorRole.CUSTOMER)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
 
     await cancel(session_factory, me, created.id)
@@ -248,7 +266,7 @@ async def test_two_cancels_at_once_release_seats_only_once(session_factory):
     # 같은 예약을 동시에 두 번 취소해도(더블 클릭) 자리는 한 번만 돌아온다
     slot_id, _ = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
-    me = AuthenticatedUser(user_id=user_id, role=AuthRole.CUSTOMER)
+    me = Actor(user_id=user_id, role=ActorRole.CUSTOMER)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
     await open_connections(session_factory, 2)  # 두 취소가 정말 동시에 부딪치게
 
@@ -268,7 +286,7 @@ async def test_owner_cancels_reservation_of_own_restaurant(session_factory):
     slot_id, owner_id = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    owner = Actor(user_id=owner_id, role=ActorRole.OWNER)
 
     await cancel(
         session_factory,
@@ -328,7 +346,7 @@ async def test_admin_cancels_any_reservation(session_factory):
     slot_id, _ = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    admin = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
+    admin = Actor(user_id=uuid.uuid4(), role=ActorRole.ADMIN)
 
     await cancel(
         session_factory,
@@ -347,8 +365,8 @@ async def test_other_owner_cancel_is_not_found(session_factory):
     slot_id, _ = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    other_owner = AuthenticatedUser(
-        user_id=await add_user(session_factory, role="OWNER"), role=AuthRole.OWNER
+    other_owner = Actor(
+        user_id=await add_user(session_factory, role="OWNER"), role=ActorRole.OWNER
     )
 
     with pytest.raises(NotFoundError):
@@ -369,8 +387,8 @@ async def test_deleted_restaurant_owner_cannot_cancel_but_admin_can(session_fact
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
     await delete_restaurant_of(session_factory, owner_id)
-    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
-    admin = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
+    owner = Actor(user_id=owner_id, role=ActorRole.OWNER)
+    admin = Actor(user_id=uuid.uuid4(), role=ActorRole.ADMIN)
 
     # 식당이 삭제되면 식당 주인을 못 찾아서(삭제된 식당은 안 꺼냄), 운영자는 404다.
     with pytest.raises(NotFoundError):
@@ -417,7 +435,7 @@ async def test_owner_no_show_is_saved_and_keeps_seats(session_factory):
     slot_id, owner_id = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    owner = Actor(user_id=owner_id, role=ActorRole.OWNER)
 
     await cancel(
         session_factory,
@@ -441,7 +459,7 @@ async def test_check_in_is_saved_and_blocks_no_show(session_factory):
     slot_id, owner_id = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    owner = Actor(user_id=owner_id, role=ActorRole.OWNER)
 
     async with session_factory() as session:
         await make_service(session).check_in(
@@ -466,7 +484,7 @@ async def test_admin_cancel_note_is_saved(session_factory):
     slot_id, _ = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    admin = AuthenticatedUser(user_id=uuid.uuid4(), role=AuthRole.ADMIN)
+    admin = Actor(user_id=uuid.uuid4(), role=ActorRole.ADMIN)
 
     await cancel(
         session_factory,
@@ -508,14 +526,14 @@ async def test_expire_no_shows_on_real_db(session_factory):
     no_show, _ = await reserve(session_factory, no_show_user, slot_id, party_size=2)
     came, _ = await reserve(session_factory, came_user, slot_id, party_size=2)
     cancelled, _ = await reserve(session_factory, cancelled_user, slot_id, party_size=2)
-    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    owner = Actor(user_id=owner_id, role=ActorRole.OWNER)
     async with session_factory() as session:
         await make_service(session).check_in(
             user=owner, reservation_id=came.id, now=STARTS_AT
         )
     await cancel(
         session_factory,
-        AuthenticatedUser(user_id=cancelled_user, role=AuthRole.CUSTOMER),
+        Actor(user_id=cancelled_user, role=ActorRole.CUSTOMER),
         cancelled.id,
     )
 
@@ -560,7 +578,7 @@ async def test_owner_no_show_and_auto_no_show_at_once_handle_once(session_factor
     slot_id, owner_id = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    owner = Actor(user_id=owner_id, role=ActorRole.OWNER)
     await open_connections(session_factory, 2)
 
     results = await asyncio.gather(
@@ -613,7 +631,7 @@ async def test_check_in_and_auto_no_show_at_once_never_both(session_factory):
     slot_id, owner_id = await add_slot(session_factory, capacity=10)
     user_id = await add_user(session_factory)
     created, _ = await reserve(session_factory, user_id, slot_id, party_size=2)
-    owner = AuthenticatedUser(user_id=owner_id, role=AuthRole.OWNER)
+    owner = Actor(user_id=owner_id, role=ActorRole.OWNER)
     await open_connections(session_factory, 2)
 
     async def check_in():
@@ -690,3 +708,109 @@ async def test_hundred_requests_on_one_slot_load(session_factory):
     # 몰린 슬롯 때문에 다른 슬롯 예약이 실패하지 않는다 (연결 대기 30초 안에 끝남)
     assert not isinstance(other_result, Exception)
     assert slowest < 30
+
+
+async def hold_slot_lock(session, slot_id: int) -> None:
+    """슬롯 줄을 FOR UPDATE로 잠그고 commit하지 않는다 (앞 요청이 멈춘 상황 흉내)"""
+    await session.execute(
+        select(ReservationSlotModel.id)
+        .where(ReservationSlotModel.id == slot_id)
+        .with_for_update()
+    )
+
+
+async def test_waiting_request_gives_up_after_lock_timeout(session_factory):
+    # 앞 요청(A)이 슬롯을 잠근 채 멈추면, 뒤 요청(B)은 락 대기 시간(0.5초)만 기다리고 409로 끝난다
+    slot_id, _ = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    await open_connections(
+        session_factory, 2
+    )  # 연결 여는 시간이 기다린 시간에 섞이지 않게
+
+    async with session_factory() as holder:
+        await hold_slot_lock(holder, slot_id)
+        started = time.perf_counter()
+        with pytest.raises(ReservationBusyError):
+            await reserve(
+                session_factory,
+                user_id,
+                slot_id,
+                party_size=2,
+                time_limits=SHORT_LIMITS,
+            )
+        waited = time.perf_counter() - started
+
+        # A는 피해가 없다: B가 포기한 뒤에도 A는 그대로 저장하고 commit할 수 있다
+        await holder.execute(
+            update(ReservationSlotModel)
+            .where(ReservationSlotModel.id == slot_id)
+            .values(reserved_guests=1)
+        )
+        await holder.commit()
+
+    # 0.5초는 기다렸고(바로 튕긴 게 아님), 끝없이 기다리지도 않았다
+    assert 0.4 <= waited < 1.5
+    # B는 rollback돼서 예약이 생기지 않았고, 자리는 A가 고친 값 그대로다
+    assert await read_slot(session_factory, slot_id) == (1, 0)
+
+
+async def test_stalled_holder_is_cut_and_lock_released(session_factory):
+    # 잠근 요청이 파이썬 쪽에서 멈춰 명령을 안 보내면(1초), DB가 그 세션을 끊어 잠금을 풀어 준다
+    slot_id, _ = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    await open_connections(session_factory, 2)
+
+    async with session_factory() as holder:
+        await SQLAlchemyReservationRepository(holder, SHORT_LIMITS).set_time_limits()
+        await hold_slot_lock(holder, slot_id)
+        await asyncio.sleep(1.5)  # 멈춘 트랜잭션 제한(1초)보다 오래 아무것도 안 함
+
+        # 다른 요청은 기다리지 않고 바로 예약된다 (잠금이 이미 풀림)
+        started = time.perf_counter()
+        await reserve(session_factory, user_id, slot_id, party_size=2)
+        assert time.perf_counter() - started < 1
+
+        # 끊긴 세션으로 다시 명령하면 "연결이 끊겼다"는 DB 오류가 난다. A는 이미 멈춘(고장 난) 요청이라 실패가 맞다
+        # (DB가 세션을 끊을 때 오류 코드 25P03을 돌려주지 못하고 연결만 닫아서, 예약 에러로 바뀌지는 않는다)
+        with pytest.raises(DBAPIError):
+            await holder.execute(text("SELECT 1"))
+
+    assert await read_slot(session_factory, slot_id) == (2, 1)
+
+
+async def test_slow_statement_is_cancelled_as_timeout(session_factory):
+    # 쿼리 하나가 쿼리 제한(1초)보다 오래 걸리면 DB가 취소하고, 시간 초과 에러(503)로 바뀐다
+    async with session_factory() as session:
+        await SQLAlchemyReservationRepository(session, SHORT_LIMITS).set_time_limits()
+        started = time.perf_counter()
+        with pytest.raises(ReservationTimeoutError):
+            await session.execute(text("SELECT pg_sleep(3)"))
+        elapsed = time.perf_counter() - started
+
+    assert elapsed < 2  # 3초를 다 기다리지 않고 1초쯤에 끊겼다
+
+
+async def test_time_limits_end_with_transaction(session_factory):
+    # 시간 제한은 그 트랜잭션에만 걸린다 (SET LOCAL). commit 뒤 같은 연결을 다른 기능이 써도 제한이 없다
+    slot_id, _ = await add_slot(session_factory, capacity=10)
+    user_id = await add_user(session_factory)
+    engine = session_factory.kw["bind"]
+
+    async with engine.connect() as conn:  # 연결 하나를 붙잡아 두고 그 위에서 예약한다
+        session = AsyncSession(bind=conn, expire_on_commit=False)
+        await make_service(session).create(
+            user_id=user_id, slot_id=slot_id, party_size=2, contact_phone=None, now=NOW
+        )
+        settings = [
+            (await conn.execute(text(f"SHOW {name}"))).scalar_one()
+            for name in (
+                "lock_timeout",
+                "statement_timeout",
+                "idle_in_transaction_session_timeout",
+            )
+        ]
+        await session.close()
+
+    # 예약 트랜잭션이 끝나자 원래 값(0 = 이 연결의 기본값)으로 돌아왔다
+    assert settings == ["0", "0", "0"]
+    assert await read_slot(session_factory, slot_id) == (2, 1)
