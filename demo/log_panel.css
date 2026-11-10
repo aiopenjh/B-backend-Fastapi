@@ -29,6 +29,68 @@
   color:#fff;
 }
 
+.log-panel {
+  position:relative;
+}
+
+.log-clear {
+  position:absolute;
+  top:8px;
+  right:12px;
+  margin:0;
+}
+
+.log-clear button {
+  font:inherit;
+  font-size:11px;
+  color:#d7dde6;
+  background:transparent;
+  border:1px solid #3a4250;
+  border-radius:6px;
+  padding:3px 10px;
+  cursor:pointer;
+}
+
+.log-clear button:hover {
+  color:#fff;
+  border-color:#8b95a5;
+}
+
+.demo-switch {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  padding:10px 16px;
+  border-bottom:1px solid #2a313c;
+  background:#1a1f27;
+}
+
+.demo-switch span {
+  color:#8b95a5;
+  font-size:11px;
+  margin-right:4px;
+}
+
+.demo-switch form {
+  margin:0;
+}
+
+.demo-switch button {
+  font:inherit;
+  font-size:11px;
+  color:#14181f;
+  background:#d7dde6;
+  border:0;
+  border-radius:999px;
+  padding:3px 10px;
+  cursor:pointer;
+}
+
+.demo-switch button:hover {
+  background:#fff;
+}
+
 .log-lines {
   list-style:none;
   margin:0;
@@ -68,6 +130,33 @@
 .log-error .log-level,
 .log-error .log-text {
   color:#ff8f86;
+}
+
+.log-code {
+  display:inline-block;
+  padding:0 6px;
+  margin:0 2px;
+  border-radius:4px;
+  font-weight:700;
+  color:#14181f;
+}
+
+.code-1xx,
+.code-3xx {
+  background:#7fb2e5;
+}
+
+.code-2xx {
+  background:#6fcf97;
+}
+
+.code-4xx {
+  background:#f0a35e;
+}
+
+.code-5xx {
+  background:#ff6b6b;
+  color:#fff;
 }
 
 .log-empty {

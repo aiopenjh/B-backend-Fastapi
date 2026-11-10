@@ -132,9 +132,7 @@ body .page-wrap {
 }
 
 body .site-footer {
-  margin:0 16px;
-  flex-direction:column;
-  gap:4px;
+  display:none;
 }
 
 body .page-heading {
@@ -346,6 +344,9 @@ body .slot-option.is-closed {
   cursor:not-allowed;
 }
 
+body .slot-option.is-closed:has(input:enabled) { cursor:pointer; }
+body .slot-option.is-closed:has(input:checked) { border-color:var(--accent); color:var(--accent); }
+
 body .booking-button {
   width:calc(100% - 32px);
   margin:0 16px 16px;
@@ -370,4 +371,179 @@ body .booking-done p {
 body .booking-fail {
   background:#fdecea;
   color:#a3271b;
+}
+
+body .my-reservation-list {
+  list-style:none;
+  margin:0;
+  padding:0;
+}
+
+body .my-reservation-list li {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:14px 16px;
+  border-top:1px solid var(--line);
+}
+
+body .my-reservation-list .muted {
+  margin-top:4px;
+}
+
+body .my-reservation-side {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:6px;
+}
+
+body .cancel-button {
+  background:none;
+  border:0;
+  padding:0;
+  cursor:pointer;
+  color:#a3271b;
+}
+
+body .restaurant-name-link {
+  color:inherit;
+}
+
+body .restaurant-name-link:hover {
+  color:var(--accent);
+}
+
+body .topbar {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center;
+}
+
+body .topbar .brand {
+  grid-column:2;
+  grid-row:1;
+  justify-self:center;
+}
+
+body .topbar .topbar-title {
+  grid-column:1;
+  grid-row:1;
+  justify-self:start;
+  text-align:left;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+body .topbar .preview-chip {
+  grid-column:3;
+  grid-row:1;
+  justify-self:end;
+}
+
+body .topbar {
+  border-bottom:0;
+  background:rgba(255,255,255,.9);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+  box-shadow:0 6px 18px -10px rgba(31,41,55,.22);
+}
+
+body .topbar::after {
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:100%;
+  height:18px;
+  background:linear-gradient(to bottom, rgba(255,255,255,.8), rgba(255,255,255,0));
+  pointer-events:none;
+}
+
+body .search-bar {
+  display:flex;
+  gap:8px;
+  margin:0 0 16px;
+}
+
+body .search-bar input {
+  flex:1;
+  min-width:0;
+  min-height:46px;
+  border-radius:10px;
+  font-size:14px;
+}
+
+body .search-bar .button {
+  min-height:46px;
+  border-radius:10px;
+}
+
+body .group-note {
+  margin:12px 16px 16px;
+  padding:10px 12px;
+  border-radius:8px;
+  background:#f7f8fa;
+  font-size:12px;
+  color:var(--muted);
+}
+
+body .signup-card {
+  max-width:420px;
+  margin:0 auto;
+}
+
+body .field-error {
+  margin:-12px 0 14px;
+  font-size:11px;
+  color:#b4261a;
+}
+
+body .detail-hero {
+  margin:0 0 16px;
+  height:200px;
+  border-radius:14px;
+  overflow:hidden;
+  background:#e5eaf0;
+}
+
+body .detail-hero img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+body .row-action {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin:2px 6px 2px 0;
+}
+
+body .cancel-form select,
+body .cancel-form input {
+  min-height:30px;
+  padding:4px 8px;
+  font-size:11px;
+  max-width:120px;
+}
+
+body .small-button {
+  min-height:30px;
+  padding:4px 12px;
+  font-size:11px;
+}
+
+body .badge-no-show {
+  color:#a3271b;
+  background:#fdecea;
+}
+
+body .cancel-detail {
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  color:var(--muted);
 }

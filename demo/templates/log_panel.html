@@ -7,12 +7,27 @@
     <span class="log-title">서버 로그</span>
     <small>최근 {{ log_panel.size }}줄 · 화면을 열 때마다 갱신</small>
   </summary>
+  <form class="log-clear" method="post" action="/demo/logs/clear">
+    <input type="hidden" name="back" value="{{ back }}">
+    <button type="submit" title="로그 창을 비웁니다 (터미널 로그는 그대로)">다 지우기</button>
+  </form>
+  {% if accounts %}
+  <div class="demo-switch">
+    <span>시연 계정 바꾸기</span>
+    {% for key, account in accounts.items() %}
+    <form method="post" action="/demo/switch">
+      <input type="hidden" name="who" value="{{ key }}">
+      <button type="submit">{{ account[0] }}</button>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
   <ol class="log-lines">
     {% for line in log_panel.latest() %}
     <li class="log-{{ line.tone }}">
       <time>{{ line.time }}</time>
       <span class="log-level">{{ line.level }}</span>
-      <span class="log-text">{{ line.text }}</span>
+      <span class="log-text">{{ line.before }}{% if line.code %}<span class="log-code code-{{ line.code[0] }}xx">{{ line.code }}</span>{% endif %}{{ line.after }}</span>
     </li>
     {% else %}
     <li class="log-empty">아직 로그가 없어요.</li>

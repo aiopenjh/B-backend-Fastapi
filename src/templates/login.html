@@ -42,6 +42,9 @@
     {% if error %}<p id="login-help" class="form-error" role="alert">{{ error }}</p>
     {% else %}<p id="login-help" class="form-help"><span class="status-dot"></span>로그인 상태는 이 브라우저에만 남아요.</p>{% endif %}
     {% endif %}
+    {% if not ui_user %}
+    <a class="button button-outline full-width" href="{{ url_for('ui_signup') }}">회원가입</a>
+    {% endif %}
     <div class="card-divider"><span>먼저 둘러보세요</span></div>
     <a class="button button-outline full-width" href="{{ url_for('ui_browse') }}">식당 둘러보기 <span aria-hidden="true">↗</span></a>
     <p class="login-footnote">식당 목록과 빈자리는 로그인 없이 볼 수 있어요.</p>

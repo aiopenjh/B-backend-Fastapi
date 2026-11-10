@@ -33,7 +33,7 @@
         <tr>
           <td data-label="식당 번호"><span class="reservation-id">#{{ restaurant.id }}</span></td>
           <td data-label="이름"><strong>{{ restaurant.name }}</strong></td>
-          <td data-label="음식 종류">{{ restaurant.cuisine }}</td>
+          <td data-label="음식 종류">{{ restaurant.cuisine|cuisine }}</td>
           <td data-label="주소">{{ restaurant.address }}</td>
           <td><a class="text-link" href="{{ url_for('ui_admin_reservations', restaurant_id=restaurant.id) }}">예약 보기</a></td>
         </tr>

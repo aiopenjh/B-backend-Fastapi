@@ -8,8 +8,16 @@ from typing import Annotated, Any
 from fastapi import Depends
 
 from auth.domain.value_object import AuthenticatedUser  # 담당 1: 로그인한 사람
-from container import create_owner_service  # 담당 5: 운영자 매니저 공장
+from common.errors import AppError  # 공통 오류
+from container import (
+    NO_SHOW_GRACE,  # 담당 4: 노쇼 유예 시간
+    create_owner_service,  # 담당 5: 운영자 매니저 공장
+    create_user_service,  # 담당 1: 회원 매니저 공장 (예약자 이름)
+)
 from owner.application.service import OwnerService  # 담당 5: 운영자 매니저
+from reservation.domain.reservation import ReservationStatus  # 담당 4: 예약 상태
+from slot.domain.day_range import seoul_now  # 담당 3: 서울 지금 시각
+from user.application.service import UserService  # 담당 1: 회원 매니저
 from web_auth import UIUser  # 담당 5: 쿠키로 로그인한 사람
 
 
@@ -28,9 +36,20 @@ class PageResult:
 class OwnerUIQueries:
     """require_owner를 통과한 사용자와 요청 단위 서비스를 주입받는다."""
 
-    def __init__(self, owner: AuthenticatedUser, service: OwnerService):
+    def __init__(self, owner: AuthenticatedUser, service: OwnerService, users: UserService | None = None):
         self.owner = owner
         self.service = service
+        self.users = users  # 예약자 이름을 꺼낼 때 씀 (담당 1 회원 매니저)
+
+    async def guest_names(self, user_ids: set) -> dict:
+        """예약한 사람 번호 → 이름 (한 화면에 최대 몇십 명이라 한 명씩 꺼냄, 탈퇴 등으로 없으면 빈칸)"""
+        names = {}
+        for user_id in user_ids:
+            try:
+                names[user_id] = (await self.users.get_user(user_id)).name if self.users else ""
+            except AppError:
+                names[user_id] = ""
+        return names
 
     async def restaurants(self, page: int, page_size: int) -> PageResult:
         from common.pagination import PageParams
@@ -48,15 +67,26 @@ class OwnerUIQueries:
         rows, total = await self.service.list_restaurant_reservations(
             self.owner, restaurant_id, day, params
         )
+        now = seoul_now()
+        mine = self.owner.user_id  # 이 목록은 내 식당 것만 오므로 식당 주인 = 나
         # 기존 조회 반환값은 (Reservation, TimeSlot) 쌍이다.
+        names = await self.guest_names({reservation.user_id for reservation, _ in rows})
         items = [
             {
                 "id": reservation.id,
+                "guest_name": names.get(reservation.user_id, ""),
                 "starts_at": slot.starts_at,
                 "party_size": reservation.party_size,
                 "contact_phone": reservation.contact_phone,
                 "status": reservation.status,
                 "cancel_reason": reservation.cancel_reason,  # 담당 4: NO_SHOW면 화면에 "노쇼"로 표시
+                "cancelled_by": reservation.cancelled_by,
+                "cancel_note": reservation.cancel_note,
+                "checked_in_at": reservation.checked_in_at,
+                # 버튼을 보일지는 담당 4 도메인 규칙에 물어봄 (입장: 시작 30분 전~끝, 노쇼: 시작 + 유예 뒤, 취소: 시작 전)
+                "can_check_in": reservation.can_check_in(self.owner, now, slot.starts_at, slot.ends_at, mine),
+                "can_mark_no_show": reservation.can_mark_no_show(self.owner, now, slot.starts_at, NO_SHOW_GRACE, mine),
+                "can_cancel": reservation.status == ReservationStatus.CONFIRMED and now < slot.starts_at,
             }
             for reservation, slot in rows
         ]
@@ -66,6 +96,7 @@ class OwnerUIQueries:
 def get_owner_ui_queries(
     user: UIUser,
     service: Annotated[OwnerService, Depends(create_owner_service)],
+    users: Annotated[UserService, Depends(create_user_service)],
 ) -> OwnerUIQueries | None:
     """운영자로 로그인했으면 운영자 매니저를 화면용으로 감싸서 준다.
 
@@ -73,4 +104,4 @@ def get_owner_ui_queries(
     """
     if user is None or not user.is_owner():
         return None
-    return OwnerUIQueries(user, service)
+    return OwnerUIQueries(user, service, users)

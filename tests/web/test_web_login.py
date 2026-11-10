@@ -191,13 +191,16 @@ async def test_broken_cookie_counts_as_not_logged_in(client):
 class FakeBrowseService:
     """가짜 둘러보기 매니저: 목록 없음"""
 
-    def list_provinces(self):
+    async def list_districts(self):
+        return []
+
+    async def list_dongs(self, district):
         return []
 
     async def list_cuisines(self):
         return []
 
-    async def list_restaurants(self, province, district, q, cuisine, seed, page):
+    async def list_restaurants(self, district, dong, q, cuisine, seed, page):
         return [], 0
 
 
@@ -234,7 +237,7 @@ async def test_menus_are_split_by_role():
     assert "운영 식당" in owner_page.text and "식당 둘러보기</a>" not in owner_page.text
     assert "운영자 워크스페이스" in owner_page.text
     assert "식당 둘러보기" in customer_page.text and "운영 식당</a>" not in customer_page.text
-    assert "손님 화면" in customer_page.text
+    assert "손님으로 로그인 중" in customer_page.text
 
 
 async def test_forbidden_page_button_goes_to_own_home(client):

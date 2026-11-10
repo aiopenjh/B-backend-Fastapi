@@ -17,7 +17,8 @@ from fastapi import Path as PathParam
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, ValidationError
+from starlette.datastructures import URL
 
 from admin.application.service import AdminService  # 담당 5: 관리자 매니저
 from auth.application.service import AuthService  # 담당 1: 로그인 매니저
@@ -33,11 +34,16 @@ from container import (
     create_reservation_service,  # 담당 4: 예약 매니저 공장 (#46)
     create_restaurant_service,  # 담당 2: 식당 매니저 공장
     create_slot_service,  # 담당 3: 빈자리 매니저 공장 (#44)
+    create_user_service,  # 담당 1: 회원 매니저 공장 (예약 연락처로 내 전화번호)
 )
 from reservation.application.query_service import (
     ReservationQueryService,  # 담당 5: 예약 조회 매니저
 )
 from reservation.application.service import ReservationService  # 담당 4: 예약 매니저
+from reservation.domain.reservation import (  # 담당 4: 누가·왜 취소 (#57)
+    CancelledBy,
+    CancelReason,
+)
 from restaurant.application.service import RestaurantService  # 담당 2: 식당 매니저
 from restaurant.domain.exceptions import RestaurantNotFoundError  # 담당 2: 없는 식당
 from restaurant.presentation.routers.v1.router import (
@@ -45,6 +51,8 @@ from restaurant.presentation.routers.v1.router import (
 )
 from slot.application.service import SlotService  # 담당 3: 빈자리 매니저
 from slot.domain.day_range import seoul_now  # 담당 3: 서울 지금 시각
+from user.application.service import UserService  # 담당 1: 회원 매니저
+from user.presentation.schemas import SignUpUserRequest  # 담당 1: 회원가입 입력 규칙
 from web_auth import (  # 담당 5: 화면 로그인
     COOKIE_NAME,
     COOKIE_PATH,
@@ -82,6 +90,27 @@ def seoul_time(value: datetime) -> str:
 
 templates.env.filters["seoul_datetime"] = seoul_datetime
 templates.env.filters["seoul_time"] = seoul_time
+
+# 음식 종류 코드 → 화면 글자 (DB 값은 그대로 두고 화면에서만 바꿔 보여 줌, 목록에 없으면 그대로)
+CUISINE_LABELS = {
+    "KOREAN": "한식",
+    "JAPANESE": "일식",
+    "CHINESE": "중식",
+    "WESTERN": "양식",
+    "ITALIAN": "이탈리안",
+    "BUNSIK": "분식",
+    "PUB": "주점",
+    "CAFE": "카페",
+    "WORLD": "세계 음식",
+}
+
+
+def cuisine_label(value: str | None) -> str:
+    """음식 종류 코드를 한국어로 ('KOREAN' → '한식')"""
+    return CUISINE_LABELS.get(value or "", value or "")
+
+
+templates.env.filters["cuisine"] = cuisine_label
 OwnerQueries = Annotated[OwnerUIQueries | None, Depends(get_owner_ui_queries)]
 Restaurants = Annotated[RestaurantService, Depends(create_restaurant_service)]
 Slots = Annotated[SlotService, Depends(create_slot_service)]
@@ -94,6 +123,7 @@ Admin = Annotated[AdminService, Depends(create_admin_service)]
 Browse = Annotated[BrowseService, Depends(create_browse_service)]
 Booking = Annotated[ReservationService, Depends(create_reservation_service)]
 MyReservations = Annotated[ReservationQueryService, Depends(create_reservation_query_service)]
+Users = Annotated[UserService, Depends(create_user_service)]
 
 # 예약하기 실패를 손님이 읽는 문구로 (오류 코드 → 문구)
 BOOKING_ERRORS = {
@@ -103,6 +133,30 @@ BOOKING_ERRORS = {
     "DUPLICATE_RESERVATION": "이미 예약한 시간이에요.",
     "NOT_THIS_RESTAURANT": "선택한 시간을 찾을 수 없어요. 다시 골라 주세요.",
 }
+
+# 예약 취소 실패를 읽는 문구로 (오류 코드 → 문구). 화면 알림 조각(notice.html)이 씀
+CANCEL_ERRORS = {
+    "ALREADY_CANCELLED": "이미 취소된 예약이에요.",
+    "CANCELLATION_NOT_ALLOWED": "예약 시간이 시작돼서 취소할 수 없어요.",
+    "NOT_FOUND": "처리할 수 있는 예약이 아니에요.",
+    "CANCEL_REASON_NOT_ALLOWED": "이 취소 이유는 쓸 수 없어요.",
+    "CANCEL_NOTE_REQUIRED": "관리자 취소는 메모를 꼭 적어 주세요.",
+    "NO_SHOW_TOO_EARLY": "아직 노쇼로 처리할 수 없어요. (시작 뒤 유예 시간이 지나야 해요)",
+    "ALREADY_CHECKED_IN": "이미 입장 확인된 예약이에요.",
+    "CHECK_IN_NOT_ALLOWED": "지금은 입장 확인을 할 수 없어요. (시작 30분 전부터 끝나기 전까지)",
+    "VALIDATION_ERROR": "입력값을 다시 확인해 주세요. (메모는 100자까지)",
+}
+templates.env.globals["CANCEL_ERRORS"] = CANCEL_ERRORS
+# 취소 이유·취소한 사람 → 화면 글자 (담당 4 CancelReason·CancelledBy)
+templates.env.globals["CANCEL_REASONS"] = {
+    "CUSTOMER_REQUEST": "손님 취소",
+    "PHONE_REQUEST": "전화 요청",
+    "RESTAURANT_ISSUE": "식당 사정",
+    "NO_SHOW": "노쇼",
+    "SYSTEM_ERROR": "시스템 오류",
+    "OTHER": "기타",
+}
+templates.env.globals["CANCELLED_BY"] = {"CUSTOMER": "손님", "OWNER": "운영자", "ADMIN": "관리자", "SYSTEM": "자동"}
 
 
 def message_page(request: Request, status_code: int, title: str, text: str) -> HTMLResponse:
@@ -150,6 +204,69 @@ async def login_page(request: Request, next: str | None = None):
         request=request, name="login.html",
         context={"active_page": "login", "next": safe_next(next) or "", "email": "", "error": None},
     )
+
+
+# 담당 5: 회원가입 화면 — 담당 1 회원가입(sign_up)을 그대로 부르고, 성공하면 바로 로그인 쿠키까지
+SIGNUP_FIELDS = ("name", "email", "password", "phone")
+# 입력 칸 검사(담당 1 SignUpUserRequest) 실패를 칸별 한국어 문구로
+SIGNUP_FIELD_ERRORS = {
+    "name": "이름은 2~20자로 적어 주세요.",
+    "email": "이메일 형식이 아니에요.",
+    "password": "비밀번호는 8자 이상, 영문·숫자·특수문자(@$!%*#?&)를 모두 넣어 주세요.",
+    "phone": "휴대폰 번호 형식이 아니에요. (예: 010-1234-5678)",
+}
+
+
+def signup_page(request: Request, status_code: int, form: dict, errors: dict, error: str | None = None):
+    """회원가입 화면 (실패하면 적은 값은 남기고 비밀번호만 비움)"""
+    return templates.TemplateResponse(
+        request=request, name="signup.html", status_code=status_code,
+        context={"active_page": "login", "form": {k: v for k, v in form.items() if k != "password"},
+                 "errors": errors, "error": error},
+    )
+
+
+@router.get("/signup", response_class=HTMLResponse, name="ui_signup")
+async def signup_form(request: Request):
+    if request.state.ui_user is not None:
+        return RedirectResponse(home_url(request, request.state.ui_user), status_code=303)
+    return signup_page(request, 200, dict.fromkeys(SIGNUP_FIELDS, ""), {})
+
+
+@router.post("/signup", name="ui_signup_submit")
+async def signup_submit(
+    request: Request,
+    users: Users,
+    auth: Auth,
+    name: Annotated[str, Form()] = "",
+    email: Annotated[str, Form()] = "",
+    password: Annotated[str, Form()] = "",
+    phone: Annotated[str, Form()] = "",
+):
+    form = {"name": name.strip(), "email": email.strip(), "password": password, "phone": phone.strip()}
+    try:
+        checked = SignUpUserRequest(**form)  # API 회원가입과 같은 입력 규칙 (담당 1)
+    except ValidationError as error:
+        fields = {str(item["loc"][0]) for item in error.errors()}
+        return signup_page(request, 422, form, {f: SIGNUP_FIELD_ERRORS.get(f, "다시 확인해 주세요.") for f in fields})
+    try:
+        await users.sign_up(email=checked.email, raw_password=checked.password, name=checked.name, phone=checked.phone)
+    except AppError as error:
+        if error.error_code.name == "DUPLICATED_USER_ERROR":
+            return signup_page(request, error.error_code.status, form, {"email": "이미 가입한 이메일이에요."})
+        # 도메인 규칙(이메일·비밀번호 모양 등)에 걸리면 칸별로
+        fields = {f: SIGNUP_FIELD_ERRORS.get(f, "다시 확인해 주세요.") for f in error.errors} or {}
+        return signup_page(request, error.error_code.status, form, fields, None if fields else error.message)
+    # 가입 성공 → 담당 1 login으로 바로 로그인 (화면 로그인과 같은 쿠키)
+    issued = await auth.login(email=checked.email, password=checked.password)
+    user = await auth.authenticate(token=issued.access_token)
+    response = RedirectResponse(home_url(request, user), status_code=303)
+    response.set_cookie(
+        COOKIE_NAME, issued.access_token, max_age=issued.expires_in,
+        httponly=True, samesite="lax", path=COOKIE_PATH,
+        secure=request.url.scheme == "https",
+    )
+    return response
 
 
 # 담당 5: 화면 로그인 — 담당 1 login으로 JWT를 받아 HttpOnly 쿠키에 담는다
@@ -237,6 +354,7 @@ async def reservations_page(
         name="owner/reservations.html",
         context={
             "active_page": "reservations",
+            "now": seoul_now(),
             "restaurant_id": restaurant_id,
             "selected_date": date.isoformat() if date else "",
             "reservations": result.items if result else None,
@@ -254,8 +372,8 @@ async def browse_page(
     browse: Browse,
     q: Annotated[str | None, Blank] = None,
     cuisine: Annotated[str | None, Blank] = None,
-    region: Annotated[str | None, Blank] = None,
     district: Annotated[str | None, Blank] = None,
+    dong: Annotated[str | None, Blank] = None,
     seed: Annotated[str | None, Query(pattern=r"^[0-9a-f]{1,16}$")] = None,
     page: PageNumber = 1,
     page_size: PageSize = 10,
@@ -264,11 +382,9 @@ async def browse_page(
         return moved
     # 새로 열 때(새로고침·검색 포함)만 새로 섞고, 쪽을 넘길 때는 링크에 실린 섞기 번호로 같은 순서를 유지
     seed = seed or secrets.token_hex(4)
-    if not region:
-        district = None
-    districts = await browse.list_districts(region) if region else []
+    dongs = await browse.list_dongs(district)  # 구를 안 고르면 동 전체
     items, total = await browse.list_restaurants(
-        region, district, q, cuisine, seed, PageParams(page=page, page_size=page_size)
+        district, dong, q, cuisine, seed, PageParams(page=page, page_size=page_size)
     )
     return templates.TemplateResponse(
         request=request,
@@ -276,9 +392,9 @@ async def browse_page(
         context={
             "active_page": "browse", "restaurants": items,
             "result": PageResult(items, total, page, page_size),
-            "cuisines": await browse.list_cuisines(), "provinces": browse.list_provinces(),
-            "districts": districts,
-            "q": q or "", "cuisine": cuisine or "", "region": region or "", "district": district or "",
+            "cuisines": await browse.list_cuisines(), "districts": await browse.list_districts(),
+            "dongs": dongs,
+            "q": q or "", "cuisine": cuisine or "", "district": district or "", "dong": dong or "",
             "page_base": request.url.include_query_params(seed=seed),
         },
     )
@@ -346,6 +462,7 @@ async def reserve_submit(
     restaurant_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
     slots: Slots,
     booking: Booking,
+    users: Users,
     slot_id: Annotated[int, Form()],
     party_size: Annotated[int, Form(ge=1, le=20)],
     date: Annotated[Date, Form()],
@@ -370,7 +487,9 @@ async def reserve_submit(
     if slot_id not in {item.slot.id for item in available}:
         return RedirectResponse(back.include_query_params(fail="NOT_THIS_RESTAURANT"), status_code=303)
     try:
-        reservation, _ = await booking.create(user.user_id, slot_id, party_size, None, seoul_now())
+        # 예약 연락처 = 예약한 사람의 회원 전화번호 (사람마다 달라서 운영자·관리자 표에서 구분됨)
+        phone = (await users.get_user(user.user_id)).phone
+        reservation, _ = await booking.create(user.user_id, slot_id, party_size, phone, seoul_now())
     except AppError as error:
         return RedirectResponse(back.include_query_params(fail=error.error_code.name, slot_id=slot_id), status_code=303)
     return RedirectResponse(back.include_query_params(reserved=reservation.id), status_code=303)
@@ -378,13 +497,22 @@ async def reserve_submit(
 
 # 담당 5: 관리자 화면 ① 운영자 목록 + 식당 수
 @router.get("/admin/owners", response_class=HTMLResponse, name="ui_admin_owners")
-async def admin_owners_page(request: Request, service: Admin, page: PageNumber = 1, page_size: PageSize = 20):
+async def admin_owners_page(
+    request: Request, service: Admin, page: PageNumber = 1, page_size: PageSize = 20,
+    q: Annotated[str, Query(max_length=150)] = "", restaurants_only: bool = False,
+):
     if denied := deny_admin(request):
         return denied
+    restaurants = await service.search_restaurants(q)
+    if restaurants_only:
+        return templates.TemplateResponse(
+            request=request, name="admin/restaurant_results.html", context={"restaurants": restaurants},
+            headers={"Cache-Control": "no-store"},
+        )
     rows, total = await service.list_owners(PageParams(page=page, page_size=page_size))
     return templates.TemplateResponse(
         request=request, name="admin/owners.html",
-        context={"active_page": "admin", "owners": rows, "total": total,
+        context={"active_page": "admin", "owners": rows, "total": total, "restaurants": restaurants, "q": q,
                  "result": PageResult(rows, total, page, page_size)},
     )
 
@@ -427,13 +555,105 @@ async def admin_reservations_page(
         return message_page(request, error.error_code.status, "식당을 찾을 수 없어요", error.message)
     return templates.TemplateResponse(
         request=request, name="admin/reservations.html",
-        context={"active_page": "admin", "restaurant": restaurant, "rows": rows, "total": total,
+        context={"active_page": "admin", "restaurant": restaurant, "rows": rows, "total": total, "now": seoul_now(),
                  "selected_date": date.isoformat() if date else "", "page_size": page_size,
                  "result": PageResult(rows, total, page, page_size)},
     )
+
+
+# 담당 5: 예약 취소 (손님·운영자·관리자 화면이 같이 씀) — 담당 4 ReservationService.cancel(#54)이 권한을 판단
+@router.post("/reservations/{reservation_id}/cancel", name="ui_cancel")
+async def cancel_submit(
+    request: Request,
+    reservation_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
+    booking: Booking,
+    next: Annotated[str, Form()] = "",
+    reason: Annotated[str, Form()] = "",
+    note: Annotated[str, Form(max_length=300)] = "",
+):
+    user = request.state.ui_user
+    if user is None:
+        return to_login(request)
+    back = URL(safe_next(next) or home_url(request, user))
+    # 누가 취소하나: 손님은 이유 없이(손님 요청), 운영자·관리자는 고른 이유와 메모 (#57 담당 4 규칙이 판단)
+    if user.is_admin():
+        by = CancelledBy.ADMIN
+    elif user.is_owner():
+        by = CancelledBy.OWNER
+    else:
+        by, reason = CancelledBy.CUSTOMER, CancelReason.CUSTOMER_REQUEST
+    try:
+        chosen = CancelReason(reason)
+    except ValueError:
+        return RedirectResponse(back.include_query_params(cancel_fail="CANCEL_REASON_NOT_ALLOWED"), status_code=303)
+    try:
+        # 손님은 내 예약, 운영자는 내 식당 예약, 관리자는 모든 예약. 아니면 404, 시간·이유가 안 맞으면 409·422
+        await booking.cancel(user, reservation_id, seoul_now(), by=by, reason=chosen, note=note.strip() or None)
+    except AppError as error:
+        return RedirectResponse(back.include_query_params(cancel_fail=error.error_code.name), status_code=303)
+    done = "no_show" if chosen == CancelReason.NO_SHOW else "cancelled"
+    return RedirectResponse(back.include_query_params(**{done: reservation_id}), status_code=303)
+
+
+# 담당 5: 운영자 "입장" — 담당 4 ReservationService.check_in(#57), 그 식당 운영자만
+@router.post("/reservations/{reservation_id}/check-in", name="ui_check_in")
+async def check_in_submit(
+    request: Request,
+    reservation_id: Annotated[int, PathParam(ge=1, le=BIGINT_MAX)],
+    booking: Booking,
+    next: Annotated[str, Form()] = "",
+):
+    user = request.state.ui_user
+    if user is None:
+        return to_login(request)
+    back = URL(safe_next(next) or home_url(request, user))
+    try:
+        await booking.check_in(user, reservation_id, seoul_now())
+    except AppError as error:
+        return RedirectResponse(back.include_query_params(cancel_fail=error.error_code.name), status_code=303)
+    return RedirectResponse(back.include_query_params(checked_in=reservation_id), status_code=303)
+
+
+# 담당 5: 손님 "내 예약" 화면 — 담당 5 내 예약 조회 매니저 + 취소 버튼
+@router.get("/my/reservations", response_class=HTMLResponse, name="ui_my_reservations")
+async def my_reservations_page(
+    request: Request,
+    my_reservations: MyReservations,
+    service: Restaurants,
+    page: PageNumber = 1,
+    page_size: PageSize = 10,
+):
+    user = request.state.ui_user
+    if user is None:
+        return to_login(request)
+    if moved := staff_redirect(request):
+        return moved
+    items, total = await my_reservations.list_my_reservations(user, None, PageParams(page=page, page_size=page_size))
+    # 예약에는 식당 번호만 있어서, 화면에 쓸 식당 이름을 한 번씩만 꺼내 둔다 (지워진 식당은 이름 없이)
+    names = {}
+    for _, slot in items:
+        if slot.restaurant_id not in names:
+            try:
+                names[slot.restaurant_id] = (await service.get_restaurant(slot.restaurant_id)).name
+            except AppError:
+                names[slot.restaurant_id] = None
+    return templates.TemplateResponse(
+        request=request,
+        name="my/reservations.html",
+        context={
+            "active_page": "my", "items": items, "names": names, "now": seoul_now(),
+            "result": PageResult(items, total, page, page_size),
+        },
+    )
+
+
+async def front_door(request: Request) -> RedirectResponse:
+    """맨 앞 주소(/)로 들어오면 404 대신 식당 둘러보기 화면으로"""
+    return RedirectResponse(request.url_for("ui_browse"), status_code=307)
 
 
 def register_web(app: FastAPI) -> None:
     """HTML 라우터와 정적 파일을 기존 앱에 등록한다."""
     app.mount("/static", StaticFiles(directory=str(SRC_DIR / "static")), name="static")
     app.include_router(router)
+    app.add_api_route("/", front_door, include_in_schema=False)  # 맨 앞 주소 → 화면

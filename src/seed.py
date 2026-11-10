@@ -25,10 +25,13 @@ GUARD_EMAIL = "owner.a@example.com"       # ▶ 이 이메일이 있으면 시�
 USERS = [
     ("customer.a@example.com", "고객A", "010-1111-0001", Role.CUSTOMER),
     ("customer.b@example.com", "고객B", "010-1111-0002", Role.CUSTOMER),
-    (GUARD_EMAIL,              "운영자A", "010-2222-0001", Role.OWNER),
-    ("owner.b@example.com",    "운영자B", "010-2222-0002", Role.OWNER),
-    ("admin.a@example.com",    "관리자",  "010-3333-0001", Role.ADMIN),  # [담당5] 관리자 화면(/ui/admin) 시연용
+    (GUARD_EMAIL,              "운영자A", "010-2222-1001", Role.OWNER),  # [담당5] 식당 CSV 운영자(010-2222-0001~0200)와 겹치지 않게
+    ("owner.b@example.com",    "운영자B", "010-2222-1002", Role.OWNER),
 ]
+
+# [담당5] 관리자 화면(/ui/admin) 시연용 계정 — 위 회원들과 비밀번호가 달라서 따로 둔다
+ADMIN = ("test@test.org", "관리자", "010-3333-0001")
+ADMIN_PASSWORD = "test1234!@"
 
 # (owner 인덱스 0=A·1=B, 식당 이름, 주소, cuisine, [(메뉴, 가격) × 3])
 RESTAURANTS = [
@@ -48,8 +51,24 @@ SLOTS = [
 ]
 
 
+async def ensure_admin(session: AsyncSession) -> None:
+    """[담당5] 관리자 계정이 없으면 넣는다. 이미 시드가 들어간 DB에도 관리자는 생기게 seed()보다 먼저 확인"""
+    email, name, phone = ADMIN
+    if await session.scalar(select(UserModel.id).where(UserModel.email == email)):
+        return
+    session.add(
+        UserModel(
+            email=email, name=name, phone=phone, role=Role.ADMIN,
+            password_hash=BcryptPasswordHasher().hash(ADMIN_PASSWORD),
+        )
+    )
+    await session.commit()
+    logger.info("seed admin added — %s", email)
+
+
 async def seed(session: AsyncSession) -> None:
     """빈 DB 면 넣고, 시드 이메일이 이미 있으면 건너뜀 (재시작·--reload 에도 한 번만)."""
+    await ensure_admin(session)
     if await session.scalar(select(UserModel.id).where(UserModel.email == GUARD_EMAIL)):
         logger.info("seed skipped — %s already exists", GUARD_EMAIL)   # ▶ 체크 8 '재시작해도 중복 없음' 을 로그로
         return

@@ -56,6 +56,11 @@ class FakeAdminService:
     async def list_owners(self, page):
         return [(OWNER, 1)], 1
 
+    async def search_restaurants(self, name):
+        if name not in RESTAURANT.name:
+            return []
+        return [{"id": RESTAURANT.id, "name": RESTAURANT.name, "address": RESTAURANT.address, "received": STARTS}]
+
     async def list_owner_restaurants(self, owner_id, page):
         if owner_id != OWNER.id:
             raise NotFoundError()
@@ -118,6 +123,15 @@ async def test_owner_list_shows_restaurant_count_and_link(client):
     assert "관리자로 로그인" in response.text  # 사이드바
 
 
+async def test_admin_restaurant_search_returns_filtered_reservation_links(client):
+    client.cookies.set(COOKIE_NAME, "admin-token")
+    async with client:
+        found = await client.get("/ui/admin/owners", params={"restaurants_only": True, "q": "한상"})
+        empty = await client.get("/ui/admin/owners", params={"restaurants_only": True, "q": "없는 식당"})
+    assert found.status_code == 200 and "/ui/admin/restaurants/7/reservations" in found.text
+    assert "가입 순" not in found.text and "일치하는 식당이 없어요" in empty.text
+
+
 async def test_owner_restaurants_and_unknown_owner(client):
     client.cookies.set(COOKIE_NAME, "admin-token")
     async with client:
@@ -172,13 +186,16 @@ async def test_admin_can_open_customer_browse(client):
     from container import create_browse_service, create_restaurant_service
 
     class FakeBrowseService:
-        def list_provinces(self):
+        async def list_districts(self):
+            return []
+
+        async def list_dongs(self, district):
             return []
 
         async def list_cuisines(self):
             return []
 
-        async def list_restaurants(self, province, district, q, cuisine, seed, page):
+        async def list_restaurants(self, district, dong, q, cuisine, seed, page):
             return [], 0
 
     class FakeRestaurantService:
@@ -192,4 +209,4 @@ async def test_admin_can_open_customer_browse(client):
         browse = await client.get("/ui/restaurants")
 
     assert browse.status_code == 200  # 손님 화면에서 돌려보내지 않음
-    assert "손님 화면" in browse.text
+    assert "로그인 중" not in browse.text  # 남의 공간(손님 화면)에서는 관리자 로그인 표시를 띄우지 않음

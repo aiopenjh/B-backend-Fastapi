@@ -9,10 +9,12 @@
 <div class="page-heading">
   <div>
     <h1>{{ restaurant.name }} <span class="reservation-id">#{{ restaurant.id }}</span></h1>
-    <p class="muted">{{ restaurant.cuisine }}<span class="separator">·</span>{{ restaurant.address }}</p>
+    <p class="muted">{{ restaurant.cuisine|cuisine }}<span class="separator">·</span>{{ restaurant.address }}</p>
   </div>
   <a class="button button-outline" href="{{ url_for('ui_admin_owner_restaurants', owner_id=restaurant.owner_id) }}">← 식당 목록</a>
 </div>
+
+{% include "components/notice.html" %}
 
 <section class="panel" aria-labelledby="admin-reservations-title">
   <div class="panel-heading">
@@ -45,6 +47,7 @@
           <th scope="col">예약자 이메일</th>
           <th scope="col">연락처</th>
           <th scope="col">상태</th>
+          <th scope="col">처리</th>
         </tr>
       </thead>
       <tbody>
@@ -57,14 +60,25 @@
           <td data-label="예약자 이메일">{{ guest.email }}</td>
           <td data-label="연락처">{{ reservation.contact_phone or guest.phone }}</td>
           <td data-label="상태">
-            {% if reservation.status == 'CONFIRMED' %}<span class="badge badge-confirmed"><span></span>예약 확정</span>
-            {% elif reservation.status == 'CANCELLED' and reservation.cancel_reason == 'NO_SHOW' %}<span class="badge"><span></span>노쇼</span>
-            {% elif reservation.status == 'CANCELLED' %}<span class="badge"><span></span>취소</span>
-            {% else %}{{ reservation.status }}{% endif %}
+            {% include "components/reservation_status.html" %}
+          </td>
+          <td data-label="처리">
+            {% if reservation.status == 'CONFIRMED' %}
+            <form class="row-action cancel-form" method="post" action="{{ url_for('ui_cancel', reservation_id=reservation.id) }}">
+              <input type="hidden" name="next" value="{{ request.url.path }}?{{ request.url.query }}">
+              <label class="sr-only" for="reason-{{ reservation.id }}">취소 이유</label>
+              <select id="reason-{{ reservation.id }}" name="reason">
+                <option value="SYSTEM_ERROR">시스템 오류</option>
+                <option value="OTHER">기타</option>
+              </select>
+              <input name="note" maxlength="100" required placeholder="메모 (필수)">
+              <button class="text-link cancel-button" type="submit" aria-label="예약 #{{ reservation.id }} 취소">취소</button>
+            </form>
+            {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7"><div class="empty-state"><h3>해당 기간의 예약이 없어요</h3><p>다른 날짜를 골라 보세요.</p></div></td></tr>
+        <tr><td colspan="8"><div class="empty-state"><h3>해당 기간의 예약이 없어요</h3><p>다른 날짜를 골라 보세요.</p></div></td></tr>
         {% endfor %}
       </tbody>
     </table>

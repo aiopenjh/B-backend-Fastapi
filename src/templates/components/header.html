@@ -2,7 +2,9 @@
 {% set ui_user = request.state.ui_user if request.state.ui_user is defined else none %}
 {% set is_owner = ui_user is not none and ui_user.is_owner() %}
 {% set is_admin = ui_user is not none and ui_user.is_admin() %}
-{% set role_names = {'ADMIN': '관리자', 'OWNER': '운영자', 'CUSTOMER': '손님'} %}
+{% set role_names = {'ADMIN': '관리자로', 'OWNER': '운영자로', 'CUSTOMER': '손님으로'} %}
+{# 관리자가 손님 화면을 볼 때처럼 남의 공간이면 로그인 표시를 띄우지 않음 #}
+{% set in_own_space = (is_admin and active_page == 'admin') or is_owner or (ui_user is not none and not is_admin) %}
 
 {% if is_admin %}
   {% set home = url_for('ui_admin_owners') %}
@@ -29,14 +31,10 @@
       관리자 백오피스
     {% elif is_owner %}
       운영자 워크스페이스
-    {% else %}
-      손님 화면
     {% endif %}
   </span>
 
-  {% if ui_user %}
-    <span class="preview-chip">{{ role_names.get(ui_user.role, ui_user.role) }}로 로그인</span>
-  {% else %}
-    <span class="preview-chip">로그인 전</span>
+  {% if ui_user and in_own_space %}
+    <span class="preview-chip">{{ role_names.get(ui_user.role, ui_user.role) }} 로그인 중</span>
   {% endif %}
 </header>
