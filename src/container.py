@@ -147,25 +147,29 @@ def create_reservation_query_service(
     return ReservationQueryService(session)
 
 
-# 담당 4 : 예약 매니저 공장 (생성, 취소)
-def create_reservation_service(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    slot_repo: Annotated[SlotRepository, Depends(create_slot_repository)],
-    uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
-) -> ReservationService:
-    return ReservationService(
-        reservation_repo=SQLAlchemyReservationRepository(session),
-        slot_repo=slot_repo,
-        uow=uow,
-    )
-
-
 # 담당 2: 식당 매니저 공장
 def create_restaurant_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
 ) -> RestaurantService:
     return RestaurantService(repo=RestaurantRepository(session), uow=uow)
+
+
+# 담당 4 : 예약 매니저 공장 (생성, 취소). 취소 권한을 보려고 식당 매니저를 받아서 식당 공장 아래에 둠
+def create_reservation_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    slot_repo: Annotated[SlotRepository, Depends(create_slot_repository)],
+    restaurant_service: Annotated[
+        RestaurantService, Depends(create_restaurant_service)
+    ],
+    uow: Annotated[UnitOfWork, Depends(create_unit_of_work)],
+) -> ReservationService:
+    return ReservationService(
+        reservation_repo=SQLAlchemyReservationRepository(session),
+        slot_repo=slot_repo,
+        restaurant_service=restaurant_service,
+        uow=uow,
+    )
 
 
 def wire_dependencies(app: FastAPI) -> None:

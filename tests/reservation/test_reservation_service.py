@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 
+from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.errors import NotFoundError
 from common.schemas import SEOUL
 from common.unit_of_work import ConflictError, UnitOfWork
@@ -15,6 +16,8 @@ from reservation.domain.exceptions import (
 )
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation, ReservationStatus
+from restaurant.domain.exceptions import RestaurantNotFoundError
+from restaurant.domain.restaurant import Restaurant
 from slot.domain.exceptions import SlotSoldOut
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
@@ -90,8 +93,35 @@ class FakeUnitOfWork(UnitOfWork):
         self.commits += 1
 
 
+class FakeRestaurantService:
+    """식당 번호로 식당을 꺼내 주는 가짜 식당 매니저 (취소 권한 확인용)"""
+
+    def __init__(self, restaurants: list[Restaurant]) -> None:
+        self.restaurants = restaurants
+
+    async def get_restaurant(self, restaurant_id: int) -> Restaurant:
+        for restaurant in self.restaurants:
+            if restaurant.id == restaurant_id:
+                return restaurant
+        raise RestaurantNotFoundError()  # 진짜 식당 매니저와 같은 404
+
+
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 OTHER_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000002")
+OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
+OTHER_OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000004")
+ADMIN_ID = uuid.UUID("00000000-0000-4000-8000-000000000005")
+
+CUSTOMER = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)  # 예약한 손님
+OTHER_CUSTOMER = AuthenticatedUser(user_id=OTHER_USER_ID, role=AuthRole.CUSTOMER)
+OWNER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)  # 1번 식당 주인
+OTHER_OWNER = AuthenticatedUser(user_id=OTHER_OWNER_ID, role=AuthRole.OWNER)
+ADMIN = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
+
+# 1번 식당 (7번 슬롯이 이 식당 것)
+RESTAURANT = Restaurant(
+    id=1, owner_id=OWNER_ID, name="테스트 식당", address="서울 중구", cuisine="한식"
+)
 NOW = datetime(2026, 12, 3, 17, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2026, 12, 3, 18, 0, tzinfo=SEOUL)
 ENDS_AT = datetime(2026, 12, 3, 19, 0, tzinfo=SEOUL)
@@ -131,6 +161,7 @@ def service(reservation_repo, slot, uow, lock_log) -> ReservationService:
     return ReservationService(
         reservation_repo=reservation_repo,
         slot_repo=InMemorySlotRepository([slot], lock_log),
+        restaurant_service=FakeRestaurantService([RESTAURANT]),
         uow=uow,
     )
 
@@ -202,7 +233,7 @@ async def test_cancel_releases_seats_and_commits(service, slot, uow):
     )
 
     cancelled, returned_slot = await service.cancel(
-        user_id=USER_ID, reservation_id=created.id, now=NOW
+        user=CUSTOMER, reservation_id=created.id, now=NOW
     )
 
     assert cancelled.status is ReservationStatus.CANCELLED
@@ -215,7 +246,7 @@ async def test_cancel_releases_seats_and_commits(service, slot, uow):
 async def test_cancel_unknown_reservation_raises_not_found(service, uow):
     # 없는 예약 번호를 취소하면 404가 나고 확정하지 않는다.
     with pytest.raises(NotFoundError):
-        await service.cancel(user_id=USER_ID, reservation_id=999, now=NOW)
+        await service.cancel(user=CUSTOMER, reservation_id=999, now=NOW)
 
     assert uow.commits == 0
 
@@ -227,7 +258,7 @@ async def test_cancel_other_users_reservation_raises_not_found(service, slot, uo
     )
 
     with pytest.raises(NotFoundError):
-        await service.cancel(user_id=OTHER_USER_ID, reservation_id=created.id, now=NOW)
+        await service.cancel(user=OTHER_CUSTOMER, reservation_id=created.id, now=NOW)
 
     assert created.status is ReservationStatus.CONFIRMED
     assert slot.reserved_guests == 4
@@ -239,10 +270,10 @@ async def test_cancel_twice_raises_already_cancelled(service, slot, uow):
     created, _ = await service.create(
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
-    await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
+    await service.cancel(user=CUSTOMER, reservation_id=created.id, now=NOW)
 
     with pytest.raises(AlreadyCancelledError):
-        await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
+        await service.cancel(user=CUSTOMER, reservation_id=created.id, now=NOW)
 
     assert slot.reserved_guests == 2
     assert uow.commits == 2
@@ -255,7 +286,7 @@ async def test_cancel_after_slot_started_raises_not_allowed(service, slot, uow):
     )
 
     with pytest.raises(CancellationNotAllowedError):
-        await service.cancel(user_id=USER_ID, reservation_id=created.id, now=STARTS_AT)
+        await service.cancel(user=CUSTOMER, reservation_id=created.id, now=STARTS_AT)
 
     assert created.status is ReservationStatus.CONFIRMED
     assert slot.reserved_guests == 4
@@ -278,7 +309,7 @@ async def test_cancel_locks_slot_before_reservation(service, lock_log):
     )
     lock_log.clear()  # 생성 때 적힌 기록은 지우고, 취소 때 기록만 본다
 
-    await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
+    await service.cancel(user=CUSTOMER, reservation_id=created.id, now=NOW)
 
     assert lock_log == ["slot", "reservation"]
 
@@ -294,3 +325,97 @@ async def test_create_db_conflict_raises_duplicate(service, reservation_repo, uo
 
     assert reservation_repo.reservations == []
     assert uow.commits == 0
+
+
+async def test_owner_cancels_reservation_of_own_restaurant(service, slot, uow):
+    # 1번 식당 주인은 그 식당 슬롯의 손님 예약을 취소할 수 있고, 자리도 반납된다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    cancelled, _ = await service.cancel(user=OWNER, reservation_id=created.id, now=NOW)
+
+    assert cancelled.status is ReservationStatus.CANCELLED
+    assert slot.reserved_guests == 2
+    assert uow.commits == 2
+
+
+async def test_other_owner_cancel_raises_not_found(service, slot, uow):
+    # 다른 식당 주인이 취소하려 하면 예약이 있는지조차 숨기려고 404가 나고, 예약과 자리는 그대로다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    with pytest.raises(NotFoundError):
+        await service.cancel(user=OTHER_OWNER, reservation_id=created.id, now=NOW)
+
+    assert created.status is ReservationStatus.CONFIRMED
+    assert slot.reserved_guests == 4
+    assert uow.commits == 1
+
+
+async def test_admin_cancels_any_reservation(service, slot, uow):
+    # 관리자는 어느 식당 예약이든 취소할 수 있다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    cancelled, _ = await service.cancel(user=ADMIN, reservation_id=created.id, now=NOW)
+
+    assert cancelled.status is ReservationStatus.CANCELLED
+    assert slot.reserved_guests == 2
+    assert uow.commits == 2
+
+
+async def test_admin_cancel_after_slot_started_raises_not_allowed(service, slot, uow):
+    # 관리자도 슬롯이 시작된 뒤에는 취소할 수 없다 (시각 규칙은 누구에게나 같다).
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    with pytest.raises(CancellationNotAllowedError):
+        await service.cancel(user=ADMIN, reservation_id=created.id, now=STARTS_AT)
+
+    assert created.status is ReservationStatus.CONFIRMED
+    assert slot.reserved_guests == 4
+    assert uow.commits == 1
+
+
+async def test_owner_cancel_unknown_reservation_raises_not_found(service, uow):
+    # 운영자·관리자도 없는 예약 번호면 404가 난다.
+    with pytest.raises(NotFoundError):
+        await service.cancel(user=OWNER, reservation_id=999, now=NOW)
+
+    assert uow.commits == 0
+
+
+async def test_owner_cancel_locks_slot_before_reservation(service, lock_log):
+    # 운영자가 취소할 때도 잠금 순서는 슬롯 -> 예약으로 같다.
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+    lock_log.clear()
+
+    await service.cancel(user=OWNER, reservation_id=created.id, now=NOW)
+
+    assert lock_log == ["slot", "reservation"]
+
+
+async def test_admin_cancels_even_if_restaurant_is_gone(
+    reservation_repo, slot, uow, lock_log
+):
+    # 식당이 삭제돼 조회되지 않아도, 관리자는 식당을 보지 않고 취소할 수 있다.
+    service = ReservationService(
+        reservation_repo=reservation_repo,
+        slot_repo=InMemorySlotRepository([slot], lock_log),
+        restaurant_service=FakeRestaurantService([]),  # 식당이 하나도 없음
+        uow=uow,
+    )
+    created, _ = await service.create(
+        user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
+    )
+
+    cancelled, _ = await service.cancel(user=ADMIN, reservation_id=created.id, now=NOW)
+
+    assert cancelled.status is ReservationStatus.CANCELLED
+    assert slot.reserved_guests == 2

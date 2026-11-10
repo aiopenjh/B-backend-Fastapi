@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
+from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.schemas import SEOUL
 from reservation.domain.reservation import Reservation, ReservationStatus
 from reservation.presentation.schemas import ReservationCreate, ReservationOut
@@ -28,6 +29,13 @@ SPEC_EXAMPLE = {
 
 OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 GUEST_ID = uuid.UUID("00000000-0000-4000-8000-000000000002")
+RESTAURANT_OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
+ADMIN_ID = uuid.UUID("00000000-0000-4000-8000-000000000005")
+
+RESERVER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.CUSTOMER)  # 예약한 손님
+GUEST = AuthenticatedUser(user_id=GUEST_ID, role=AuthRole.CUSTOMER)  # 다른 손님
+RESTAURANT_OWNER = AuthenticatedUser(user_id=RESTAURANT_OWNER_ID, role=AuthRole.OWNER)
+ADMIN = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
 CREATED_AT = datetime(2026, 12, 1, 15, 0, tzinfo=SEOUL)
 NOW = datetime(2026, 12, 3, 17, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2026, 12, 3, 18, 0, tzinfo=SEOUL)
@@ -81,7 +89,7 @@ def test_from_domain_combines_reservation_and_slot():
         can_cancel=True,
     )
 
-    out = ReservationOut.from_domain(reservation, slot, OWNER_ID, NOW)
+    out = ReservationOut.from_domain(reservation, slot, RESERVER, NOW)
 
     assert out == expected
 
@@ -99,7 +107,7 @@ def test_from_domain_can_cancel_false_for_other_viewer():
         created_at=CREATED_AT,
         cancelled_at=None,
     )
-    out = ReservationOut.from_domain(reservation, slot, GUEST_ID, NOW)
+    out = ReservationOut.from_domain(reservation, slot, GUEST, NOW)
 
     assert out.can_cancel is False
 
@@ -118,7 +126,7 @@ def test_from_domain_can_cancel_false_when_cancelled():
         cancelled_at=NOW,
     )
 
-    out = ReservationOut.from_domain(reservation, slot, OWNER_ID, NOW)
+    out = ReservationOut.from_domain(reservation, slot, RESERVER, NOW)
 
     assert out.can_cancel is False
 
@@ -137,9 +145,54 @@ def test_from_domain_can_cancel_false_after_slot_started():
         cancelled_at=None,
     )
 
-    out = ReservationOut.from_domain(reservation, slot, OWNER_ID, STARTS_AT)
+    out = ReservationOut.from_domain(reservation, slot, RESERVER, STARTS_AT)
 
     assert out.can_cancel is False
+
+
+def make_confirmed() -> tuple[Reservation, TimeSlot]:
+    reservation = Reservation(
+        id=3,
+        user_id=OWNER_ID,
+        slot_id=7,
+        party_size=2,
+        status=ReservationStatus.CONFIRMED,
+        created_at=CREATED_AT,
+    )
+    return reservation, TimeSlot(**TIME_SLOT_EXAMPLE)
+
+
+# 그 식당 운영자가 보면 손님 예약도 can_cancel은 True
+def test_from_domain_can_cancel_true_for_restaurant_owner():
+    reservation, slot = make_confirmed()
+
+    out = ReservationOut.from_domain(
+        reservation,
+        slot,
+        RESTAURANT_OWNER,
+        NOW,
+        restaurant_owner_id=RESTAURANT_OWNER_ID,
+    )
+
+    assert out.can_cancel is True
+
+
+# 운영자라도 식당 주인을 모르면(넘기지 않으면) can_cancel은 False
+def test_from_domain_can_cancel_false_for_owner_without_restaurant_owner_id():
+    reservation, slot = make_confirmed()
+
+    out = ReservationOut.from_domain(reservation, slot, RESTAURANT_OWNER, NOW)
+
+    assert out.can_cancel is False
+
+
+# 관리자가 보면 can_cancel은 True
+def test_from_domain_can_cancel_true_for_admin():
+    reservation, slot = make_confirmed()
+
+    out = ReservationOut.from_domain(reservation, slot, ADMIN, NOW)
+
+    assert out.can_cancel is True
 
 
 # DB에서 꺼낸 시각(UTC)을 응답에서는 서울 시간(+09:00)으로 바꿔 내보내는지
@@ -161,7 +214,7 @@ def test_from_domain_converts_times_to_seoul():
         cancelled_at=NOW.astimezone(UTC),
     )
 
-    body = ReservationOut.from_domain(reservation, slot, OWNER_ID, NOW).model_dump(
+    body = ReservationOut.from_domain(reservation, slot, RESERVER, NOW).model_dump(
         mode="json"
     )
 
@@ -223,3 +276,46 @@ def test_reservation_create_rejects_zero_slot_id():
 def test_reservation_create_rejects_too_big_slot_id():
     with pytest.raises(ValidationError):
         ReservationCreate(slot_id=9223372036854775808, party_size=2)
+
+
+# 슬롯 번호는 진짜 정수만 받는다 (글자, 소수, true를 정수로 바꿔 주지 않는다)
+@pytest.mark.parametrize("slot_id", ["7", 7.0, True])
+def test_reservation_create_rejects_non_int_slot_id(slot_id):
+    with pytest.raises(ValidationError):
+        ReservationCreate(slot_id=slot_id, party_size=2)
+
+
+# 인원도 진짜 정수만 받는다 (true가 1명이 되면 안 된다)
+@pytest.mark.parametrize("party_size", ["2", 2.0, True])
+def test_reservation_create_rejects_non_int_party_size(party_size):
+    with pytest.raises(ValidationError):
+        ReservationCreate(slot_id=7, party_size=party_size)
+
+
+# 연락처는 휴대폰 번호 모양만 받는다 (글자, 이모지, NUL, 다른 나라 숫자는 막는다)
+@pytest.mark.parametrize(
+    "contact_phone",
+    ["abc", "!!!!", "😀", "010\x001234", "010-١٢٣٤-٥٦٧٨", "02-123-4567", "0101234567"],
+)
+def test_reservation_create_rejects_non_phone_contact(contact_phone):
+    with pytest.raises(ValidationError):
+        ReservationCreate(slot_id=7, party_size=2, contact_phone=contact_phone)
+
+
+# 하이픈은 있어도 없어도 받고, 저장할 모양은 항상 010-1234-5678로 맞춘다
+@pytest.mark.parametrize(
+    ("contact_phone", "expected"),
+    [
+        ("010-1234-5678", "010-1234-5678"),
+        ("01012345678", "010-1234-5678"),
+        ("010-12345678", "010-1234-5678"),
+        ("0101234-5678", "010-1234-5678"),
+        ("  01012345678  ", "010-1234-5678"),
+        ("0111234567", "011-123-4567"),
+        ("011-123-4567", "011-123-4567"),
+    ],
+)
+def test_reservation_create_formats_contact_phone(contact_phone, expected):
+    body = ReservationCreate(slot_id=7, party_size=2, contact_phone=contact_phone)
+
+    assert body.contact_phone == expected
