@@ -485,3 +485,14 @@ body .group-note {
   font-size:12px;
   color:var(--muted);
 }
+
+body .signup-card {
+  max-width:420px;
+  margin:0 auto;
+}
+
+body .field-error {
+  margin:-12px 0 14px;
+  font-size:11px;
+  color:#b4261a;
+}

@@ -1,0 +1,33 @@
+{# [담당 5] 회원가입 화면: 담당 1 회원가입(sign_up)으로 손님 계정을 만들고 바로 로그인 (POST /ui/signup) #}
+{% extends "base.html" %}
+{% block title %}회원가입{% endblock %}
+{% block content %}
+<section class="login-card signup-card" aria-labelledby="signup-title">
+  <span class="small-logo" aria-hidden="true">t</span>
+  <h2 id="signup-title">회원가입</h2>
+  <p class="muted">가입하면 바로 로그인돼서 예약할 수 있어요.</p>
+  {% if error %}
+  <p class="form-error" role="alert">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('ui_signup_submit') }}">
+    <fieldset>
+      <legend class="sr-only">회원 정보</legend>
+      <label for="name">이름</label>
+      <input id="name" name="name" required value="{{ form.name }}" placeholder="2~20자">
+      {% if errors.name %}<p class="field-error">{{ errors.name }}</p>{% endif %}
+      <label for="email">이메일</label>
+      <input id="email" name="email" type="email" autocomplete="username" required value="{{ form.email }}" placeholder="로그인할 때 쓰는 이메일">
+      {% if errors.email %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+      <label for="password">비밀번호</label>
+      <input id="password" name="password" type="password" autocomplete="new-password" required placeholder="8자 이상, 영문·숫자·특수문자(@$!%*#?&) 포함">
+      {% if errors.password %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+      <label for="phone">휴대폰 번호</label>
+      <input id="phone" name="phone" type="tel" required value="{{ form.phone }}" placeholder="010-1234-5678">
+      {% if errors.phone %}<p class="field-error">{{ errors.phone }}</p>{% endif %}
+      <button class="button button-primary full-width" type="submit">가입하고 시작하기</button>
+    </fieldset>
+  </form>
+  <div class="card-divider"><span>이미 계정이 있어요</span></div>
+  <a class="button button-outline full-width" href="{{ url_for('ui_login') }}">로그인</a>
+</section>
+{% endblock %}

@@ -41,7 +41,7 @@ ACCOUNTS = {"admin": ("관리자", seed.ADMIN[0], seed.ADMIN_PASSWORD)} | {
     for email, name, _, _ in sorted(seed.USERS, key=lambda user: user[3] != "OWNER")  # 운영자 먼저, 그다음 손님
 }
 
-LOGIN_PAGES = {"/ui", "/ui/login"}  # 로그인 폼이 있는 화면
+LOGIN_PAGES = {"/ui", "/ui/login", "/ui/signup"}  # 로그인·회원가입 폼이 있는 화면
 DETAIL_PAGE = re.compile(r"^/ui/restaurants/\d+$")  # 식당 상세(예약하기) 화면
 CLOSED_SLOT = re.compile(r'(<input type="radio" name="slot_id"[^>]*?)\s+disabled')  # 마감·자리 부족 시간 버튼
 # 화면이 잡아서 안내로 바꾼 실패 코드 → 원래 HTTP 상태 (로그 창에 같이 찍음)

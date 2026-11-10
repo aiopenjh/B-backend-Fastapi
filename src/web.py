@@ -17,7 +17,7 @@ from fastapi import Path as PathParam
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, ValidationError
 from starlette.datastructures import URL
 
 from admin.application.service import AdminService  # 담당 5: 관리자 매니저
@@ -48,6 +48,7 @@ from restaurant.presentation.routers.v1.router import (
 from slot.application.service import SlotService  # 담당 3: 빈자리 매니저
 from slot.domain.day_range import seoul_now  # 담당 3: 서울 지금 시각
 from user.application.service import UserService  # 담당 1: 회원 매니저
+from user.presentation.schemas import SignUpUserRequest  # 담당 1: 회원가입 입력 규칙
 from web_auth import (  # 담당 5: 화면 로그인
     COOKIE_NAME,
     COOKIE_PATH,
@@ -183,6 +184,69 @@ async def login_page(request: Request, next: str | None = None):
         request=request, name="login.html",
         context={"active_page": "login", "next": safe_next(next) or "", "email": "", "error": None},
     )
+
+
+# 담당 5: 회원가입 화면 — 담당 1 회원가입(sign_up)을 그대로 부르고, 성공하면 바로 로그인 쿠키까지
+SIGNUP_FIELDS = ("name", "email", "password", "phone")
+# 입력 칸 검사(담당 1 SignUpUserRequest) 실패를 칸별 한국어 문구로
+SIGNUP_FIELD_ERRORS = {
+    "name": "이름은 2~20자로 적어 주세요.",
+    "email": "이메일 형식이 아니에요.",
+    "password": "비밀번호는 8자 이상, 영문·숫자·특수문자(@$!%*#?&)를 모두 넣어 주세요.",
+    "phone": "휴대폰 번호 형식이 아니에요. (예: 010-1234-5678)",
+}
+
+
+def signup_page(request: Request, status_code: int, form: dict, errors: dict, error: str | None = None):
+    """회원가입 화면 (실패하면 적은 값은 남기고 비밀번호만 비움)"""
+    return templates.TemplateResponse(
+        request=request, name="signup.html", status_code=status_code,
+        context={"active_page": "login", "form": {k: v for k, v in form.items() if k != "password"},
+                 "errors": errors, "error": error},
+    )
+
+
+@router.get("/signup", response_class=HTMLResponse, name="ui_signup")
+async def signup_form(request: Request):
+    if request.state.ui_user is not None:
+        return RedirectResponse(home_url(request, request.state.ui_user), status_code=303)
+    return signup_page(request, 200, dict.fromkeys(SIGNUP_FIELDS, ""), {})
+
+
+@router.post("/signup", name="ui_signup_submit")
+async def signup_submit(
+    request: Request,
+    users: Users,
+    auth: Auth,
+    name: Annotated[str, Form()] = "",
+    email: Annotated[str, Form()] = "",
+    password: Annotated[str, Form()] = "",
+    phone: Annotated[str, Form()] = "",
+):
+    form = {"name": name.strip(), "email": email.strip(), "password": password, "phone": phone.strip()}
+    try:
+        checked = SignUpUserRequest(**form)  # API 회원가입과 같은 입력 규칙 (담당 1)
+    except ValidationError as error:
+        fields = {str(item["loc"][0]) for item in error.errors()}
+        return signup_page(request, 422, form, {f: SIGNUP_FIELD_ERRORS.get(f, "다시 확인해 주세요.") for f in fields})
+    try:
+        await users.sign_up(email=checked.email, raw_password=checked.password, name=checked.name, phone=checked.phone)
+    except AppError as error:
+        if error.error_code.name == "DUPLICATED_USER_ERROR":
+            return signup_page(request, error.error_code.status, form, {"email": "이미 가입한 이메일이에요."})
+        # 도메인 규칙(이메일·비밀번호 모양 등)에 걸리면 칸별로
+        fields = {f: SIGNUP_FIELD_ERRORS.get(f, "다시 확인해 주세요.") for f in error.errors} or {}
+        return signup_page(request, error.error_code.status, form, fields, None if fields else error.message)
+    # 가입 성공 → 담당 1 login으로 바로 로그인 (화면 로그인과 같은 쿠키)
+    issued = await auth.login(email=checked.email, password=checked.password)
+    user = await auth.authenticate(token=issued.access_token)
+    response = RedirectResponse(home_url(request, user), status_code=303)
+    response.set_cookie(
+        COOKIE_NAME, issued.access_token, max_age=issued.expires_in,
+        httponly=True, samesite="lax", path=COOKIE_PATH,
+        secure=request.url.scheme == "https",
+    )
+    return response
 
 
 # 담당 5: 화면 로그인 — 담당 1 login으로 JWT를 받아 HttpOnly 쿠키에 담는다
