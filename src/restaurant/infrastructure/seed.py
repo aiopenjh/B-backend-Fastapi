@@ -10,8 +10,10 @@
 - 맨 끝에 한 번만 commit
 """
 
+import argparse
 import asyncio
 import csv
+import re
 import sys
 from pathlib import Path
 
@@ -53,22 +55,52 @@ def parse_row(row: dict) -> tuple[dict, dict, list[dict]]:
     return owner, restaurant, menus
 
 
-async def seed_rows(session: AsyncSession, rows: list[dict], password_hash: str) -> int:
+async def refresh_sample_restaurant(session, user, owner, restaurant, menus):
+    """목업 운영자 이메일과 고유 전화번호로 기존 식당을 찾아 ID와 예약을 유지한다."""
+    match = re.fullmatch(r"owner(\d{5})@example\.com", owner["email"])
+    if not match or owner["phone"] != f"010-2222-{int(match[1]):04d}" or user.role != Role.OWNER:
+        raise ValueError("목업 전용 계정과 전화번호를 확인하세요.")
+    existing = (await session.scalars(
+        select(RestaurantModel).where(
+            RestaurantModel.owner_id == user.id, RestaurantModel.phone == owner["phone"],
+            RestaurantModel.deleted_at.is_(None),
+        )
+    )).one()
+    if len(existing.menus) != len(menus):
+        raise ValueError(f"식당 #{existing.id}의 메뉴 수가 목업과 다릅니다.")
+    user.name = owner["name"]
+    existing.name = restaurant["name"]
+    existing.description = restaurant["description"]
+    existing.address = restaurant["address"]
+    existing.cuisine = restaurant["cuisine"]
+    if not existing.image_url or existing.image_url.startswith((
+        PHOTO_PREFIX, "https://commons.wikimedia.org/wiki/Special:FilePath/",
+    )):
+        existing.image_url = restaurant["image_url"]
+    for current, new in zip(existing.menus, menus, strict=True):
+        current.name = new["name"]
+        current.price = new["price"]
+
+
+async def seed_rows(session: AsyncSession, rows: list[dict], password_hash: str, *, refresh_sample: bool = False) -> int:
     """CSV 줄들을 DB에 넣음. 새로 넣은 식당 수를 돌려줌 (commit은 부른 쪽에서)"""
     added = 0
     for row in rows:
         owner, restaurant, menus = parse_row(row)
 
-        owner_id = await session.scalar(
-            select(UserModel.id).where(UserModel.email == owner["email"])
+        existing_user = await session.scalar(
+            select(UserModel).where(UserModel.email == owner["email"])
         )
-        if owner_id is not None:
+        if existing_user is not None:
+            if refresh_sample:
+                await refresh_sample_restaurant(session, existing_user, owner, restaurant, menus)
+                continue
             photo = restaurant["image_url"]
             if photo and photo.startswith(PHOTO_PREFIX):
                 await session.execute(
                     update(RestaurantModel)
                     .where(
-                        RestaurantModel.owner_id == owner_id,
+                        RestaurantModel.owner_id == existing_user.id,
                         RestaurantModel.name == restaurant["name"],
                         RestaurantModel.address == restaurant["address"],
                         RestaurantModel.deleted_at.is_(None),
@@ -122,7 +154,7 @@ def read_rows(csv_path: str) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-async def main(rows: list[dict]) -> None:
+async def main(rows: list[dict], *, refresh_sample: bool = False) -> None:
     # DB 연결은 실행할 때만 불러옴 (테스트에서 parse_row만 쓸 때는 필요 없음)
     from common.database import AsyncSessionLocal, engine
     from common.model import Base, init_models
@@ -135,7 +167,7 @@ async def main(rows: list[dict]) -> None:
     password_hash = BcryptPasswordHasher().hash(DEMO_PASSWORD)  # 한 번만 계산
 
     async with AsyncSessionLocal() as session:
-        added = await seed_rows(session, rows, password_hash)
+        added = await seed_rows(session, rows, password_hash, refresh_sample=refresh_sample)
         await session.commit()
 
     await engine.dispose()
@@ -143,7 +175,8 @@ async def main(rows: list[dict]) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("사용법: uv run python src/restaurant/infrastructure/seed.py <csv 파일>")
-        sys.exit(1)
-    asyncio.run(main(read_rows(sys.argv[1])))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("csv")
+    parser.add_argument("--refresh-sample", action="store_true", help="기존 목업 식당과 메뉴를 CSV에 맞춰 갱신")
+    args = parser.parse_args()
+    asyncio.run(main(read_rows(args.csv), refresh_sample=args.refresh_sample))

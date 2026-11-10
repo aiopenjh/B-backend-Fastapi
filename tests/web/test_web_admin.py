@@ -56,6 +56,11 @@ class FakeAdminService:
     async def list_owners(self, page):
         return [(OWNER, 1)], 1
 
+    async def search_restaurants(self, name):
+        if name not in RESTAURANT.name:
+            return []
+        return [{"id": RESTAURANT.id, "name": RESTAURANT.name, "address": RESTAURANT.address, "received": STARTS}]
+
     async def list_owner_restaurants(self, owner_id, page):
         if owner_id != OWNER.id:
             raise NotFoundError()
@@ -116,6 +121,15 @@ async def test_owner_list_shows_restaurant_count_and_link(client):
     assert "운영자A" in response.text and "owner.a@example.com" in response.text
     assert f"/ui/admin/owners/{OWNER.id}/restaurants" in response.text
     assert "관리자로 로그인" in response.text  # 사이드바
+
+
+async def test_admin_restaurant_search_returns_filtered_reservation_links(client):
+    client.cookies.set(COOKIE_NAME, "admin-token")
+    async with client:
+        found = await client.get("/ui/admin/owners", params={"restaurants_only": True, "q": "한상"})
+        empty = await client.get("/ui/admin/owners", params={"restaurants_only": True, "q": "없는 식당"})
+    assert found.status_code == 200 and "/ui/admin/restaurants/7/reservations" in found.text
+    assert "가입 순" not in found.text and "일치하는 식당이 없어요" in empty.text
 
 
 async def test_owner_restaurants_and_unknown_owner(client):

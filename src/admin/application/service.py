@@ -25,6 +25,9 @@ class AdminService:
         self.query = AdminQueryRepository(db)
         self.restaurants = OwnerQueryRepository(db)  # 식당 하나·운영자별 식당 목록은 운영자 창고 그대로
 
+    async def search_restaurants(self, name: str):
+        return await self.query.search_restaurants(name.strip())
+
     async def list_owners(self, page: PageParams) -> tuple[list[tuple[User, int]], int]:
         # 운영자 목록 + 식당 수
         return await self.query.list_owners(page.offset, page.page_size)

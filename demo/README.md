@@ -22,18 +22,20 @@ uv run uvicorn demo.log_panel_app:app --port 8000
 앱을 한 번 켜서 표와 기본 시드(#47)가 들어간 뒤, 저장소 맨 위 폴더에서 차례로 실행합니다. 둘 다 여러 번 돌려도 중복이 생기지 않습니다.
 
 ```bash
-uv run python src/restaurant/infrastructure/seed.py restaurants_menus_sample.csv
+uv run --env-file .env python src/restaurant/infrastructure/seed.py restaurants_menus_sample.csv --refresh-sample
 ```
 
 ```bash
 uv run python demo/make_slots.py
 ```
 
-- 첫 줄: 담당 2 식당 시드 (운영자·식당·메뉴 200곳)
+- 첫 줄은 서울 25개 구에 8곳씩 배치한 가상 식당 200곳의 상호·주소·업종·메뉴를 반영합니다. 기존 목업 식당 번호와 예약은 유지합니다.
 - 둘째 줄: 모든 식당에 내일부터 14일치 예약 시간대 (12:00 · 18:00 · 19:30, 그날 시간대가 이미 있는 식당은 건너뜀). `uv run python demo/make_slots.py 30`처럼 날 수를 바꿀 수 있습니다. 팀 코드는 고치지 않고 시간대 표에 데이터만 넣습니다.
 - 마감 409 시연: `uv run python demo/make_full.py "식당 이름"` — 그 식당의 가장 가까운 시간 하나를 시연용 손님 예약으로 꽉 채움 (`SCENARIO.md` 참고)
 
 시연 순서와 상태 코드 내는 법은 `SCENARIO.md`를 보세요.
+
+관리자 첫 화면의 **식당 검색**에서 상호를 누르면 해당 식당의 예약 목록이 열립니다. 검색어가 비어 있으면 최근 예약 접수순으로 10곳을 보여 줍니다. 시연 앱에서는 화면이 보이는 동안 3초마다 이 표를 갱신합니다. 관리자 창을 열어 두고 별도 브라우저 세션에서 손님 예약을 접수하면 식당이 맨 위로 올라옵니다.
 
 ## 노쇼 설정 (`.env`)
 

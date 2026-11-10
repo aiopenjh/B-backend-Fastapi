@@ -31,6 +31,26 @@ class AdminQueryRepository:
     def __init__(self, db:AsyncSession):
         self.db = db
 
+    async def search_restaurants(self, name: str):
+        latest = (
+            select(ReservationSlotModel.restaurant_id, func.max(ReservationModel.created_at).label("received"))
+            .select_from(ReservationModel)
+            .join(ReservationSlotModel, ReservationSlotModel.id == ReservationModel.slot_id)
+            .group_by(ReservationSlotModel.restaurant_id)
+            .subquery()
+        )
+        query = (
+            select(RestaurantModel.id, RestaurantModel.name, RestaurantModel.address, latest.c.received)
+            .outerjoin(latest, latest.c.restaurant_id == RestaurantModel.id)
+            .where(RestaurantModel.deleted_at.is_(None))
+            .order_by(latest.c.received.desc().nulls_last(), RestaurantModel.name, RestaurantModel.id)
+        )
+        if name:
+            query = query.where(RestaurantModel.name.icontains(name, autoescape=True))
+        else:
+            query = query.limit(10)
+        return (await self.db.execute(query)).all()
+
     async def list_owners(self, offset: int, limit: int) -> tuple[list[tuple[User, int]], int]:
         #운영자만, 탈퇴한 사람 빼기
         conditions = [UserModel.role == "OWNER", UserModel.deleted_at.is_(None)]

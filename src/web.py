@@ -497,13 +497,22 @@ async def reserve_submit(
 
 # 담당 5: 관리자 화면 ① 운영자 목록 + 식당 수
 @router.get("/admin/owners", response_class=HTMLResponse, name="ui_admin_owners")
-async def admin_owners_page(request: Request, service: Admin, page: PageNumber = 1, page_size: PageSize = 20):
+async def admin_owners_page(
+    request: Request, service: Admin, page: PageNumber = 1, page_size: PageSize = 20,
+    q: Annotated[str, Query(max_length=150)] = "", restaurants_only: bool = False,
+):
     if denied := deny_admin(request):
         return denied
+    restaurants = await service.search_restaurants(q)
+    if restaurants_only:
+        return templates.TemplateResponse(
+            request=request, name="admin/restaurant_results.html", context={"restaurants": restaurants},
+            headers={"Cache-Control": "no-store"},
+        )
     rows, total = await service.list_owners(PageParams(page=page, page_size=page_size))
     return templates.TemplateResponse(
         request=request, name="admin/owners.html",
-        context={"active_page": "admin", "owners": rows, "total": total,
+        context={"active_page": "admin", "owners": rows, "total": total, "restaurants": restaurants, "q": q,
                  "result": PageResult(rows, total, page, page_size)},
     )
 

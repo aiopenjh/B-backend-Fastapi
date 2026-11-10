@@ -179,5 +179,6 @@ async def switch_account(
     return response
 
 
+app.state.live_admin_restaurants = True
 app.add_middleware(LogPanelMiddleware)  # 마지막에 붙인 것이 가장 바깥 → 팀 로그가 먼저 찍힘
 
