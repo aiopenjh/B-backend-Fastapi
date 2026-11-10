@@ -1,5 +1,7 @@
 # [담당1 - 강성수]
-from datetime import datetime
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+from datetime import UTC, datetime
 
 from sqlalchemy import exists, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,3 +33,14 @@ class SQLAlchemyTokenBlackListRepository(TokenBlackListRepository):
             TokenBlackListModel.expired_at < current_time
         )
         await self.session.execute(stmt)
+
+
+async def purge_expired_tokens(
+    session_factory: Callable[[], AbstractAsyncContextManager[AsyncSession]],
+    now: datetime | None = None,
+) -> None:
+    """만료된 블랙리스트 행을 지우고 확정한다. 앱 시작(lifespan)에서 부른다"""
+    async with session_factory() as session:
+        repo = SQLAlchemyTokenBlackListRepository(session=session)
+        await repo.cleanup_expired(now or datetime.now(UTC))
+        await session.commit()
