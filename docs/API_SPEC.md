@@ -37,7 +37,7 @@
 | `code` | 문자열 | `"OK"` | 에러 코드 표의 값 (예: `"SLOT_SOLD_OUT"`) |
 | `message` | 문자열 | 처리 결과 메시지 | 사람이 읽을 실패 이유 |
 | `errors` | 객체 또는 `null` | `null` | 필드 이름 → 메시지 목록 (예: `{"party_size": ["1 이상이어야 합니다."]}`), 특정 필드가 없으면 `{}` |
-| `data` | `T` 또는 `null` | 출력 스키마 (`UserOut`, `ReservationOut`, `Page[T]` …) | `null` |
+| `data` | `T` 또는 `null` | 출력 스키마 (`UserResponse`, `ReservationOut`, `Page[T]` …) | `null` |
 | `request_id` | 문자열 | 요청 로그 미들웨어가 만든 id (응답 헤더 `X-Request-ID`와 같은 값) | 같음 |
 | `responded_at` | 시각 | 응답 시각 | 같음 |
 
@@ -108,8 +108,11 @@
 | 상태 | code | 뜻 |
 | --- | --- | --- |
 | 401 | `UNAUTHORIZED` | 토큰 없음·만료·로그아웃한 토큰, 로그인 실패 |
-| 403 | `FORBIDDEN` | 운영자가 아님(역할), 남의 식당(소유) |
+| 400 | `DUPLICATED_USER_ERROR` | 이미 가입된 이메일 (대소문자·앞뒤 공백 무시, 동시 가입으로 commit에서 걸린 경우 포함) |
+| 400 | `INVALID_ROLE_CHANGE` | `ADMIN` 부여, `ADMIN` 계정의 역할 변경 |
+| 403 | `FORBIDDEN` | 운영자가 아님(역할), 남의 식당(소유), 관리자가 아님(`require_admin`) |
 | 404 | `NOT_FOUND` | 없는 리소스, 관련 없는 사람에게 숨긴 리소스 (예: 남의 예약) |
+| 404 | `USER_NOT_FOUND` | 없거나 탈퇴한 사용자 (역할 변경) |
 | 409 | `SLOT_SOLD_OUT` | 남은 자리 부족 |
 | 409 | `PARTY_SIZE_EXCEEDED` | 슬롯의 1회 최대 인원 초과 |
 | 409 | `SLOT_ALREADY_STARTED` | 이미 시작한 시간대 |
@@ -323,3 +326,79 @@ Authorization: Bearer <access_token>
   "responded_at": "2026-10-28T15:20:01+09:00"
 }
 ```
+
+### 회원가입
+
+| 항목 | 값 |
+| --- | --- |
+| 기능 분류 | user |
+| API Path | `/api/v1/users` |
+| http method | `POST` |
+| 담당자 | 강성수 (담당 1) |
+| 인증 | 필요 없음 |
+| 명세 작성 현황 | 완료 (코드 #18·#25·#31, 입력 규칙 #53·#61) |
+| 테스트 여부 | ☑ 정상 · ☑ 실패 (서비스·도메인·스키마 테스트, 이메일 규칙 위반 422 API 테스트, 화면 가입 테스트 `tests/web/test_web_signup.py`) |
+
+**요청 상세**
+
+```http
+POST /api/v1/users
+Content-Type: application/json
+
+{
+  "name": "고객A",
+  "email": "customer-a@example.com",
+  "password": "pass1234!",
+  "phone": "010-1234-5678"
+}
+```
+
+| 필드 | 위치 | 타입 | 필수 | 규칙 |
+| --- | --- | --- | --- | --- |
+| `name` | body | 문자열 | O | 2~20자 |
+| `email` | body | 문자열 | O | 앞뒤 공백을 지우고 소문자로 바꾼 뒤 검사·저장 (`Email` 값 객체, 스키마도 같은 규칙). ASCII만. `@` 앞은 영문·숫자·`. _ % + -`(점은 처음·끝·연속 불가, 최대 64자), `@` 뒤는 영문·숫자·하이픈으로 된 이름을 점으로 잇고 최상위 도메인은 영문 2자 이상. 전체 최대 254자 |
+| `password` | body | 문자열 | O | 8~72자, 영문·숫자·특수문자를 각각 1개 이상. 특수문자는 공백을 뺀 ASCII 기호 전부(`. _ - ! @ #` 등). 공백·한글 자판 기호(`₩` 등)·전각 문자는 쓸 수 없음 |
+| `phone` | body | 문자열 | O | 휴대폰 번호 `01[016789]-?\d{3,4}-?\d{4}` |
+
+**응답 상세**
+
+| 상태 | code | 언제 |
+| --- | --- | --- |
+| 201 | `OK` | 가입 성공 (역할은 항상 `CUSTOMER`) |
+| 400 | `DUPLICATED_USER_ERROR` | 이미 가입된 이메일 |
+| 422 | `VALIDATION_ERROR` | 필드 누락·형식 위반. 이메일 규칙 위반은 `errors.email = ["올바른 이메일 형식이 아닙니다."]`, 비밀번호 규칙 위반은 `errors.password` |
+
+성공 응답 예시 (`APIResponse[UserResponse]`, `password_hash`는 나가지 않음):
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "message": "회원가입이 완료되었습니다.",
+  "data": {
+    "id": "6f1c2a4e-8b3d-4f5a-9c7e-1d2b3a4c5e6f",
+    "email": "customer-a@example.com",
+    "name": "고객A",
+    "phone": "010-1234-5678",
+    "role": "CUSTOMER"
+  }
+}
+```
+
+**실패 예시**
+
+```text
+[400 DUPLICATED_USER_ERROR]
+요청: POST /api/v1/users  {"name": "고객A", "email": " Customer-A@Example.com ", "password": "pass1234!", "phone": "010-1234-5678"}   (customer-a@example.com 이미 가입)
+응답: 400
+{
+  "success": false,
+  "code": "DUPLICATED_USER_ERROR",
+  "message": "중복된 회원이 등록되어 있습니다.",
+  "errors": {},
+  "data": null,
+  ...
+}
+```
+
+알려진 한계: 국제화 이메일(한글 로컬 부분·한글 도메인)과 `xn--`로 시작하는 최상위 도메인은 받지 않습니다(422).
