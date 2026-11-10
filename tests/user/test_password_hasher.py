@@ -18,10 +18,11 @@ def test_verify_returns_false_for_password_over_72_bytes():
     assert hasher.verify("a" * 73, HASHED) is False
 
 
-def test_verify_does_not_truncate_to_72_bytes():
+def test_verify_accepts_72_bytes_but_not_a_longer_password_with_the_same_prefix():
     # 앞 72바이트가 저장된 비밀번호와 같아도 통과하면 안 된다
     hashed_72 = hasher.hash("a" * 72)
 
+    assert hasher.verify("a" * 72, hashed_72) is True
     assert hasher.verify("a" * 72 + "b", hashed_72) is False
 
 

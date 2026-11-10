@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI, Depends
 
 from auth.application.service import IssuedToken
-from auth.domain.exceptions import InvalidCredentialsError
+from auth.domain.exceptions import InvalidCredentialsError, TooManyLoginAttemptsError
 from auth.domain.value_object import AuthenticatedUser, AuthRole
 from auth.presentation.dependencies import auth_service, get_authenticated_user
 from auth.presentation.routers.v1.router import router
@@ -16,6 +16,7 @@ from common.errors import UnauthorizedError
 LOGIN_URL = "/api/v1/auth/login"
 LOGOUT_URL = "/api/v1/auth/logout"
 EMAIL = "owner@example.com"
+BLOCKED_EMAIL = "blocked@example.com"
 PASSWORD = "abcd1234!"
 VALID_TOKEN = "valid-token"
 USER_ID = uuid.uuid4()
@@ -25,6 +26,8 @@ class StubAuthService:
     """가짜 서비스. 로그인 규칙은 test_auth_service가 검사"""
 
     async def login(self, email: str, password: str) -> IssuedToken:
+        if email == BLOCKED_EMAIL:
+            raise TooManyLoginAttemptsError()
         if (email, password) == (EMAIL, PASSWORD):
             return IssuedToken(access_token=VALID_TOKEN, expires_in=3600)
 
@@ -81,6 +84,17 @@ async def test_login_fail_wrong_credentials_returns_401_envelope(client):
 
     assert response.status_code == 401
     assert response.json()["code"] == "UNAUTHORIZED"
+
+
+async def test_login_blocked_returns_429_envelope(client):
+    response = await client.post(
+        LOGIN_URL, data={"username": BLOCKED_EMAIL, "password": PASSWORD}
+    )
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "TOO_MANY_LOGIN_ATTEMPTS"
+    # 429는 재인증 문제가 아니므로 WWW-Authenticate를 붙이지 않는다
+    assert "www-authenticate" not in response.headers
 
 
 async def test_login_fail_missing_password_returns_422(client):
