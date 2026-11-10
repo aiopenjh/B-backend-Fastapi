@@ -78,8 +78,8 @@ async def list_restaurant_reservations(
     items, total = await service.list_restaurant_reservations(owner, restaurant_id, date, page)
     now = seoul_now()
     return APIResponse.ok(data=Page(
-        # 보는 사람 = 운영자 (운영자는 손님 예약을 취소할 수 없으니 can_cancel은 False)
-        items=[ReservationOut.from_domain(r, s, owner.user_id, now) for r, s in items],
+        # 보는 사람 = 운영자. 매니저가 내 식당인지 이미 확인했으니 식당 주인 = 나 (손님 예약도 취소 가능)
+        items=[ReservationOut.from_domain(r, s, owner, now, restaurant_owner_id=owner.user_id) for r, s in items],
         page=page.page,
         page_size=page.page_size,
         total=total,

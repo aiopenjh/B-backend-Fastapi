@@ -21,6 +21,11 @@ OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
 OTHER_OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000004")
 ADMIN_ID = uuid.UUID("00000000-0000-4000-8000-000000000005")
 
+ME = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)  # 예약한 손님(나)
+OWNER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)  # 1번 식당 주인
+OTHER_OWNER = AuthenticatedUser(user_id=OTHER_OWNER_ID, role=AuthRole.OWNER)
+ADMIN = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
+
 # 1번 식당 (주인은 OWNER_ID)
 RESTAURANT = Restaurant(
     id=1, owner_id=OWNER_ID, name="테스트 식당", address="서울 중구", cuisine="한식"
@@ -70,7 +75,7 @@ def test_can_cancel_true_for_owner_confirmed():
 
     # 예약한 본인이 요청하면 취소할 수 있어야 한다.
     assert (
-        reservation.can_cancel(user_id=USER_ID, slot_starts_at=SLOT_STARTS_AT, now=NOW)
+        reservation.can_cancel(viewer=ME, slot_starts_at=SLOT_STARTS_AT, now=NOW)
         is True
     )
 
@@ -82,7 +87,7 @@ def test_can_cancel_false_for_other_user():
 
     # 다른 사람이 요청하면 취소할 수 없어야 한다.
     assert (
-        reservation.can_cancel(user_id=USER_ID, slot_starts_at=SLOT_STARTS_AT, now=NOW)
+        reservation.can_cancel(viewer=ME, slot_starts_at=SLOT_STARTS_AT, now=NOW)
         is False
     )
 
@@ -94,7 +99,7 @@ def test_can_cancel_false_when_already_cancelled():
 
     # 취소된 예약은 본인이어도 취소할 수 없어야 한다.
     assert (
-        reservation.can_cancel(user_id=USER_ID, slot_starts_at=SLOT_STARTS_AT, now=NOW)
+        reservation.can_cancel(viewer=ME, slot_starts_at=SLOT_STARTS_AT, now=NOW)
         is False
     )
 
@@ -105,7 +110,7 @@ def test_can_cancel_false_when_slot_started():
     # 슬롯이 시작된 순간부터는 본인이어도 취소 할 수 없어야 한다.
     assert (
         reservation.can_cancel(
-            user_id=USER_ID, slot_starts_at=SLOT_STARTS_AT, now=SLOT_STARTS_AT
+            viewer=ME, slot_starts_at=SLOT_STARTS_AT, now=SLOT_STARTS_AT
         )
         is False
     )
@@ -155,3 +160,76 @@ def test_can_be_cancelled_by_admin():
     admin = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
 
     assert make_reservation().can_be_cancelled_by(admin, RESTAURANT) is True
+
+
+# 그 식당 운영자가 보면 손님 예약도 취소 버튼이 보인다
+def test_can_cancel_true_for_restaurant_owner():
+    assert (
+        make_reservation().can_cancel(
+            viewer=OWNER,
+            slot_starts_at=SLOT_STARTS_AT,
+            now=NOW,
+            restaurant_owner_id=OWNER_ID,
+        )
+        is True
+    )
+
+
+# 다른 식당 운영자가 보면 취소 버튼이 보이지 않는다
+def test_can_cancel_false_for_other_restaurant_owner():
+    assert (
+        make_reservation().can_cancel(
+            viewer=OTHER_OWNER,
+            slot_starts_at=SLOT_STARTS_AT,
+            now=NOW,
+            restaurant_owner_id=OWNER_ID,
+        )
+        is False
+    )
+
+
+# 식당 주인을 모르면(None) 운영자 권한으로 보지 않는다
+def test_can_cancel_false_for_owner_without_restaurant_owner_id():
+    assert (
+        make_reservation().can_cancel(
+            viewer=OWNER, slot_starts_at=SLOT_STARTS_AT, now=NOW
+        )
+        is False
+    )
+
+
+# 관리자가 보면 어느 예약이든 취소 버튼이 보인다
+def test_can_cancel_true_for_admin():
+    assert (
+        make_reservation().can_cancel(
+            viewer=ADMIN, slot_starts_at=SLOT_STARTS_AT, now=NOW
+        )
+        is True
+    )
+
+
+# 운영자·관리자여도 시작 시각이 지나거나 이미 취소된 예약은 버튼이 보이지 않는다
+def test_can_cancel_false_for_admin_and_owner_after_start_or_cancelled():
+    started = make_reservation()
+    cancelled = make_reservation()
+    cancelled.cancel(slot_starts_at=SLOT_STARTS_AT, now=NOW)
+
+    for viewer in (ADMIN, OWNER):
+        assert (
+            started.can_cancel(
+                viewer=viewer,
+                slot_starts_at=SLOT_STARTS_AT,
+                now=SLOT_STARTS_AT,
+                restaurant_owner_id=OWNER_ID,
+            )
+            is False
+        )
+        assert (
+            cancelled.can_cancel(
+                viewer=viewer,
+                slot_starts_at=SLOT_STARTS_AT,
+                now=NOW,
+                restaurant_owner_id=OWNER_ID,
+            )
+            is False
+        )

@@ -45,7 +45,7 @@ async def create_reservation(
         now=now,
     )
     return APIResponse.ok(
-        data=ReservationOut.from_domain(reservation, slot, me.user_id, now),
+        data=ReservationOut.from_domain(reservation, slot, me, now),
         message="예약이 완료되었습니다.",
     )
 
@@ -76,6 +76,4 @@ async def cancel_reservation(
     reservation, slot = await service.cancel(
         user=me, reservation_id=reservation_id, now=now
     )  # 역할(손님, 운영자, 관리자)까지 봐야 해서 로그인한 사람 전체를 넘김
-    return APIResponse.ok(
-        data=ReservationOut.from_domain(reservation, slot, me.user_id, now)
-    )
+    return APIResponse.ok(data=ReservationOut.from_domain(reservation, slot, me, now))
