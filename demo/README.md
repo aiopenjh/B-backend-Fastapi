@@ -17,6 +17,21 @@ uv run uvicorn demo.log_panel_app:app --port 8000
 
 평소처럼 로그 창 없이 켜려면 `src` 폴더에서 `uv run uvicorn main:app`을 그대로 쓰면 됩니다.
 
+## 시연 데이터 채우기 (처음 한 번)
+
+앱을 한 번 켜서 표와 기본 시드(#47)가 들어간 뒤, 저장소 맨 위 폴더에서 차례로 실행합니다. 둘 다 여러 번 돌려도 중복이 생기지 않습니다.
+
+```bash
+uv run python src/restaurant/infrastructure/seed.py restaurants_menus_sample.csv
+```
+
+```bash
+uv run python demo/make_slots.py
+```
+
+- 첫 줄: 담당 2 식당 시드 (운영자·식당·메뉴 200곳)
+- 둘째 줄: 모든 식당에 내일부터 14일치 예약 시간대 (12:00 · 18:00 · 19:30, 그날 시간대가 이미 있는 식당은 건너뜀). `uv run python demo/make_slots.py 30`처럼 날 수를 바꿀 수 있습니다. 팀 코드는 고치지 않고 시간대 표에 데이터만 넣습니다.
+
 ## 보이는 것
 
 | 줄 | 예 |

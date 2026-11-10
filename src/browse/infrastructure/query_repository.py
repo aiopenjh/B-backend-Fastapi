@@ -28,13 +28,13 @@ class BrowseQueryRepository:
         )
         return [name for name in rows if name]
 
-    async def list_dongs(self, district: str) -> list[str]:
-        """한 구 안에서 식당이 있는 동 (가나다순, 주소에 동이 없는 식당은 빠짐)"""
+    async def list_dongs(self, district: str | None) -> list[str]:
+        """식당이 있는 동 (가나다순). 구를 고르면 그 구 안만, 주소에 동이 없는 식당은 빠짐"""
+        conditions = [ACTIVE, DONG.is_not(None)]
+        if district:
+            conditions.append(DISTRICT == district)
         rows = await self.db.scalars(
-            select(DONG)
-            .where(ACTIVE, DISTRICT == district, DONG.is_not(None))
-            .group_by(DONG)
-            .order_by(DONG.collate("C"))
+            select(DONG).where(*conditions).group_by(DONG).order_by(DONG.collate("C"))
         )
         return [name for name in rows if name]
 
@@ -62,8 +62,8 @@ class BrowseQueryRepository:
         conditions = [ACTIVE]
         if district:
             conditions.append(DISTRICT == district)
-            if dong:
-                conditions.append(DONG == dong)
+        if dong:
+            conditions.append(DONG == dong)
         if q:
             conditions.append(RestaurantModel.name.icontains(q, autoescape=True))
         if cuisine:

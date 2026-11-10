@@ -132,9 +132,7 @@ body .page-wrap {
 }
 
 body .site-footer {
-  margin:0 16px;
-  flex-direction:column;
-  gap:4px;
+  display:none;
 }
 
 body .page-heading {
@@ -404,4 +402,12 @@ body .cancel-button {
   padding:0;
   cursor:pointer;
   color:#a3271b;
+}
+
+body .restaurant-name-link {
+  color:inherit;
+}
+
+body .restaurant-name-link:hover {
+  color:var(--accent);
 }

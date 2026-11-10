@@ -175,6 +175,9 @@ async def test_admin_can_open_customer_browse(client):
         async def list_districts(self):
             return []
 
+        async def list_dongs(self, district):
+            return []
+
         async def list_cuisines(self):
             return []
 
@@ -192,4 +195,4 @@ async def test_admin_can_open_customer_browse(client):
         browse = await client.get("/ui/restaurants")
 
     assert browse.status_code == 200  # 손님 화면에서 돌려보내지 않음
-    assert "손님 화면" in browse.text
+    assert "로그인 중" not in browse.text  # 남의 공간(손님 화면)에서는 관리자 로그인 표시를 띄우지 않음

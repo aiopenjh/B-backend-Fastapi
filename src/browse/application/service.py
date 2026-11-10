@@ -18,7 +18,7 @@ class BrowseService:
     async def list_districts(self) -> list[str]:
         return await self.query.list_districts()
 
-    async def list_dongs(self, district: str) -> list[str]:
+    async def list_dongs(self, district: str | None) -> list[str]:
         return await self.query.list_dongs(district)
 
     async def list_cuisines(self) -> list[str]:

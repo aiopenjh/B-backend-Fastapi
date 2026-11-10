@@ -129,11 +129,11 @@ async def test_browse_page_shows_restaurants_and_passes_filters(client, fakes):
     assert response.status_code == 200
     assert "테스트 식당" in response.text
     assert "/ui/restaurants/1" in response.text  # 상세로 가는 링크
-    # 빈 칸은 '안 고름'(None), 구가 없으면 동도 무시, 한 페이지 기본 10개
-    assert fakes[2].received == (None, None, "테스트", None, 2, 10)
+    # 빈 칸은 '안 고름'(None), 구 없이 동만 골라도 됨, 한 페이지 기본 10개
+    assert fakes[2].received == (None, "낙원동", "테스트", None, 2, 10)
     assert '<option value="한식"' in response.text and '<option value="종로구"' in response.text
-    assert 'id="dong" name="dong" disabled' in response.text  # 구를 안 고르면 동 칸 잠김
-    assert fakes[2].dongs_for is None  # 구를 안 고르면 동 목록은 안 부름
+    assert '<option value="낙원동"' in response.text  # 구를 안 골라도 동 전체가 열림
+    assert fakes[2].dongs_for is None  # 구를 안 고르면 동 전체(구 조건 없음)
     assert "number-tag" not in response.text  # 식당 개수는 안 보임
 
 
