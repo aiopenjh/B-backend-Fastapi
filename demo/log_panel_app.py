@@ -28,6 +28,7 @@ sys.path.insert(0, str(HERE.parent / "src"))  # 팀 코드(src)를 import 할 �
 
 from main import app  # 팀 앱 그대로 (위에서 src 경로를 넣은 뒤에 가져옴)
 
+LOGIN_PAGES = {"/ui", "/ui/login"}  # 로그인 폼이 있는 화면
 STATUS = re.compile(r"\s([45])\d\d\s")  # 요청 로그 속 4xx·5xx 상태 번호
 logger = logging.getLogger("demo")
 
@@ -56,8 +57,8 @@ class RecentLogs(logging.Handler):
         status = STATUS.search(f" {text} ")
         if record.levelno >= logging.ERROR or (status and status.group(1) == "5"):
             tone = "error"
-        elif record.levelno >= logging.WARNING or status:
-            tone = "warn"
+        elif record.levelno >= logging.WARNING or status or record.name == "common.error_handlers":
+            tone = "warn"  # 4xx 요청 줄, 경고, API 오류 코드 줄(FORBIDDEN 등)
         else:
             tone = "ok"
         self.lines.append(
@@ -106,6 +107,9 @@ class LogPanelMiddleware(BaseHTTPMiddleware):
         body = b"".join([chunk async for chunk in response.body_iterator])
         panel = views.get_template("log_panel.html").render(log_panel=recent_logs, style=STYLE)
         page = body.decode("utf-8").replace("</body>", panel + "\n</body>", 1)
+        if request.url.path in LOGIN_PAGES:
+            # 시연용: 브라우저의 이메일 형식 검사를 꺼서 엉터리 값도 서버까지 가게 함 (로그에 401이 찍힘)
+            page = page.replace("<form", "<form novalidate", 1)
         headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
         return Response(page, status_code=response.status_code, headers=headers)
 
