@@ -181,3 +181,11 @@ async def test_too_big_page_is_422(booking):
         response = await client.get("/ui/restaurants", params={"page": 10**18})
 
     assert response.status_code == 422
+
+
+async def test_group_note_shows_max_party_and_phone(booking):
+    async with make_client(booking, CUSTOMER) as client:
+        response = await client.get("/ui/restaurants/1", params={"date": "2030-01-02"})
+
+    assert "한 번에 최대 4명까지 예약할 수 있어요." in response.text  # 그날 시간대의 최대 인원
+    assert "단체는 식당에 전화로 문의해 주세요" in response.text

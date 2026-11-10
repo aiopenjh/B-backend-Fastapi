@@ -137,6 +137,11 @@
           <p class="filter-help">손님 계정으로 예약할 수 있어요.</p>
         {% endif %}
       </form>
+      {% set max_party = availability|map(attribute='slot.max_party_size')|max %}
+      <p class="group-note">
+        한 번에 최대 {{ max_party }}명까지 예약할 수 있어요.
+        단체는 식당에 전화로 문의해 주세요{% if restaurant.phone %} ({{ restaurant.phone }}){% endif %}.
+      </p>
     {% endif %}
   </section>
 </div>
