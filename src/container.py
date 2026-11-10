@@ -1,14 +1,16 @@
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.database import get_session  # 공통: 요청마다 DB 연결 하나
 
-from auth.application.service import AuthService
+from auth.application.service import AuthService, make_dummy_hash
+from auth.domain.limiter import LoginAttemptLimiter
 from auth.domain.provider import TokenProvider
 from auth.domain.repository import TokenBlackListRepository
+from auth.infrastructure.login_limiter import InMemoryLoginAttemptLimiter
 from auth.infrastructure.repositories import SQLAlchemyTokenBlackListRepository
 from auth.infrastructure.security import JwtTokenProvider
 from auth.presentation.dependencies import auth_service
@@ -48,6 +50,10 @@ from user.infrastructure.unit_of_work import SQLAlchemyUnitOfWork  # 담당 1: �
 from user.presentation.dependencies import user_service
 
 password_hasher: PasswordHasher = BcryptPasswordHasher()
+# 담당 1: 로그인 실패 횟수 (모든 요청이 하나를 같이 써야 횟수가 쌓인다)
+login_limiter: LoginAttemptLimiter = InMemoryLoginAttemptLimiter()
+# 담당 1: 없는 계정도 같은 시간이 걸리게 검증할 더미 해시 (시작할 때 한 번, 약 0.25초)
+dummy_password_hash: str = make_dummy_hash(password_hasher)
 
 
 # 담당 1: 회원 창고 공장
@@ -89,6 +95,7 @@ def create_token_blacklist_repository(
 
 
 def create_auth_service(
+    request: Request,
     user_repo: Annotated[UserRepository, Depends(create_user_repository)],
     blacklist_repo: Annotated[
         TokenBlackListRepository, Depends(create_token_blacklist_repository)
@@ -102,6 +109,10 @@ def create_auth_service(
         blacklist_repo=blacklist_repo,
         token_provider=token_provider,
         uow=uow,
+        login_limiter=login_limiter,
+        # 프록시 뒤라면 uvicorn --forwarded-allow-ips를 설정해야 실제 접속 IP가 들어온다
+        client_ip=request.client.host if request.client else None,
+        dummy_hash=dummy_password_hash,
     )
 
 
