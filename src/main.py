@@ -4,7 +4,7 @@ from auth.presentation.routers.v1.router import router as auth_router
 from common.error_handlers import register_error_handlers
 from common.logger import get_logger
 from common.middleware import register_middleware
-from common.database import engine
+from common.database import AsyncSessionLocal, engine
 from common.model import init_models, Base
 from restaurant.presentation.routers.v1.router import router as restaurant_router
 from restaurant.presentation.routers.v1.router import (
@@ -16,6 +16,7 @@ from owner.presentation.router import router as owner_router
 from reservation.presentation.query_router import router as reservation_query_router
 from reservation.presentation.router import router as reservation_router
 from slot.presentation.router import router as slot_router
+from seed import seed
 
 logger = get_logger(__name__)
 
@@ -28,6 +29,8 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
 
     logger.info("tables ensured")
+    async with AsyncSessionLocal() as session:
+        await seed(session)
 
     yield
     await engine.dispose()  # 커넥션 풀 반납
