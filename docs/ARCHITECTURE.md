@@ -72,10 +72,13 @@ src/
 ├── slot/                    # 담당 3
 ├── reservation/             # 담당 4 (생성·취소) + 담당 5 (조회)
 ├── owner/                   # 담당 5 (운영자 조회 · 권한, 자기 테이블 없음)
-├── web.py                   # 담당 5 (Jinja2 화면 라우터 /ui. 데이터는 다른 모듈 서비스로 읽음, PR 예정)
-├── web_data.py              # 담당 5 (화면 ↔ 운영자 매니저 연결, PR 예정)
-├── templates/               # 담당 5 (HTML 템플릿, PR 예정)
-└── static/                  # 담당 5 (CSS, PR 예정)
+├── browse/                  # 담당 5 (손님 둘러보기 조회, 화면 전용)
+├── admin/                   # 담당 5 (관리자 조회, 화면 전용, domain 없음)
+├── web.py                   # 담당 5 (Jinja2 화면 라우터 /ui. 데이터는 다른 모듈 서비스로 읽음)
+├── web_auth.py              # 담당 5 (화면 로그인: JWT를 HttpOnly 쿠키에)
+├── web_data.py              # 담당 5 (화면 ↔ 운영자 매니저 연결)
+├── templates/               # 담당 5 (HTML 템플릿)
+└── static/                  # 담당 5 (CSS)
 ```
 
 모든 모듈·계층 패키지에 `__init__.py`를 둡니다 (`routers/`, `routers/v1/` 포함).
@@ -286,17 +289,20 @@ ERD에 더해 아래 제약을 모델에 선언합니다. 해당 테이블 담�
 
 선택 과제 API(`POST /auth/signup`)는 필수 흐름이 다 돌아간 뒤에 추가합니다.
 
-**화면 (Jinja2, 담당 5, 2026-11-02 추가)**: `/api/v1` 밖의 경로로 HTML을 돌려줍니다. 응답 봉투(`APIResponse`)는 쓰지 않습니다. 지금 만든 것은 운영자 화면 틀입니다 (`feat/web-pages`, 데이터 연결은 인증 구현 뒤). 식당 목록·상세는 담당 2 식당 부품이 들어온 뒤 붙입니다.
+**화면 (Jinja2, 담당 5, 2026-11-02 추가)**: `/api/v1` 밖의 `/ui` 경로로 HTML을 돌려줍니다. 응답 봉투(`APIResponse`)는 쓰지 않고, 오류는 안내 화면(403·404)으로 보여 줍니다. 화면 로그인은 담당 1 `AuthService`가 만든 JWT를 HttpOnly 쿠키(`Path=/ui`, `SameSite=Lax`, https에서 `Secure`)에 담고, 로그아웃하면 쿠키를 지우고 토큰도 차단합니다(#45). API는 그대로 `Authorization: Bearer` 방식입니다.
 
-| 화면 | 경로 | 내용 |
-| --- | --- | --- |
-| 로그인 | `GET /ui` | 로그인 폼 (지금 만듦) |
-| 내 식당 | `GET /ui/owner/restaurants` | 운영자 식당 목록 · 페이지 (지금 만듦) |
-| 식당 예약 | `GET /ui/owner/restaurants/{id}/reservations` | 날짜 필터 · 페이지 (지금 만듦) |
-| 식당 목록 | `GET /` | 검색(`q`) · 페이지(`page`, 한 쪽 20개) · 이전/다음 |
-| 식당 상세 | `GET /web/restaurants/{id}` | 식당 정보와 메뉴, 없으면 에러 화면 |
+| 공간 | 화면 | 경로 | 내용 |
+| --- | --- | --- | --- |
+| 공통 | 로그인·회원가입 | `GET /ui`, `POST /ui/login`, `POST /ui/logout`, `GET·POST /ui/signup` | 역할에 맞는 첫 화면으로 이동, 가입하면 바로 로그인 (담당 1 `sign_up`) |
+| 손님 | 식당 둘러보기 | `GET /ui/restaurants` (`/`도 여기로) | 이름·메뉴·주소 전체 검색, 음식 종류·구·동, 10개씩, 열 때마다 새로 섞기 |
+| 손님 | 식당 상세·예약하기 | `GET /ui/restaurants/{id}`, `POST .../reserve` | 대표 사진·메뉴, 날짜·인원별 빈자리, 바로 예약 (담당 4 `ReservationService.create`, 연락처 = 회원 전화번호) |
+| 손님 | 내 예약 | `GET /ui/my/reservations` | 내 예약 목록, 시작 전 확정 예약 취소 |
+| 운영자 | 내 식당 | `GET /ui/owner/restaurants` | 운영자 식당 목록 |
+| 운영자 | 식당 예약 | `GET /ui/owner/restaurants/{id}/reservations` | 날짜 필터 · 페이지 · 예약자 이름, 입장·노쇼·이유 고르는 취소 (담당 4 #57 규칙) |
+| 관리자 | 운영자 → 식당 → 예약 | `GET /ui/admin/owners` → `.../owners/{id}/restaurants` → `/ui/admin/restaurants/{id}/reservations` | 운영자별 식당 수, 예약과 예약자 이름·연락처, 이유+메모 취소 |
+| 공통 | 취소·입장 | `POST /ui/reservations/{id}/cancel`, `POST /ui/reservations/{id}/check-in` | 역할에 맞는 누가·왜를 담당 4 `cancel`·`check_in`에 넘김 |
 
-데이터는 서비스(운영자 화면은 `OwnerService`, 식당 화면은 담당 2의 식당 서비스)로 읽고, 화면 라우터에 SQL을 쓰지 않습니다. 공용 파일 `main.py`(정적 파일·화면 라우터 등록)와 `pyproject.toml`(jinja2 추가)을 고치므로 팀에 먼저 알립니다.
+데이터는 서비스(운영자 화면은 `OwnerService`, 식당 화면은 담당 2의 식당 서비스, 빈자리는 담당 3 `SlotService`, 둘러보기·관리자는 담당 5 조회 창고)로 읽고, 화면 라우터에 SQL을 쓰지 않습니다. 시연할 때는 `demo/`(서버 로그 창·계정 바꾸기)로 팀 앱을 감싸서 켭니다. 공용 파일 `main.py`(정적 파일·화면 라우터 등록)와 `pyproject.toml`(jinja2 추가)을 고치므로 팀에 먼저 알립니다.
 
 ## 6. 보안과 트랜잭션
 
@@ -345,7 +351,7 @@ FK는 "그 id의 사용자가 존재한다"만 보장하고 역할은 확인하�
 | 항목 | 결정 | 대신 |
 | --- | --- | --- |
 | 프론트 연결 (React 등) | 제외 (2026-10-28) | API 문서 화면(`/docs`)과 pytest로 확인 |
-| Jinja2 화면 | 제외(2026-10-28) → **다시 포함 (2026-11-02, 담당 5)** | 운영자 화면 3개 틀(`/ui`) + 식당 목록·상세 화면 2개 예정 (5장) |
+| Jinja2 화면 | 제외(2026-10-28) → **다시 포함 (2026-11-02, 담당 5)** | 손님·운영자·관리자 화면 (`/ui`, 5장) |
 | CI | 제외 (2026-10-28) | PR 전에 로컬에서 테스트, 실행 결과를 PR에 기록 |
 | Redis 캐시 | 제외 (2026-10-28) | 모든 조회를 PostgreSQL에서 바로 읽음 |
 | Alembic 마이그레이션 | 제외 (2026-10-28) | lifespan `create_all`. 스키마가 바뀌면 로컬 DB를 다시 만듦 |
