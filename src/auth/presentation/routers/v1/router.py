@@ -2,11 +2,11 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from auth.application.schemas import TokenResponse
 from auth.application.service import AuthService
-from auth.presentation.dependencies import auth_service
+from auth.presentation.dependencies import auth_service, oauth2_scheme
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -25,3 +25,12 @@ async def login(
     issued = await service.login(email=form.username, password=form.password)
     return TokenResponse(access_token=issued.access_token, expires_in=issued.expires_in)
 
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="로그아웃")
+async def logout(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    service: Annotated[AuthService, Depends(auth_service)],
+) -> Response:
+    # 블랙리스트에는 토큰 안의 jti 필요, 사용자 대신 토큰 문자열을 받는다.
+    await service.logout(token=token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

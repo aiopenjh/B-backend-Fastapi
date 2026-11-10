@@ -13,6 +13,7 @@ from auth.domain.value_object import AuthRole
 from auth.infrastructure.security import JwtTokenProvider
 
 from common.errors import UnauthorizedError
+from common.unit_of_work import ConflictError, UnitOfWork
 
 from user.domain.hasher import PasswordHasher
 from user.domain.repository import UserRepository
@@ -33,6 +34,20 @@ class FakePasswordHasher(PasswordHasher):
         return self.hash(raw_password) == hashed_password
 
 
+class FakeUnitOfWork(UnitOfWork):
+    """commit 호출 횟수를 세는 가짜 UoW. conflict=True면 commit에서 충돌을 낸다"""
+
+    def __init__(self, conflict: bool = False) -> None:
+        self.commits = 0
+        self.conflict = conflict
+
+    async def commit(self) -> None:
+        if self.conflict:
+            raise ConflictError()
+
+        self.commits += 1
+
+
 class InMemoryUserRepository(UserRepository):
     def __init__(self) -> None:
         self.users: dict[uuid.UUID, User] = {}
@@ -51,9 +66,11 @@ class InMemoryUserRepository(UserRepository):
 class InMemoryBlackListRepository(TokenBlackListRepository):
     def __init__(self) -> None:
         self.jtis: set[str] = set()
+        self.saved: list[BlackListToken] = []
 
     async def add(self, token: BlackListToken) -> None:
         self.jtis.add(token.jti)
+        self.saved.append(token)
 
     async def is_blacklisted(self, jti: str) -> bool:
         return jti in self.jtis
@@ -78,12 +95,18 @@ def blacklist() -> InMemoryBlackListRepository:
 
 
 @pytest.fixture
-def service(user_repo, hasher, blacklist) -> AuthService:
+def uow() -> FakeUnitOfWork:
+    return FakeUnitOfWork()
+
+
+@pytest.fixture
+def service(user_repo, hasher, blacklist, uow) -> AuthService:
     return AuthService(
         user_repo=user_repo,
         hasher=hasher,
         token_provider=JwtTokenProvider(secret_key=SECRET),
         blacklist_repo=blacklist,
+        uow=uow,
     )
 
 
@@ -178,3 +201,70 @@ async def test_authenticate_fail_unknown_user(service, user, user_repo):
 
     with pytest.raises(UnauthorizedError):
         await service.authenticate(issued.access_token)
+
+
+async def test_logout_success_blocks_the_token(service, user, blacklist, uow):
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    await service.logout(issued.access_token)
+
+    with pytest.raises(UnauthorizedError):
+        await service.authenticate(issued.access_token)
+
+    assert uow.commits == 1
+    assert blacklist.saved[0].user_id == user.id
+
+
+async def test_logout_success_keeps_other_tokens_valid(service, user):
+    first = await service.login("owner@example.com", PASSWORD)
+    second = await service.login("owner@example.com", PASSWORD)
+
+    await service.logout(first.access_token)
+
+    assert (await service.authenticate(second.access_token)).user_id == user.id
+
+
+async def test_login_again_after_logout_issues_working_token(service, user):
+    first = await service.login("owner@example.com", PASSWORD)
+    await service.logout(first.access_token)
+
+    second = await service.login("owner@example.com", PASSWORD)
+
+    assert (await service.authenticate(second.access_token)).user_id == user.id
+    with pytest.raises(UnauthorizedError):
+        await service.authenticate(first.access_token)
+
+
+async def test_logout_fail_already_logged_out(service, user, uow):
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    await service.logout(issued.access_token)
+
+    with pytest.raises(UnauthorizedError):
+        await service.logout(issued.access_token)
+    assert uow.commits == 1
+
+
+async def test_logout_fail_invalid_token(service, blacklist, uow):
+    with pytest.raises(UnauthorizedError):
+        await service.logout("not-a-jwt")
+
+    assert blacklist.saved == []
+    assert uow.commits == 0
+
+
+async def test_logout_conflict_at_commit_becomes_unauthorized(
+    user_repo, hasher, blacklist, user
+):
+    service = AuthService(
+        user_repo=user_repo,
+        hasher=hasher,
+        token_provider=JwtTokenProvider(secret_key=SECRET),
+        blacklist_repo=blacklist,
+        uow=FakeUnitOfWork(conflict=True),
+    )
+
+    issued = await service.login("owner@example.com", PASSWORD)
+
+    with pytest.raises(UnauthorizedError):
+        await service.logout(issued.access_token)

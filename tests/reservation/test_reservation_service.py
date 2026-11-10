@@ -1,30 +1,32 @@
 # [담당 4] 예약 서비스 테스트 : 가짜 저장소로 예약 생성.취소 흐름 확인
 import uuid
-import pytest
 from datetime import datetime
 
+import pytest
+
+from common.errors import NotFoundError
 from common.schemas import SEOUL
 from common.unit_of_work import ConflictError, UnitOfWork
-from common.errors import NotFoundError
+from reservation.application.service import ReservationService
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
     CancellationNotAllowedError,
     DuplicateReservationError,
 )
-from reservation.application.service import ReservationService
 from reservation.domain.repository import ReservationRepository
 from reservation.domain.reservation import Reservation, ReservationStatus
+from slot.domain.exceptions import SlotSoldOut
 from slot.domain.repository import SlotRepository
 from slot.domain.time_slot import TimeSlot
-from slot.domain.exceptions import SlotSoldOut
+
 
 class InMemoryReservationRepository(ReservationRepository):
     """DB 대신 리스트에 예약을 보관하는 가짜 저장소"""
 
     def __init__(self, lock_log: list[str]) -> None:
         self.reservations: list[Reservation] = []
-        self.lock_log = lock_log # 잠근 순서를 적는 기록장 (슬롯 저장소와 같이 씀)
-        self.conflict = False # True면 DB 규칙(확정 예약은 사람, 슬롯당 하나)이 막은 상황을 흉내 낸다.
+        self.lock_log = lock_log  # 잠근 순서를 적는 기록장 (슬롯 저장소와 같이 씀)
+        self.conflict = False  # True면 DB 규칙(확정 예약은 사람, 슬롯당 하나)이 막은 상황을 흉내 낸다.
 
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
         return any(
@@ -36,8 +38,8 @@ class InMemoryReservationRepository(ReservationRepository):
 
     async def add(self, reservation: Reservation) -> Reservation:
         if self.conflict:
-            raise ConflictError() # 진짜 어댑터가 flush에서 난 IntegrityError를 번역해 던지는 것과 같은 에러
-        reservation.id = len(self.reservations) + 1 # DB가 번호를 붙여주는 흉내
+            raise ConflictError()  # 진짜 어댑터가 flush에서 난 IntegrityError를 번역해 던지는 것과 같은 에러
+        reservation.id = len(self.reservations) + 1  # DB가 번호를 붙여주는 흉내
         self.reservations.append(reservation)
         return reservation
 
@@ -45,12 +47,12 @@ class InMemoryReservationRepository(ReservationRepository):
         return next((r for r in self.reservations if r.id == reservation_id), None)
 
     async def get_for_update(self, reservation_id: int) -> Reservation | None:
-        self.lock_log.append("reservation") # 진짜로 잠그진 않고, 잠근 순서만 기록
+        self.lock_log.append("reservation")  # 진짜로 잠그진 않고, 잠근 순서만 기록
 
-        return await self.get(reservation_id) # 메모리에는 잠글 게 없어서 그냥 꺼냄
+        return await self.get(reservation_id)  # 메모리에는 잠글 게 없어서 그냥 꺼냄
 
     async def save(self, reservation: Reservation) -> None:
-        pass # 같은 객체를 들고 있어서 따로 반영할 게 없음
+        pass  # 같은 객체를 들고 있어서 따로 반영할 게 없음
 
 
 class InMemorySlotRepository(SlotRepository):
@@ -58,20 +60,24 @@ class InMemorySlotRepository(SlotRepository):
 
     def __init__(self, slots: list[TimeSlot], lock_log: list[str]) -> None:
         self.slots = slots
-        self.lock_log = lock_log # 잠근 순서를 적는 기록장 (예약 저장소와 같이 씀)
+        self.lock_log = lock_log  # 잠근 순서를 적는 기록장 (예약 저장소와 같이 씀)
 
     async def get_for_update(self, slot_id: int) -> TimeSlot | None:
-        self.lock_log.append("slot") # 진짜로 잠그진 않고, 잠근 순서만 기록
-        return next((s for s in self.slots if s.id == slot_id), None) # 메모리에는 잠글 게 없어서 그냥 꺼냄
+        self.lock_log.append("slot")  # 진짜로 잠그진 않고, 잠근 순서만 기록
+        return next(
+            (s for s in self.slots if s.id == slot_id), None
+        )  # 메모리에는 잠글 게 없어서 그냥 꺼냄
 
     async def save(self, slot: TimeSlot) -> None:
-        pass # 같은 객체를 들고 있어서 따로 반영할 게 없음
+        pass  # 같은 객체를 들고 있어서 따로 반영할 게 없음
 
-    async def list_for_day(self, restaurant_id: int, start: datetime, end: datetime) -> list[TimeSlot]:
-        raise NotImplementedError # 예약 서비스는 안 씀
+    async def list_for_day(
+        self, restaurant_id: int, start: datetime, end: datetime
+    ) -> list[TimeSlot]:
+        raise NotImplementedError  # 예약 서비스는 안 씀
 
     async def restaurant_exists(self, restaurant_id: int) -> bool:
-        raise NotImplementedError # 예약 서비스는 안 씀
+        raise NotImplementedError  # 예약 서비스는 안 씀
 
 
 class FakeUnitOfWork(UnitOfWork):
@@ -83,11 +89,13 @@ class FakeUnitOfWork(UnitOfWork):
     async def commit(self) -> None:
         self.commits += 1
 
+
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 OTHER_USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000002")
 NOW = datetime(2026, 12, 3, 17, 0, tzinfo=SEOUL)
 STARTS_AT = datetime(2026, 12, 3, 18, 0, tzinfo=SEOUL)
 ENDS_AT = datetime(2026, 12, 3, 19, 0, tzinfo=SEOUL)
+
 
 @pytest.fixture
 def slot() -> TimeSlot:
@@ -102,17 +110,21 @@ def slot() -> TimeSlot:
         max_party_size=4,
     )
 
+
 @pytest.fixture
 def lock_log() -> list[str]:
-    return [] # 두 가짜 저장소가 같이 쓰는 잠금 기록장
+    return []  # 두 가짜 저장소가 같이 쓰는 잠금 기록장
+
 
 @pytest.fixture
 def reservation_repo(lock_log) -> InMemoryReservationRepository:
     return InMemoryReservationRepository(lock_log)
 
+
 @pytest.fixture
 def uow() -> FakeUnitOfWork:
     return FakeUnitOfWork()
+
 
 @pytest.fixture
 def service(reservation_repo, slot, uow, lock_log) -> ReservationService:
@@ -122,7 +134,10 @@ def service(reservation_repo, slot, uow, lock_log) -> ReservationService:
         uow=uow,
     )
 
-async def test_create_saves_reservation_and_reserves_seats(service, reservation_repo, slot, uow):
+
+async def test_create_saves_reservation_and_reserves_seats(
+    service, reservation_repo, slot, uow
+):
     reservation, returned_slot = await service.create(
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
@@ -136,6 +151,7 @@ async def test_create_saves_reservation_and_reserves_seats(service, reservation_
     # 맨 끝에 한 번만 확정한다.
     assert uow.commits == 1
 
+
 async def test_create_unknown_slot_raises_not_found(service, reservation_repo, uow):
     # 없는 슬롯 번호로 예약하면 404가 나고, 아무것도 저장, 확정하지 않는다.
     with pytest.raises(NotFoundError):
@@ -145,6 +161,7 @@ async def test_create_unknown_slot_raises_not_found(service, reservation_repo, u
 
     assert reservation_repo.reservations == []
     assert uow.commits == 0
+
 
 async def test_create_twice_raises_duplicate(service, reservation_repo, slot, uow):
     # 같은 사람이 같은 슬롯을 두 번 예약하면, 두 번째는 409가 나고 자리도 다시 늘지 않는다.
@@ -161,7 +178,10 @@ async def test_create_twice_raises_duplicate(service, reservation_repo, slot, uo
     assert slot.reserved_guests == 4
     assert uow.commits == 1
 
-async def test_create_sold_out_raises_and_keeps_seats(service, reservation_repo, slot, uow):
+
+async def test_create_sold_out_raises_and_keeps_seats(
+    service, reservation_repo, slot, uow
+):
     # 남은 자리(1명)보다 많이 예약하면 409가 나고, 자리 수는 그대로다.
     slot.reserved_guests = 9
 
@@ -173,6 +193,7 @@ async def test_create_sold_out_raises_and_keeps_seats(service, reservation_repo,
     assert reservation_repo.reservations == []
     assert slot.reserved_guests == 9
     assert uow.commits == 0
+
 
 async def test_cancel_releases_seats_and_commits(service, slot, uow):
     # 내 예약을 취소하면 취소 상태가 되고, 자리가 반납되고, 한 번 더 확정한다.
@@ -190,12 +211,14 @@ async def test_cancel_releases_seats_and_commits(service, slot, uow):
     assert slot.reserved_guests == 2
     assert uow.commits == 2
 
+
 async def test_cancel_unknown_reservation_raises_not_found(service, uow):
     # 없는 예약 번호를 취소하면 404가 나고 확정하지 않는다.
     with pytest.raises(NotFoundError):
         await service.cancel(user_id=USER_ID, reservation_id=999, now=NOW)
 
     assert uow.commits == 0
+
 
 async def test_cancel_other_users_reservation_raises_not_found(service, slot, uow):
     # 남의 예약을 취소하려 하면 있는지조차 숨기려고 404가 나고, 예약과 자리는 그대로다.
@@ -210,6 +233,7 @@ async def test_cancel_other_users_reservation_raises_not_found(service, slot, uo
     assert slot.reserved_guests == 4
     assert uow.commits == 1
 
+
 async def test_cancel_twice_raises_already_cancelled(service, slot, uow):
     # 두 번 취소하면 두 번째는 409가 나고, 자리를 또 반납하지 않는다.
     created, _ = await service.create(
@@ -222,6 +246,7 @@ async def test_cancel_twice_raises_already_cancelled(service, slot, uow):
 
     assert slot.reserved_guests == 2
     assert uow.commits == 2
+
 
 async def test_cancel_after_slot_started_raises_not_allowed(service, slot, uow):
     # 슬롯이 시작된 뒤에 취소하면 409가 나고, 예약과 자리는 그대로다.
@@ -236,6 +261,7 @@ async def test_cancel_after_slot_started_raises_not_allowed(service, slot, uow):
     assert slot.reserved_guests == 4
     assert uow.commits == 1
 
+
 async def test_create_locks_slot(service, lock_log):
     # 예약을 만들 때는 슬롯만 잠근다. (예약은 아직 없으니까)
     await service.create(
@@ -244,16 +270,18 @@ async def test_create_locks_slot(service, lock_log):
 
     assert lock_log == ["slot"]
 
+
 async def test_cancel_locks_slot_before_reservation(service, lock_log):
     # 취소할 때는 생성과 같은 순서(슬롯 -> 예약)로 잡는다. 순서가 다르면 데드락이 생길 수 있다.
     created, _ = await service.create(
         user_id=USER_ID, slot_id=7, party_size=2, contact_phone=None, now=NOW
     )
-    lock_log.clear() # 생성 때 적힌 기록은 지우고, 취소 때 기록만 본다
+    lock_log.clear()  # 생성 때 적힌 기록은 지우고, 취소 때 기록만 본다
 
     await service.cancel(user_id=USER_ID, reservation_id=created.id, now=NOW)
 
     assert lock_log == ["slot", "reservation"]
+
 
 async def test_create_db_conflict_raises_duplicate(service, reservation_repo, uow):
     # 서비스가 중복 확인을 지나쳤어도, 저장(add)할 때 DB 규칙이 막으면(ConflictError) 409 중복 예약 에러로 바꿔 준다.

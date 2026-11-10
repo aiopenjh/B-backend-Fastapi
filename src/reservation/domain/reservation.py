@@ -1,20 +1,27 @@
 # [담당 4] 예약 도메인 : 예약 규칙 (생성, 취소, 취소 가능 여부)
 import uuid
-from enum import StrEnum
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Self
 
-from reservation.domain.exceptions import AlreadyCancelledError, CancellationNotAllowedError
+from reservation.domain.exceptions import (
+    AlreadyCancelledError,
+    CancellationNotAllowedError,
+)
+
 
 class ReservationStatus(StrEnum):
     """예약 상태. 확정과 취소 두가지이고, DB에는 문자열로 저장한다."""
+
     CONFIRMED = "CONFIRMED"
-    CANCELLED = "CANCELLED" 
+    CANCELLED = "CANCELLED"
+
 
 @dataclass
 class Reservation:
     """예약 한 건. 누가(user_id) 어느 슬롯(slot_id)을 몇 명(party_size)으로 예약했는지와 상태를 가진다."""
+
     user_id: uuid.UUID
     slot_id: int
     party_size: int
@@ -40,9 +47,9 @@ class Reservation:
             party_size=party_size,
             status=ReservationStatus.CONFIRMED,
             created_at=now,
-            contact_phone=contact_phone
+            contact_phone=contact_phone,
         )
-    
+
     def cancel(self, slot_starts_at: datetime, now: datetime) -> None:
         """예약을 취소 상태로 바꾸고 취소 시각을 남긴다. 이미 취소된 예약이면 AlreadyCancelledError, 슬롯이 시작됐으면 CancellationNotAllowedError."""
         if self.status is ReservationStatus.CANCELLED:
@@ -50,11 +57,13 @@ class Reservation:
 
         if now >= slot_starts_at:
             raise CancellationNotAllowedError()
-        
+
         self.status = ReservationStatus.CANCELLED
         self.cancelled_at = now
 
-    def can_cancel(self, user_id: uuid.UUID, slot_starts_at: datetime, now: datetime) -> bool:
+    def can_cancel(
+        self, user_id: uuid.UUID, slot_starts_at: datetime, now: datetime
+    ) -> bool:
         """취소할 수 있는지 확인만 한다 (상태는 바꾸지 않음). 예약자 본인이고 확정 상태이고, 슬롯 시작 전이면 True."""
         return (
             self.user_id == user_id
