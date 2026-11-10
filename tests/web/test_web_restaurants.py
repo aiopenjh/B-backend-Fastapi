@@ -145,7 +145,7 @@ async def test_restaurant_page_shows_menus_and_slots(client, fakes):
     assert "비빔밥" in response.text and "9,000원" in response.text
     assert "예약하기" in response.text and "빈자리" not in response.text
     assert "18:00" in response.text and "남은 10석" in response.text  # 고를 수 있는 시간: 남은 자리
-    assert "마감" in response.text  # 꽉 찬 20:00은 이유와 함께 비활성
+    assert "매진 · 남은 0석" in response.text
     assert re.search(r'value="2" required\s+disabled', response.text)  # 꽉 찬 시간은 고를 수 없음
     assert fakes[1].received[0] == 1
     assert fakes[1].received[1].isoformat() == "2030-01-02"

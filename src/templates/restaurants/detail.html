@@ -65,6 +65,7 @@
       <div class="booking-notice booking-done" role="status">
         <strong>예약됐어요</strong>
         <p>{{ done_slot.starts_at|seoul_datetime }} · {{ done_reservation.party_size }}명 · 예약 번호 #{{ done_reservation.id }}</p>
+        <p>이 시간대 {% if done_slot.remaining == 0 %}매진 · {% endif %}남은 {{ done_slot.remaining }}석</p>
         <a class="text-link" href="{{ url_for('ui_my_reservations') }}">내 예약 보기</a>
       </div>
     {% elif fail %}
@@ -112,10 +113,10 @@
             {% set slot = item.slot %}
             {% if slot.has_started(now) %}
               {% set reason = "지난 시간" %}
+            {% elif slot.remaining == 0 %}
+              {% set reason = "매진" %}
             {% elif party_size > slot.max_party_size %}
               {% set reason = "최대 " ~ slot.max_party_size ~ "명" %}
-            {% elif slot.remaining == 0 %}
-              {% set reason = "마감" %}
             {% elif slot.remaining < party_size %}
               {% set reason = "자리 부족" %}
             {% else %}
@@ -127,11 +128,7 @@
                 {% if slot_id == slot.id and item.available %}checked{% endif %}>
               <span class="slot-time">{{ slot.starts_at|seoul_time }}</span>
               <span class="slot-seats">
-                {% if item.available %}
-                  남은 {{ slot.remaining }}석
-                {% else %}
-                  {{ reason }}
-                {% endif %}
+                {% if reason %}{{ reason }} · {% endif %}남은 {{ slot.remaining }}석
               </span>
             </label>
           {% endfor %}

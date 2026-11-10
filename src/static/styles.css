@@ -344,6 +344,9 @@ body .slot-option.is-closed {
   cursor:not-allowed;
 }
 
+body .slot-option.is-closed:has(input:enabled) { cursor:pointer; }
+body .slot-option.is-closed:has(input:checked) { border-color:var(--accent); color:var(--accent); }
+
 body .booking-button {
   width:calc(100% - 32px);
   margin:0 16px 16px;
