@@ -92,3 +92,23 @@ async def test_get_me_fail_without_token_returns_401(client):
 
     assert response.status_code == 401
     assert response.json()["code"] == "UNAUTHORIZED"
+
+
+SIGNUP_URL = "/api/v1/users"
+
+
+async def test_sign_up_with_email_outside_rule_returns_422_with_korean_message(client):
+    # 스키마 단계에서 도메인과 같은 문구로 거절된다 (서비스까지 가지 않음)
+    response = await client.post(
+        SIGNUP_URL,
+        json={
+            "name": "김철수",
+            "email": "o'neil@example.com",
+            "password": "abcd1234!",
+            "phone": "010-1234-5678",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "VALIDATION_ERROR"
+    assert response.json()["errors"] == {"email": ["올바른 이메일 형식이 아닙니다."]}

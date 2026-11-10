@@ -185,6 +185,14 @@ async def test_sign_up_duplicate_email_does_not_hash():
     assert "hash" not in events
 
 
+async def test_sign_up_accepts_plus_address(service, repo):
+    user = await service.sign_up(
+        "a+b@example.com", VALID_PASSWORD, "김철수", "010-1234-5678"
+    )
+
+    assert user.email == Email("a+b@example.com")
+
+
 async def test_sign_up_saves_user_with_normalized_email(service, repo):
     user = await service.sign_up(
         "  Alice@Example.COM ", VALID_PASSWORD, "김철수", "010-1234-5678"
