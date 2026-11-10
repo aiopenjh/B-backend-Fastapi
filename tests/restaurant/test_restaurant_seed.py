@@ -6,7 +6,7 @@ ROW = {
     "address": "서울특별시 종로구 수표로 146 (낙원동)",
     "cuisine": "BUNSIK",
     "image_url": "",
-    "phone": "02-0000-0001",
+    "phone": "010-2222-0001",
     "email": "owner00001@example.com",
     "menu1": "김밥",
     "menu1_price": "2500",
@@ -23,7 +23,7 @@ def test_parse_row_makes_owner_from_email_name_phone():
     assert owner == {
         "email": "owner00001@example.com",
         "name": "들꽃분식집",
-        "phone": "02-0000-0001",
+        "phone": "010-2222-0001",
     }
 
 
