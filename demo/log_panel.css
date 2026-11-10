@@ -1,0 +1,98 @@
+.log-panel {
+  margin:16px auto calc(90px + env(safe-area-inset-bottom));
+  max-width:480px;
+  background:#14181f;
+  color:#d7dde6;
+  border-radius:12px;
+  font:12px/1.6 Consolas, "D2Coding", monospace;
+  box-shadow:0 20px 60px #1f29372e;
+  overflow:hidden;
+}
+
+.log-panel summary {
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  padding:12px 16px;
+  cursor:pointer;
+  background:#1d232c;
+  border-bottom:1px solid #2a313c;
+}
+
+.log-panel summary small {
+  color:#8b95a5;
+  font-size:11px;
+}
+
+.log-title {
+  font-weight:700;
+  color:#fff;
+}
+
+.log-lines {
+  list-style:none;
+  margin:0;
+  padding:8px 0;
+  max-height:40vh;
+  overflow-y:auto;
+}
+
+.log-lines li {
+  display:grid;
+  grid-template-columns:auto auto minmax(0,1fr);
+  gap:8px;
+  padding:3px 16px;
+}
+
+.log-lines time {
+  color:#7d8796;
+}
+
+.log-level {
+  color:#7fb2e5;
+}
+
+.log-text {
+  overflow-wrap:anywhere;
+}
+
+.log-warn .log-level,
+.log-warn .log-text {
+  color:#f0c36d;
+}
+
+.log-error {
+  background:#3a1d1d;
+}
+
+.log-error .log-level,
+.log-error .log-text {
+  color:#ff8f86;
+}
+
+.log-empty {
+  color:#7d8796;
+}
+
+@media (min-width:1100px) {
+  .log-panel {
+    position:fixed;
+    top:24px;
+    right:24px;
+    bottom:24px;
+    width:min(560px, calc(50vw - 280px));
+    max-width:none;
+    margin:0;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .log-panel[open] .log-lines {
+    max-height:none;
+    flex:1;
+  }
+
+  .log-panel:not([open]) {
+    bottom:auto;
+  }
+}

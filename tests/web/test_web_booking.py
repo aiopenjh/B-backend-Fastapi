@@ -15,6 +15,7 @@ from container import (
     create_slot_service,
 )
 from reservation.domain.reservation import Reservation, ReservationStatus
+from restaurant.domain.exceptions import RestaurantNotFoundError
 from restaurant.domain.restaurant import Restaurant
 from slot.application.service import SlotAvailability
 from slot.domain.exceptions import SlotSoldOut
@@ -157,3 +158,26 @@ async def test_next_open_day_link_when_no_time_left(booking):
 
     assert "이 날은 예약 가능한 시간이 없어요" in page.text
     assert "date=2030-01-05" in page.text
+
+
+class DeletedRestaurantSlots:
+    async def get_availability(self, restaurant_id, day, party_size):
+        raise RestaurantNotFoundError()
+
+
+async def test_booking_deleted_restaurant_shows_page_not_json(booking):
+    async with make_client(booking, CUSTOMER) as client:
+        client._transport.app.dependency_overrides[create_slot_service] = DeletedRestaurantSlots
+        response = await client.post("/ui/restaurants/1/reserve", data=FORM)
+
+    assert response.status_code == 404
+    assert response.headers["content-type"].startswith("text/html")  # JSON 대신 안내 화면
+    assert "식당을 찾을 수 없어요" in response.text
+    assert booking.received is None  # 예약 매니저는 부르지 않음
+
+
+async def test_too_big_page_is_422(booking):
+    async with make_client(booking, CUSTOMER) as client:
+        response = await client.get("/ui/restaurants", params={"page": 10**18})
+
+    assert response.status_code == 422
