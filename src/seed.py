@@ -27,6 +27,7 @@ USERS = [
     ("customer.b@example.com", "고객B", "010-1111-0002", Role.CUSTOMER),
     (GUARD_EMAIL,              "운영자A", "010-2222-0001", Role.OWNER),
     ("owner.b@example.com",    "운영자B", "010-2222-0002", Role.OWNER),
+    ("admin.a@example.com",    "관리자",  "010-3333-0001", Role.ADMIN),  # [담당5] 관리자 화면(/ui/admin) 시연용
 ]
 
 # (owner 인덱스 0=A·1=B, 식당 이름, 주소, cuisine, [(메뉴, 가격) × 3])
