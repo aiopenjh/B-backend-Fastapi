@@ -62,3 +62,10 @@ async def test_customer_sees_own_reservation(): # 손님 본인 예약 상세 �
     data = response.json()["data"]                    # 상세는 하나라서 items 없이 바로
     assert data["id"] == 100                          # 100번 예약이 왔나
     assert data["can_cancel"] is True                 # 내 예약 + 시작 전 → 취소 가능
+
+
+async def test_too_big_reservation_id_is_422(): # DB 번호 칸보다 큰 번호 확인 422 (500 아님)
+    async with make_client(fake_login_customer) as client:
+        response = await client.get(f"/api/v1/reservations/{10**19}")
+
+    assert response.status_code == 422

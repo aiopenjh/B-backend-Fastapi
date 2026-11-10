@@ -3,7 +3,8 @@ import csv
 import io
 
 from datetime import date
-from fastapi import APIRouter, Depends, BackgroundTasks
+from typing import Annotated
+from fastapi import APIRouter, Depends, BackgroundTasks, Path
 
 from fastapi.responses import StreamingResponse
 from common.logger import get_logger # 담당1 : 로그
@@ -12,6 +13,7 @@ from common.pagination import Page, PageParams, page_params # 담당 2: 목록 �
 from owner.presentation.dependencies import require_owner # 만든 오너 문
 from owner.application.service import OwnerService # 담당 5 : 매니저
 from restaurant.presentation.schemas import RestaurantOut # 담당 2 : 식당 응답 모양
+from restaurant.presentation.routers.v1.router import BIGINT_MAX # 담당 2 : DB 번호 상한
 from reservation.presentation.schemas import ReservationOut # 담당 4 : 민지님
 from auth.domain.value_object import AuthenticatedUser # 담당 1 : 회원
 from container import create_owner_service # 담당 5: 매니저 공장
@@ -69,7 +71,7 @@ async def list_my_restaurants(
 
 @router.get("/restaurants/{restaurant_id}/reservations", response_model=APIResponse[Page[ReservationOut]], summary="식당 예약 목록")
 async def list_restaurant_reservations(
-    restaurant_id: int,
+    restaurant_id: Annotated[int, Path(ge=1, le=BIGINT_MAX)],  # DB 번호 칸보다 크면 500 대신 422
     date: date | None = None,
     page: PageParams = Depends(page_params),
     owner: AuthenticatedUser = Depends(require_owner),
@@ -87,7 +89,7 @@ async def list_restaurant_reservations(
 
 @router.get("/restaurants/{restaurant_id}/reservations/export/csv", summary="식당 예약 CSV 내려받기")
 async def export_restaurant_reservations(
-    restaurant_id: int,
+    restaurant_id: Annotated[int, Path(ge=1, le=BIGINT_MAX)],  # DB 번호 칸보다 크면 500 대신 422
     background_tasks: BackgroundTasks,          # 응답 뒤에 할 일 목록 (FastAPI가 넣어 줌)
     date: date | None = None,
     owner: AuthenticatedUser = Depends(require_owner),

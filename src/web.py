@@ -85,7 +85,7 @@ templates.env.filters["seoul_time"] = seoul_time
 OwnerQueries = Annotated[OwnerUIQueries | None, Depends(get_owner_ui_queries)]
 Restaurants = Annotated[RestaurantService, Depends(create_restaurant_service)]
 Slots = Annotated[SlotService, Depends(create_slot_service)]
-PageNumber = Annotated[int, Query(ge=1)]
+PageNumber = Annotated[int, Query(ge=1, le=10_000)]  # 너무 큰 쪽 번호는 DB 건너뛰기 수가 넘쳐서 막음
 PageSize = Annotated[int, Query(ge=1, le=100)]
 # 빈 칸으로 보낸 폼 값("")은 '안 고름'(None)으로 본다
 Blank = BeforeValidator(lambda value: value or None)
@@ -360,7 +360,11 @@ async def reserve_submit(
     if not user.is_customer():
         return message_page(request, 403, "손님 계정으로 예약할 수 있어요", "운영자·관리자 계정으로는 예약하지 않아요.")
     # 이 식당·이 날짜의 시간대인지 먼저 확인 (다른 식당 시간대 번호로 예약하지 못하게)
-    available = await slots.get_availability(restaurant_id, date, party_size)
+    try:
+        available = await slots.get_availability(restaurant_id, date, party_size)
+    except RestaurantNotFoundError:
+        # 상세를 열어 둔 사이 식당이 지워졌으면 JSON 대신 안내 화면
+        return message_page(request, 404, "식당을 찾을 수 없어요", "지워졌거나 없는 식당이에요.")
     if slot_id not in {item.slot.id for item in available}:
         return RedirectResponse(back.include_query_params(fail="NOT_THIS_RESTAURANT"), status_code=303)
     try:
