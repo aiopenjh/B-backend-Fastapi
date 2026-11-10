@@ -517,7 +517,13 @@ async def my_reservations_page(
     )
 
 
+async def front_door(request: Request) -> RedirectResponse:
+    """맨 앞 주소(/)로 들어오면 404 대신 식당 둘러보기 화면으로"""
+    return RedirectResponse(request.url_for("ui_browse"), status_code=307)
+
+
 def register_web(app: FastAPI) -> None:
     """HTML 라우터와 정적 파일을 기존 앱에 등록한다."""
     app.mount("/static", StaticFiles(directory=str(SRC_DIR / "static")), name="static")
     app.include_router(router)
+    app.add_api_route("/", front_door, include_in_schema=False)  # 맨 앞 주소 → 화면

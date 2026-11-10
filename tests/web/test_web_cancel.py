@@ -178,3 +178,11 @@ async def test_owner_and_admin_tables_have_cancel_buttons(booking):
         assert page.text.count("/ui/reservations/11/cancel") == 1
         assert "/ui/reservations/12/cancel" not in page.text
     assert "한식" in admin_page.text  # 음식 종류는 한국어로
+
+
+async def test_front_door_goes_to_browse(booking):
+    async with make_client(booking, None) as client:
+        response = await client.get("/")
+
+    assert response.status_code == 307
+    assert response.headers["location"].endswith("/ui/restaurants")  # 맨 앞 주소는 404 대신 둘러보기로
