@@ -1,19 +1,26 @@
 # B-backend-Fastapi
 
-팀장님이 공유한 「처음 만나는 도메인 중심 4계층 아키텍처」 자료를 바탕으로 진행하는 FastAPI 백엔드 팀 프로젝트입니다. 5명이 도메인 모듈을 하나씩 맡아 구현합니다.
+「처음 만나는 도메인 중심 4계층 아키텍처」 자료를 바탕으로 만든 **식당 예약 서비스** FastAPI 백엔드 팀 프로젝트입니다. 5명이 도메인 모듈을 하나씩 맡아 구현했습니다.
 
-가게 예약 서비스 예시를 통해 **요청 받기 → 업무 규칙 확인 → DB 저장 → 결과 응답**의 흐름을 배우고 구현합니다.
+손님 예약, 운영자 예약 관리, 관리자 식당·예약 조회를 **요청 받기 → 업무 규칙 확인 → DB 저장 → 결과 응답**의 흐름으로 구현합니다.
 
-> **11월 11일 발표 안내** · 손님 예약, 운영자 예약 관리, 관리자 식당 검색이 연결돼 있습니다. [시연 환경 준비](demo/README.md) · [발표 순서](demo/SCENARIO.md) · [Jinja2 화면과 코드](docs/JINJA2_TEMPLATE_GUIDE.md)
+## 시연 영상
+
+https://github.com/user-attachments/assets/34e192ff-7359-48f8-abd9-4d0580655602
+
+왼쪽은 화면(Jinja2)·API 호출, 오른쪽은 실시간 서버 로그입니다 (약 1분 40초).
+
+- **손님:** 회원가입 → 식당 고르기 → 날짜·인원·시간 선택 예약, 같은 시간 중복 예약은 `409`로 거절
+- **운영자:** 내 식당 예약 목록에서 입장·노쇼·취소 처리, 메뉴 등록·수정·삭제, 예약 CSV 내려받기
+- **관리자·오류 처리:** 관리자 취소, 권한 없는 접근 `401`/`403`, 입력 오류 `422`, 없는 식당 `404`, 로그인 시도 제한 `429`
 
 | 문서 | 내용 |
 | --- | --- |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | 모듈·계층 구조, ERD, 예약 규칙, API, 트랜잭션 |
-| [API_SPEC](docs/API_SPEC.md) | API 명세 작성 기준, 공통 응답·에러 형식, 템플릿 |
-| [BACKEND_PLAN](docs/BACKEND_PLAN.md) | 담당 1~5별 모듈·테이블·API·배울 것 |
-| [ROADMAP](docs/ROADMAP.md) | 12일 일정과 체크포인트 |
-| [WORKFLOW](docs/WORKFLOW.md) | 브랜치·리뷰·통합 방식 |
+| [API_SPEC](docs/API_SPEC.md) | API 명세, 공통 응답·에러 형식 |
+| [JINJA2_TEMPLATE_GUIDE](docs/JINJA2_TEMPLATE_GUIDE.md) | Jinja2 화면과 코드 |
 | [TEAM_CONVENTIONS](docs/TEAM_CONVENTIONS.md) | 코드·API·DB·테스트 규칙 |
+| [시연 환경 준비](demo/README.md) · [시연 순서](demo/SCENARIO.md) | 시연 데이터·서버 로그 창 실행, 발표 흐름 |
 
 ## 프로젝트 목표
 
@@ -22,9 +29,8 @@
 - 예약 규칙을 순수 파이썬 도메인 객체 안에 작성합니다.
 - PostgreSQL에 비동기로 데이터를 저장하고, 예약과 좌석 변경을 한 트랜잭션으로 처리합니다.
 - 로그인·로그아웃(토큰 차단)과 현재 사용자 확인, 역할·소유 기반 권한 확인을 구현합니다.
-- 동작을 확인한 결과와 개발 중 해결한 문제를 기록해 발표 자료로 정리합니다.
 
-## 사용할 기술
+## 사용 기술
 
 | 구분 | 사용 기술 |
 | --- | --- |
@@ -33,13 +39,11 @@
 | 데이터 검증 | Pydantic |
 | 데이터 저장 | PostgreSQL 17 (Docker Compose), SQLAlchemy 비동기 ORM, asyncpg |
 | 인증 | OAuth2 비밀번호 폼, JWT(PyJWT), bcrypt |
+| 화면 | Jinja2 템플릿 |
 | 테스트 | pytest, pytest-asyncio, httpx(`AsyncClient`) |
 | 코드 검사 | ruff |
-| 화면 | Jinja2 템플릿 (담당 5, #17에서 설치) |
 
-**비동기 DB 연결은 필수입니다.** 예약 생성에는 행 락을 넣고, 여러 요청이 같은 좌석을 동시에 예약하는 상황을 **실제로 재현해 검증하는 것은 선택 도전 기능**입니다.
-
-**범위에서 뺀 것 (2026-10-28)**: 프론트 연결(React 등), CI, Redis 캐시. API는 Swagger UI(`/docs`)와 pytest로 확인합니다. **Jinja2 화면은 2026-11-02 회의에서 다시 넣었습니다** (담당 5: 식당 목록·상세).
+프론트 프레임워크(React 등), CI, Redis 캐시, 실제 결제·메일·SMS 연동은 범위에서 제외했습니다. API는 Swagger UI(`/docs`)와 pytest로 확인합니다.
 
 ## 가게 예약 도메인
 
@@ -51,7 +55,7 @@
 | `TimeSlot` | `slot` | 이용 시간, 총 수용 인원, 예약된 인원, 1회 최대 인원을 가진 시간대 |
 | `Reservation` | `reservation` | 어느 회원이 어떤 시간대에 몇 명을 예약했는지 나타내는 내역 |
 
-운영자는 별도 소속 테이블 없이 `restaurants.owner_id`로 가게와 연결합니다. 전체 ERD(테이블 6개)는 [ARCHITECTURE 3장](docs/ARCHITECTURE.md#3-데이터-모델-erd)에 있습니다.
+운영자는 별도 소속 테이블 없이 `restaurants.owner_id`로 가게와 연결합니다. 사용자 id는 UUID, 나머지 테이블 id는 BIGINT입니다. 전체 ERD(테이블 6개)는 [ARCHITECTURE 3장](docs/ARCHITECTURE.md#3-데이터-모델-erd)에 있습니다.
 
 주요 규칙:
 
@@ -87,7 +91,7 @@ flowchart TD
 - 레포지토리는 DB 모델을 순수 도메인 객체로 변환해 반환합니다.
 - 서비스는 업무 규칙을 도메인에 맡기고, 여러 변경을 저장한 뒤 `commit()`으로 함께 확정합니다.
 - 라우터는 업무 처리 결과와 예외를 API 응답으로 바꿉니다.
-- 공통 DB 세션을 서비스에 전달하는 연결 코드는 허용하되, 라우터에 SQL과 업무 규칙을 모아 작성하지 않습니다.
+- 로그인한 사용자는 `Depends(get_authenticated_user)`로 받은 `AuthenticatedUser`(`user_id`, `role`)로 다룹니다.
 - 모듈 사이에서 무엇을 가져다 쓸 수 있는지는 [ARCHITECTURE 2장](docs/ARCHITECTURE.md#모듈-사이-참조-규칙)을 따릅니다.
 
 ### 폴더 구조와 담당
@@ -95,7 +99,7 @@ flowchart TD
 ```text
 src/
 ├── main.py              # 앱 생성, lifespan(테이블 생성 + 시드), 미들웨어, 라우터 등록
-├── common/              # DB 세션, ORM Base(model.py), 설정, 공통 에러 형식, Page[T], 미들웨어
+├── common/              # DB 세션, ORM Base, 설정, 공통 에러 형식, Page[T], 미들웨어
 ├── auth/                # 담당 1 강성수: 로그인 · 로그아웃 · 현재 사용자 의존성
 ├── user/                # 담당 1 강성수: 회원가입 · 역할 변경 · 내 정보 조회
 │   ├── domain/
@@ -106,18 +110,16 @@ src/
 ├── slot/                # 담당 3 이영민: 예약 시간대 · 예약 가능 조회 · 시드
 ├── reservation/         # 담당 4 김민지: 예약 생성·취소 / 담당 5 최지훈: 예약 조회
 ├── owner/               # 담당 5 최지훈: 운영자 권한 검사 · 운영자 조회 (자기 테이블 없음)
-├── browse/              # 담당 5 최지훈: 손님 식당 둘러보기 조회 (구·동·음식 종류, 이름·메뉴·주소 검색, 화면 전용)
-├── admin/               # 담당 5 최지훈: 관리자 조회 (운영자+식당 수, 예약+예약자, 화면 전용, domain 없음)
+├── browse/              # 담당 5 최지훈: 손님 식당 둘러보기 조회 (화면 전용)
+├── admin/               # 담당 5 최지훈: 관리자 조회 (화면 전용, domain 없음)
 ├── web.py               # 담당 5 최지훈: Jinja2 화면 라우터 /ui (손님·운영자·관리자)
-├── web_auth.py          # 담당 5 최지훈: 화면 로그인 (JWT를 HttpOnly 쿠키에, 담당 1 AuthService 사용)
+├── web_auth.py          # 담당 5 최지훈: 화면 로그인 (JWT를 HttpOnly 쿠키에)
 ├── web_data.py          # 담당 5 최지훈: 화면 ↔ 운영자 매니저 연결
 ├── seed.py              # 담당 3 이영민: 시드 (lifespan에서 한 번)
 ├── templates/           # 담당 5 최지훈: HTML 템플릿 (base + components include)
 └── static/              # 담당 5 최지훈: CSS
-demo/                    # 담당 5 최지훈: 시연 앱 (서버 로그 창·계정 바꾸기·시간대 채우기, 팀 앱을 감싸서 켬, src/는 안 고침)
+demo/                    # 담당 5 최지훈: 시연 앱 (서버 로그 창·계정 바꾸기·시간대 채우기)
 ```
-
-각 모듈·계층 패키지에 `__init__.py`를 포함합니다. 처음의 레이어 우선 골격은 위 모듈 구조로 옮겼습니다 (`src/common/database.py`).
 
 ## 예약 요청 하나가 처리되는 순서
 
@@ -128,110 +130,36 @@ demo/                    # 담당 5 최지훈: 시연 앱 (서버 로그 창·�
 3. 레포지토리가 DB 모델을 도메인 객체로 변환합니다.
 4. 도메인이 시작 시각·인원·잔여석 규칙을 검사하고 좌석과 예약 상태를 변경합니다.
 5. 레포지토리가 시간대와 예약 변경 내용을 저장합니다.
-6. 서비스가 좌석 변경과 예약 생성을 하나의 트랜잭션으로 확정합니다.
+6. 서비스가 좌석 변경과 예약 생성을 하나의 트랜잭션으로 확정합니다. 락 대기가 길어지면(기본 3초) 트랜잭션을 끊고 오류로 응답합니다.
 7. 라우터가 성공 결과(201) 또는 오류(409 등)를 응답합니다.
 
-API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
+## 구현 범위
 
-## 필수 구현 범위
-
-| 항목 | 구현할 내용 |
+| 항목 | 구현 내용 |
 | --- | --- |
 | 구조와 업무 규칙 | 도메인 모듈별 4계층, 단방향 의존성, 순수 도메인 검증과 상태 변경 |
 | DB와 저장 | 비동기 연결, ORM 모델과 도메인 변환, 서비스의 트랜잭션 제어, 행 락 |
 | API | Pydantic 요청·응답 검증, 경로·쿼리 처리, 검색·필터·정렬·페이지네이션 |
 | 예외 처리 | 잘못된 입력, 규칙 위반, 없는 대상에 맞는 공통 형식 오류 응답 |
-| 인증과 보안 | 비밀번호 해시, OAuth2 로그인, JWT 발급, 로그아웃 토큰 차단(블랙리스트), 역할·소유 권한 확인, 손님 회원가입 |
+| 인증과 보안 | 비밀번호 해시, OAuth2 로그인, JWT 발급, 로그아웃 토큰 차단, 로그인 시도 제한, 역할·소유 권한 확인, 손님 회원가입 |
 | 공통 처리 | CORS, 요청 로그와 처리 시간 기록 |
-| 화면 | Jinja2 템플릿 화면 (담당 5). 손님: 식당 둘러보기 `/ui/restaurants`(이름·메뉴·주소 전체 검색, 음식 종류·구·동, 10개씩), 상세(대표 사진·메뉴)에서 날짜·인원·시간 골라 예약, 내 예약 `/ui/my/reservations`에서 취소, 회원가입 `/ui/signup`. 운영자: 내 식당 `/ui/owner/restaurants`, 식당 예약 `.../{id}/reservations`(예약자 이름, 입장·노쇼·이유 고르는 취소). 관리자: 운영자 목록 `/ui/admin/owners` → 식당 → 예약+예약자(이유+메모 취소). 로그인 `/ui`(JWT를 HttpOnly 쿠키에, 로그아웃 시 토큰 차단). `/`는 식당 둘러보기로 |
-| 시작 데이터 | lifespan을 이용한 테이블 생성과 시연용 데이터 20건 이상, 재시작 시 중복 방지 |
-| 문서와 발표 | 실행 안내, 구조도, 동작 캡처, 팀 기록과 발표 자료 |
+| 시작 데이터 | lifespan을 이용한 테이블 생성과 시연용 시드, 재시작 시 중복 방지 |
 
-## 선택 도전 기능
+### 화면 (Jinja2)
 
-필수 기능을 완성한 뒤 팀에서 선택합니다.
-
-- **A 동시성 제어 검증:** 동시에 요청이 몰리는 상황을 독립 DB 세션으로 재현하고, 행 락이 초과 예약을 막는지 확인합니다. 예약 생성·취소 매니저에 행 락은 들어갔고(#37), 동시 요청 재현은 아직입니다.
-- **B 후속 작업과 다운로드:** `BackgroundTasks`로 후속 로그를 처리하고 `StreamingResponse`로 CSV를 내려받습니다. **완료 (#34)**: 운영자 식당 예약 CSV 내려받기 + 응답 뒤 로그.
-- **C 회원가입:** 회원가입 API로 고객 계정을 만듭니다.
-
-프론트 연결(React 등), CI, Redis 캐시, 예약 요청 중복 방지(멱등성)는 범위에서 제외합니다. Jinja2 화면은 필수 범위에 넣었습니다 (2026-11-02). 실제 결제 연동과 상용 메일·SMS 발송도 제외합니다. 외부 배포는 제출 조건일 때만 합니다.
-
-## 현재 구현과 발표 흐름
-
-| 역할 | 발표에서 할 일 | 화면에서 확인할 결과 |
+| 역할 | 주소 | 할 수 있는 일 |
 | --- | --- | --- |
-| 손님 | 회원가입 → 식당 검색 → 시간대를 골라 4명 예약 | 직전 잔여석이 10석이면 완료 안내와 시간 버튼에 남은 6석 표시 |
-| 손님 | 한옥집 기본 시드 첫날 20시를 새 손님으로 선택 | ‘매진 · 남은 0석’. 시연 앱에서 1명으로 예약하면 로그에 `409 SLOT_SOLD_OUT` |
-| 운영자 | 내 식당의 예약 조회 → 입장 또는 사유를 골라 취소 | 시작 전 일반 취소는 좌석 복구, 노쇼는 좌석 유지 |
-| 관리자 | 상호로 식당 찾기 → 예약 목록 열기 | 검색어가 없으면 최근 예약 접수순 10곳. 시연 앱에서 3초 주기로 식당 표 갱신 |
+| 공통 | `/ui`, `/ui/signup` | 로그인(JWT를 HttpOnly 쿠키에, 로그아웃 시 토큰 차단), 회원가입. `/`는 식당 둘러보기로 이동 |
+| 손님 | `/ui/restaurants` | 이름·메뉴·주소 검색, 음식 종류·구·동 필터, 10개씩 보기. 상세(대표 사진·메뉴)에서 날짜·인원·시간을 골라 예약 |
+| 손님 | `/ui/my/reservations` | 내 예약 확인과 취소 |
+| 운영자 | `/ui/owner/restaurants` | 내 식당 목록, 식당별 예약(예약자 이름)에서 입장·노쇼·이유를 고르는 취소 |
+| 관리자 | `/ui/admin/owners` | 운영자 목록 → 식당 → 예약+예약자, 이유+메모를 남기는 취소 |
 
-앱 시작 시 기본 시드를 넣습니다. 발표용 식당 200곳·대표 사진 50장 및 이후 날짜의 슬롯은 [시연 환경 준비](demo/README.md)를 따릅니다.
+### 선택 도전 기능
 
-### 주요 PR 이력
-
-각 행은 해당 PR 당시의 기록입니다.
-
-| PR | 담당 | 들어온 것 | 쉽게 말하면 |
-| --- | --- | --- | --- |
-| #1 | 1 강성수 | uv 프로젝트, Docker PostgreSQL, 비동기 DB 연결 | 프로젝트를 켜고 DB에 붙을 준비 |
-| #2 | 5 최지훈 | `require_owner` | 운영자만 통과시키는 문. 안에서 쓰는 부품(`get_current_user`, 403 예외)이 아직 없어 실행은 아직 |
-| #3 | 1 강성수 | 응답 봉투 `APIResponse`, 에러 코드표, 요청 로그·CORS 미들웨어, ORM `Base`, DB 세션 `get_session`, `User` 도메인, auth·user 라우터 골격 | 모든 응답을 같은 모양으로 + 회원 기능의 뼈대 |
-| #4 | 4 김민지 | `ReservationModel`, `Reservation.create()`, `ReservationOut` | 예약 표와 예약 응답 모양 |
-| #6 | 3 이영민 | `TimeSlot` 규칙, 슬롯 에러 3개 | 자리 계산 규칙 (문법 오류는 #8에서 고침) |
-| #7 | 5 최지훈 | 운영자 식당 목록, 운영자 식당 예약 목록 창구·매니저, `container.py`의 `create_owner_service` | 운영자 조회. 식당·페이지 부품이 없어 실행은 아직 |
-| #8 | 1 강성수 | `AppError` 계열 예외(`Unauthorized`·`Forbidden`·`NotFound`·`InvalidInput`) + 공통 에러 핸들러, `get_current_user` 자리, 회원가입 서비스, 비밀번호 해시, **사용자 id UUID** | 에러를 한곳에서 봉투로 바꾸기 + 회원 규칙 |
-| #10 | 3 이영민 | 슬롯 예외에 `error_code` 붙임, `seoul_day_range`·`seoul_now`, 슬롯 테스트 | 슬롯 규칙 위반이 500이 아니라 409로 나감 |
-| #12 | 1 강성수 | 422 검증 문구 한국어, `HTTPException`도 실패 봉투로 | 입력 오류도 같은 봉투·한국어로 나감 |
-| #14 | 1 강성수 | **`get_current_user` → `get_authenticated_user`**, 돌려주는 값 `User` → **`AuthenticatedUser`**(`user_id`·`role`·`is_owner()`·`is_customer()`, `auth/domain/value_object.py`), `UserModel`, `Email` 값 객체, `create_user_service` | 로그인한 사람을 가벼운 값 하나로 받음. 이름이 바뀌어 쓰는 쪽(담당 2·4·5)도 맞춰야 함 |
-| #15 | 4 김민지 | `Reservation.cancel()`(재취소 409 `ALREADY_CANCELLED`), `reservations.user_id` UUID | 예약 취소 규칙 |
-| #16 | 5 최지훈 | owner를 #14 이름(`get_authenticated_user`·`is_owner()`)에 맞춤, 운영자 창고, `GET /users/me/reservations`·`GET /reservations/{reservation_id}` 창구·매니저·창고, `create_reservation_query_service`, 문서 갱신 | 운영자 API와 내 예약 API 4개 코드. `main.py` 등록은 부품이 들어온 뒤 |
-| #17 | 5 최지훈 | Jinja2 화면 틀 `/ui`(로그인·내 식당·식당 예약), `web.py`·`web_data.py`·`templates/`·`static/`, `jinja2` 의존성 | 운영자 화면 3개. 데이터 연결은 인증 구현 뒤 |
-| #18 | 1 강성수 | `UnitOfWork` 포트·`SQLAlchemyUnitOfWork`, `SQLAlchemyUserRepository` 구현, `User.create()`에서 UUID 부여, 요청 필드 `row_password` → `password` | 회원가입이 저장 뒤 한 번 commit. 동시 가입 중복도 400으로 |
-| #19 | 5 최지훈 | 내 예약 목록 정렬에 예약 번호 추가 | 같은 시각 예약이 있어도 페이지가 흔들리지 않음 |
-| #20 | 5 최지훈 | 템플릿을 `components/`(header·sidebar·footer) include 구조로 정리 | 화면 모양은 그대로 |
-| #21 | 2 김태양 | `Page[T]`, `PageParams`, `page_params` | 목록 응답 모양 + 페이지 번호 검사 |
-| #22 | 1 강성수 | 관리자 역할 `ADMIN`, `require_admin`, `change_role`(CUSTOMER↔OWNER), 기존 사용자 저장을 갱신(merge)으로 | 관리자가 운영자 역할을 줄 수 있게 (HTTP API는 아직) |
-| #23 | 4 김민지 | `Reservation.can_cancel(user_id)`(본인·확정 상태), `cancel()`에서 `slot` 인자 제거 | 취소 버튼을 보여 줄지 판단. 시작 여부는 서비스가 확인 |
-| #24 | 3 이영민 | `ReservationSlotModel`, `SlotRepository`·`SQLAlchemySlotRepository` | 슬롯 표와 저장소. `restaurants` 표가 없어 FK는 아직 못 묶음 |
-| #25 | 1 강성수 | 회원가입 API `POST /api/v1/users`, `container.wire_dependencies(app)` | 회원가입 창구 |
-| #26 | 1 강성수 | dev 통합본(#14~#25)을 main에 반영 | main 갱신 |
-| #27 | 5 최지훈 | 운영자·내 예약 창고의 슬롯 변환을 #24 이름 `_to_domain`에 맞춤, 낡은 주석 정리 | 이름 맞추기 |
-| #28 | 1 강성수 | 문서에 #16~#25 반영 (main) | 문서 최신화 |
-| #29 | 4 김민지 | `ReservationRepository`·`SQLAlchemyReservationRepository`(`exists_confirmed`·`add`·`get_for_update`·`save`), `to_reservation` | 예약 창고. 담당 5 조회 창고도 `to_reservation`을 씀 |
-| #30 | 2 김태양 | `Restaurant`·`Menu` 도메인(`is_owned_by`, `owner_id` UUID), `RestaurantModel`·`MenuModel`, `to_restaurant` | 식당 표와 "내 식당인가" 규칙 |
-| #31 | 1 강성수 | `JwtTokenProvider`(HS512, 토큰 만들기·읽기), 로그아웃 명단 표·창고, `main.py`의 `wire_dependencies` 연결 | 출입증 부품. 회원가입이 실제로 동작 |
-| #32 | 2 김태양 | 식당 목록 `GET /restaurants`(검색 `q`·음식 종류 `cuisine`·정렬·페이지)·상세 `GET /restaurants/{id}`, `RestaurantService`, `RestaurantOut` | 로그인 없이 보는 식당 API |
-| #33 | 3 이영민 | `SlotService.get_availability`, `SlotOut`·`AvailabilityOut` | 빈자리 조회 매니저와 응답 모양 (창구는 아직) |
-| #34 | 5 최지훈 | 운영자 식당 예약 CSV 내려받기(`StreamingResponse`·`BackgroundTasks`, 선택 B), 담당 5 테스트 10개 | 엑셀로 여는 예약 목록 + 403·404 판단 테스트 |
-| #35 | 4 김민지 | `ReservationOut.from_domain(reservation, slot, viewer_id, now)`, `can_cancel`에 "시작 전" 조건 | 예약 응답을 만드는 곳 하나 |
-| #36 | 1 강성수 | 로그인 `POST /auth/login`(봉투 없는 OAuth2 토큰 응답), `AuthService`, `get_authenticated_user` 진짜 구현 | **로그인이 실제로 동작.** `/docs` Authorize 가능 |
-| #37 | 4 김민지 | `ReservationService.create`·`cancel`(슬롯 → 예약 순서로 행 락, 끝에 commit 한 번), 확정 예약 중복을 막는 부분 unique 인덱스, 시작한 예약 취소 409, `UnitOfWork`를 `common`으로 옮김 | 예약하기·취소 매니저 (창구는 아직) |
-| #38 | 5 최지훈 | `main.py`에 운영자·내 예약 창구 등록, 창구 3곳을 `from_domain` 새 모양으로, 응답 테스트 2개 | `/docs`에 담당 5 API 5개 |
-| #48 | 5 최지훈 | Jinja2 화면 연결: 손님 둘러보기·예약하기(#46 매니저), 화면 로그인(쿠키 JWT), 운영자 화면, 관리자 화면 3개, 시드 관리자 계정 | 손님·운영자·관리자 세 공간 |
-| #50 | 5 최지훈 | 시연용 서버 로그 창(`demo/`), 큰 번호·쪽 번호 422, 둘러보기 쪽 넘김 순서 유지 | 시연 때 서버 로그를 화면에서 확인 |
-| #59 | 5 최지훈 | 손님·운영자·관리자 화면, 식당 사진·지역, 관리자 검색·최근 예약 정렬, 예약 후 잔여석과 매진 0석 표시 | [시연 순서](demo/SCENARIO.md) |
-
-실행 중인 앱의 전체 API는 `/docs`에서 확인할 수 있습니다.
-
-**사용자 id는 UUID입니다 (#8).** 사용자 id를 받는 곳(`reservations.user_id`, `restaurants.owner_id`, `Reservation.user_id`, `ReservationOut.user_id`, `is_owned_by`)은 `int`가 아니라 `uuid.UUID`입니다. 예약 쪽은 #15, 식당 쪽은 #30에서 맞췄습니다. 나머지 테이블 id는 BIGINT 그대로입니다.
-
-**로그인한 사람은 `AuthenticatedUser`로 받습니다 (#14).** `Depends(get_authenticated_user)`를 쓰고, 번호는 `.user_id`, 운영자 여부는 `.is_owner()`로 봅니다. 예전 이름 `get_current_user`·`User`·`.id`는 쓰지 않습니다.
-
-### 발표 전 확인할 것
-
-- 시연 PC에서 [실행 안내](#실행-안내)를 따라 DB와 앱을 켜고, [시연 데이터](demo/README.md)를 준비합니다.
-- 손님과 관리자를 다른 브라우저 세션으로 열어 잔여석 차감과 관리자 표의 순서 변경을 함께 보여 줍니다.
-- Swagger에서는 예약 성공 HTTP 201과 매진 HTTP 409를, 화면에서는 완료·실패 안내와 시연 로그를 보여 줍니다.
-
-## 공부와 개발 기록
-
-- **데일리 기록:** 오늘 한 일, 다음 할 일, 막힌 점을 짧게 남깁니다.
-- **개념 노트:** 새로 이해한 개념을 자기 말과 예시로 설명합니다.
-- **문제 해결 기록:** 오류 원문, 재현 방법, 시도와 결과, 원인과 해결을 남깁니다.
-- **확인 증거:** 실제로 확인한 응답·저장 결과를 캡처합니다.
-
-이 기록을 모아 README, 팀 노션, 발표 자료를 만듭니다. 계획한 기능과 실제로 확인한 기능을 구분해 기록합니다.
+- **A 동시성 제어 검증:** 독립 DB 세션으로 동시 요청을 재현해, 행 락이 초과 예약과 중복 취소를 막는지 테스트로 확인합니다 (`tests/reservation/test_reservation_db.py`).
+- **B 후속 작업과 다운로드:** 운영자 식당 예약을 `StreamingResponse`로 CSV 내려받기, `BackgroundTasks`로 응답 뒤 로그 처리.
+- **C 회원가입:** 회원가입 API와 화면으로 손님 계정을 만듭니다.
 
 ## 실행 안내
 
@@ -242,7 +170,7 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
    POSTGRES_PASSWORD=<로컬 비밀번호>
    POSTGRES_DB=postgres
    POSTGRES_URL=postgresql+asyncpg://postgres:<로컬 비밀번호>@localhost:5432/postgres
-   # 로그인 토큰 서명 열쇠 (#31). 없거나 64바이트보다 짧으면 로그인 때 에러
+   # 로그인 토큰 서명 열쇠. 없거나 64바이트보다 짧으면 로그인 때 에러
    JWT_SECRET_KEY=<64바이트 이상 무작위 문자열>
    # 선택: 허용할 프론트 주소 (쉼표 구분, 기본값 http://localhost:3000)
    CORS_ORIGINS=http://localhost:3000
@@ -264,13 +192,13 @@ API 응답은 Swagger UI(`/docs`)·Postman·curl로 확인합니다.
    uv run python -c "import secrets; print(secrets.token_urlsafe(64))"
    ```
 
-3. 앱을 실행합니다. 시작할 때 lifespan이 테이블을 만들고, DB가 비어 있으면 시드(#47)를 넣습니다.
+3. 앱을 실행합니다. 시작할 때 lifespan이 테이블을 만들고, DB가 비어 있으면 시드를 넣습니다.
 
    ```bash
    uv run uvicorn main:app --app-dir src --reload
    ```
 
-   시연할 때는 화면 옆에 서버 로그 창을 붙여서 켭니다 (저장소 맨 위 폴더에서, 자세한 내용은 `demo/README.md`).
+   시연할 때는 화면 옆에 서버 로그 창을 붙여서 켭니다 (저장소 맨 위 폴더에서, 자세한 내용은 [시연 환경 준비](demo/README.md)).
 
    ```bash
    uv run uvicorn demo.log_panel_app:app
