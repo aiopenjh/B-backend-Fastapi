@@ -15,7 +15,7 @@ from reservation.domain.reservation import (
     Reservation,
     ReservationStatus,
 )
-from reservation.domain.value_object import ContactPhone
+from reservation.domain.value_object import Actor, ContactPhone
 from slot.domain.time_slot import TimeSlot
 
 # BIGINT 최댓값. 이보다 큰 id는 DB 오류(500) 대신 422로 막음
@@ -128,13 +128,16 @@ class ReservationOut(BaseModel):
         cls,
         reservation: Reservation,
         slot: TimeSlot,
-        viewer: AuthenticatedUser,
+        viewer: AuthenticatedUser | Actor,
         now: datetime,
         restaurant_owner_id: uuid.UUID | None = None,
         no_show_grace: timedelta = DEFAULT_NO_SHOW_GRACE,
     ) -> ReservationOut:
         """도메인 Reservation + TimeSlot -> 응답 DTO. 시각 칸은 서울 시간으로 바꿔 넣고, 버튼 표시·메모 공개는 도메인에 물어서 채운다.
-        viewer는 보는 사람(역할까지), restaurant_owner_id는 그 식당 주인. 운영자에게 버튼·메모를 보여 줄 때 필요하다."""
+        viewer는 보는 사람(역할까지), restaurant_owner_id는 그 식당 주인. 운영자에게 버튼·메모를 보여 줄 때 필요하다.
+        viewer는 로그인한 사람(AuthenticatedUser) 그대로 받아도 되고, 도메인에 묻기 전에 예약 쪽 Actor로 바꾼다."""
+        # 부르는 쪽(예약·조회·운영자 창구)은 바꾸지 않아도 되게, 바꿔 끼우기는 여기 한 곳에서 한다
+        viewer = Actor(viewer.user_id, viewer.role)
         # DB에서 꺼낸 시각은 UTC라서, 응답에서는 같은 순간을 서울 시계(+09:00)로 다시 읽어 내보낸다
         cancelled_at = reservation.cancelled_at
         checked_in_at = reservation.checked_in_at

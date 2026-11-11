@@ -10,6 +10,10 @@ class ReservationRepository(ABC):
     """예약 저장소 약속. 서비스는 이것만 보고, 실제 DB구현은 infrastructure의 SQLAlchemyReservationRepository."""
 
     @abstractmethod
+    async def set_time_limits(self) -> None:
+        """예약 생성·취소·입장 확인 : 잠그기 전에 이 트랜잭션에만 시간 상한(락 대기·쿼리·멈춤)을 건다. 값은 구현이 정한다"""
+
+    @abstractmethod
     async def exists_confirmed(self, user_id: uuid.UUID, slot_id: int) -> bool:
         """예약 생성 : 이 사용자가 이 슬롯에 CONFIRMED 예약이 있으면 True (중복 예약 확인)"""
 

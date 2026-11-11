@@ -1,16 +1,18 @@
-# [담당 4] 예약 도메인 규칙 테스트 : 생성, 취소, 취소 가능 여부
+# [담당 4] 예약 도메인 규칙 테스트 : 생성, 취소, 취소 가능 여부, 로그인 모듈과의 경계
+import ast
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
-from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.schemas import SEOUL
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
     CancellationNotAllowedError,
 )
 from reservation.domain.reservation import Reservation, ReservationStatus
+from reservation.domain.value_object import Actor, ActorRole
 from restaurant.domain.restaurant import Restaurant
 
 NOW = datetime(2026, 11, 3, 6, 0, tzinfo=SEOUL)
@@ -21,10 +23,10 @@ OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
 OTHER_OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000004")
 ADMIN_ID = uuid.UUID("00000000-0000-4000-8000-000000000005")
 
-ME = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)  # 예약한 손님(나)
-OWNER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)  # 1번 식당 주인
-OTHER_OWNER = AuthenticatedUser(user_id=OTHER_OWNER_ID, role=AuthRole.OWNER)
-ADMIN = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
+ME = Actor(user_id=USER_ID, role=ActorRole.CUSTOMER)  # 예약한 손님(나)
+OWNER = Actor(user_id=OWNER_ID, role=ActorRole.OWNER)  # 1번 식당 주인
+OTHER_OWNER = Actor(user_id=OTHER_OWNER_ID, role=ActorRole.OWNER)
+ADMIN = Actor(user_id=ADMIN_ID, role=ActorRole.ADMIN)
 
 # 1번 식당 (주인은 OWNER_ID)
 RESTAURANT = Restaurant(
@@ -122,28 +124,28 @@ def make_reservation() -> Reservation:
 
 # 예약자 본인은 취소할 수 있다
 def test_can_be_cancelled_by_reservation_owner():
-    me = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)
+    me = Actor(user_id=USER_ID, role=ActorRole.CUSTOMER)
 
     assert make_reservation().can_be_cancelled_by(me, RESTAURANT.owner_id) is True
 
 
 # 다른 손님은 취소할 수 없다
 def test_cannot_be_cancelled_by_other_customer():
-    other = AuthenticatedUser(user_id=OTHER_USER_ID, role=AuthRole.CUSTOMER)
+    other = Actor(user_id=OTHER_USER_ID, role=ActorRole.CUSTOMER)
 
     assert make_reservation().can_be_cancelled_by(other, RESTAURANT.owner_id) is False
 
 
 # 그 식당의 운영자는 손님 예약을 취소할 수 있다
 def test_can_be_cancelled_by_restaurant_owner():
-    owner = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)
+    owner = Actor(user_id=OWNER_ID, role=ActorRole.OWNER)
 
     assert make_reservation().can_be_cancelled_by(owner, RESTAURANT.owner_id) is True
 
 
 # 다른 식당의 운영자는 취소할 수 없다
 def test_cannot_be_cancelled_by_other_restaurant_owner():
-    other_owner = AuthenticatedUser(user_id=OTHER_OWNER_ID, role=AuthRole.OWNER)
+    other_owner = Actor(user_id=OTHER_OWNER_ID, role=ActorRole.OWNER)
 
     assert (
         make_reservation().can_be_cancelled_by(other_owner, RESTAURANT.owner_id)
@@ -153,7 +155,7 @@ def test_cannot_be_cancelled_by_other_restaurant_owner():
 
 # 운영자 역할이 아니면 식당 주인 id와 같아도 운영자로 보지 않는다
 def test_cannot_be_cancelled_by_customer_with_owner_id():
-    not_owner = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.CUSTOMER)
+    not_owner = Actor(user_id=OWNER_ID, role=ActorRole.CUSTOMER)
 
     assert (
         make_reservation().can_be_cancelled_by(not_owner, RESTAURANT.owner_id) is False
@@ -162,7 +164,7 @@ def test_cannot_be_cancelled_by_customer_with_owner_id():
 
 # 관리자는 어느 식당 예약이든 취소할 수 있다
 def test_can_be_cancelled_by_admin():
-    admin = AuthenticatedUser(user_id=ADMIN_ID, role=AuthRole.ADMIN)
+    admin = Actor(user_id=ADMIN_ID, role=ActorRole.ADMIN)
 
     assert make_reservation().can_be_cancelled_by(admin, RESTAURANT.owner_id) is True
 
@@ -238,3 +240,26 @@ def test_can_cancel_false_for_admin_and_owner_after_start_or_cancelled():
             )
             is False
         )
+
+
+# 예약 도메인과 예약 매니저는 로그인 모듈(auth)을 직접 모른다. 입구(라우터·응답 스키마)에서 Actor로 바꿔 넘긴다
+# Actor와 AuthenticatedUser는 모양이 같아서 잘못 넘겨도 다른 테스트는 통과한다. 그래서 import를 직접 본다
+SRC = Path(__file__).resolve().parents[2] / "src"
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted((SRC / "reservation" / "domain").glob("*.py"))
+    + [SRC / "reservation" / "application" / "service.py"],
+    ids=lambda path: path.relative_to(SRC).as_posix(),
+)
+def test_reservation_core_does_not_import_auth(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    imported = [
+        node.module if isinstance(node, ast.ImportFrom) else alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for alias in (node.names if isinstance(node, ast.Import) else [None])
+    ]
+    # auth 또는 auth.xxx를 가져오면 안 된다
+    assert [name for name in imported if name and name.split(".")[0] == "auth"] == []

@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from auth.domain.value_object import AuthenticatedUser, AuthRole
 from common.schemas import SEOUL
 from reservation.domain.exceptions import (
     AlreadyCancelledError,
@@ -21,6 +20,7 @@ from reservation.domain.reservation import (
     Reservation,
     ReservationStatus,
 )
+from reservation.domain.value_object import Actor, ActorRole
 
 USER_ID = uuid.UUID("00000000-0000-4000-8000-000000000001")
 STARTS_AT = datetime(2026, 12, 3, 16, 0, tzinfo=SEOUL)  # 4시 슬롯
@@ -239,14 +239,14 @@ def test_check_in_twice_or_cancelled_is_rejected():
 
 
 OWNER_ID = uuid.UUID("00000000-0000-4000-8000-000000000003")
-OWNER = AuthenticatedUser(user_id=OWNER_ID, role=AuthRole.OWNER)  # 이 식당 주인
-OTHER_OWNER = AuthenticatedUser(
-    user_id=uuid.UUID("00000000-0000-4000-8000-000000000004"), role=AuthRole.OWNER
+OWNER = Actor(user_id=OWNER_ID, role=ActorRole.OWNER)  # 이 식당 주인
+OTHER_OWNER = Actor(
+    user_id=uuid.UUID("00000000-0000-4000-8000-000000000004"), role=ActorRole.OWNER
 )
-ADMIN = AuthenticatedUser(
-    user_id=uuid.UUID("00000000-0000-4000-8000-000000000005"), role=AuthRole.ADMIN
+ADMIN = Actor(
+    user_id=uuid.UUID("00000000-0000-4000-8000-000000000005"), role=ActorRole.ADMIN
 )
-CUSTOMER = AuthenticatedUser(user_id=USER_ID, role=AuthRole.CUSTOMER)  # 예약한 손님
+CUSTOMER = Actor(user_id=USER_ID, role=ActorRole.CUSTOMER)  # 예약한 손님
 
 
 # 입장 버튼은 그 식당 운영자에게, 입장 시간 안에, 확정·미입장 예약에만 보인다
